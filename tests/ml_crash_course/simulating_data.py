@@ -107,25 +107,25 @@ def duffing_produce_training_batch( key, batchsize, ranges , num_frequency_bins,
     return x, jnp.stack([omega0s,gammas,epsilons],1)
 
 
+if __name__ == "__main__":
+    # Example usage
+    key = jax.random.key( 44 )
+    num_panels = 10
+    npixels = 200
 
-# Example usage
-key = jax.random.key( 44 )
-num_panels = 10
-npixels = 200
+    start_time = timeit.default_timer()
+    x, y_target = duffing_produce_training_batch(key, num_panels,
+                                                [[-1., 1.], [0.5, 1.5], [0.0, 0.15]], npixels)
 
-start_time = timeit.default_timer()
-x, y_target = duffing_produce_training_batch(key, num_panels,
-                                             [[-1., 1.], [0.5, 1.5], [0.0, 0.15]], npixels)
-
-omegas = jnp.linspace(-4.,4.,npixels)
-fig,ax=plt.subplots(ncols = num_panels, sharey = True, figsize=(10,2))
-for idx in range(num_panels):
-    ax[idx].fill_between(omegas,0*omegas,x[idx,:])
-    ax[idx].set_ylim(0.,4.)
-    ax[idx].set_aspect(1.0)
-    ax[idx].axis('off')
-    omega0,gamma,epsilon=y_target[idx,:]
-plt.show()
-elapsed = timeit.default_timer() - start_time
-print(f"Time elapsed: {elapsed:.6f} seconds")
-    
+    omegas = jnp.linspace(-4.,4.,npixels)
+    fig,ax=plt.subplots(ncols = num_panels, sharey = True, figsize=(10,2))
+    for idx in range(num_panels):
+        ax[idx].fill_between(omegas,0*omegas,x[idx,:])
+        ax[idx].set_ylim(0.,4.)
+        ax[idx].set_aspect(1.0)
+        ax[idx].axis('off')
+        omega0,gamma,epsilon=y_target[idx,:]
+    plt.show()
+    elapsed = timeit.default_timer() - start_time
+    print(f"Time elapsed: {elapsed:.6f} seconds")
+        
