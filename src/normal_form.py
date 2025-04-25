@@ -1,118 +1,107 @@
-import jax.numpy as jnp
-from typing import Sequence, Dict, Callable
-import matplotlib.pyplot as plt
+from dataclasses import dataclass
 import numpy as np
-from scipy.integrate import solve_ivp
-import time
 
-def normal_form(parameters_modes: Sequence[Dict[str, jnp.ndarray]],
-                drive_frequency: float
-               ) -> Callable[[float, jnp.ndarray], jnp.ndarray]:
+@dataclass
+class NormalForm:
     """
-    Returns RHS(t, y) for the 1st-order system written in the image.
-    
-    y = [q₁, …, q_N, q̇₁, …, q̇_N]  (length 2N)
-
-    Each entry in `parameters_modes` must be a dictionary that contains
-    (for its own mode j):
-        'zeta'  : scalar damping ratio ζ_j
-        'omega' : scalar natural freq  ω_j
-        'z1'    : (N,)      array        z_{j i}
-        'z2'    : (N,N)     array        z_{j i k}
-        'z3'    : (N,N,N)   array        z_{j i k l}
-        'f'     : scalar forcing amplitude f_j
+    N       : int             — number of modes
+    c       : shape (N,)      — damping coefficients c_i
+    k       : shape (N,N)     — stiffness matrix k_{ij}
+    alpha   : shape (N,N,N)   — quadratic coeffs alpha_{i j k}
+    gamma   : shape (N,N,N,N) — cubic    coeffs gamma_{i j k l}
+    f       : shape (N,)      — forcing amplitudes f_i
+    omega_d : scalar          — driving frequency
     """
-    N = len(parameters_modes)
+    N: int
+    c: np.ndarray
+    k: np.ndarray
+    alpha: np.ndarray
+    gamma: np.ndarray
+    f: np.ndarray
+    omega_d: float
+
+    def __post_init__(self):
+        if self.N < 1:
+            raise ValueError("NormalForm must contain at least one mode")
+        if self.c.shape != (self.N,):
+            raise ValueError(f"Damping coefficients must be of shape ({self.N},)")
+        if self.k.shape != (self.N, self.N):
+            raise ValueError(f"Stiffness matrix must be of shape ({self.N}, {self.N})")
+        if self.alpha.shape != (self.N, self.N, self.N):
+            raise ValueError(f"Quadratic coeffs must be of shape ({self.N}, {self.N}, {self.N})")
+        if self.gamma.shape != (self.N, self.N, self.N, self.N):
+            raise ValueError(f"Cubic coeffs must be of shape ({self.N}, {self.N}, {self.N}, {self.N})")
+        if self.f.shape != (self.N,):
+            raise ValueError(f"Forcing amplitudes must be of shape ({self.N},)")
+        
+    @classmethod
+    def random(cls, N: int, seed: int = None) -> "NormalForm":
+        """
+        Create a NormalForm instance with random parameters.
+        """
+        rng = np.random.default_rng(seed)
+        c       = rng.uniform(0.0, 1.0, size=N)
+        k       = rng.uniform(0.0, 1.0, size=(N, N))
+        alpha   = rng.uniform(-1.0, 1.0, size=(N, N, N))
+        gamma   = rng.uniform(-1.0, 1.0, size=(N, N, N, N))
+        f       = rng.uniform(-1.0, 1.0, size=N)
+        omega_d = float(rng.uniform(0.0, 10.0))
+        return cls(N=N, c=c, k=k, alpha=alpha, gamma=gamma, f=f, omega_d=omega_d)
     
-    if N < 1:
-        raise ValueError("parameters_modes must contain at least one mode")
+    @classmethod
+    def example(cls) -> "NormalForm":
+        """
+        Create a NormalForm instance with example parameters.
+        """
+        N = 2
+        c = np.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
+        k = np.array([[10.0, 1.0], [ 1.0,12.0]])  
+        alpha = np.zeros((N, N, N))
+        alpha[0] = np.array([[0.0, 0.5], [0.5, 0.0]])
+        gamma = np.zeros((N, N, N, N))
+        f = np.array([1.0, 0.5])
+        omega_d = 3.0
+        return cls(N=N, c=c, k=k, alpha=alpha, gamma=gamma, f=f, omega_d=omega_d)
 
-    zeta  = np.array([p["zeta"]  for p in parameters_modes])      # (N,)
-    omega = np.array([p["omega"] for p in parameters_modes])      # (N,)
-    f_vec = np.array([p["f"]     for p in parameters_modes])      # (N,)
+    def rhs(self, t: float, state: np.ndarray, omega_d: float = None) -> np.ndarray:
+        """
+        Compute the time derivative of state = [q, v].
 
-    z1 = np.stack([p["z1"] for p in parameters_modes])            # (N, N)
-    z2 = np.stack([p["z2"] for p in parameters_modes])            # (N, N, N)
-    z3 = np.stack([p["z3"] for p in parameters_modes])            # (N, N, N, N)]
+        Parameters
+        ----------
+        t : float
+            Current time.
+        state : ndarray, shape (2*N,)
+            Concatenated [q (N,), v (N,)].
+
+        Returns
+        -------
+        dstate_dt : ndarray, shape (2*N,)
+            [v, a], where a includes linear, quadratic, cubic, and forcing terms.
+        """
+        if omega_d is None:
+            omega_d = self.omega_d
+        
+        # unpack
+        q = state[:self.N]
+        v = state[self.N:]
+
+        # linear part:  -c_i v_i   - sum_j k_{ij} q_j
+        #a_lin = -self.c * v - self.k @ q
+        a_lin = - self.k @ q # no damping term
+
+        # quadratic:  - sum_{j,k} alpha_{i j k} q_j q_k
+        a_quad = -np.einsum('ijk,j,k->i', self.alpha, q, q)
+
+        # cubic:      - sum_{j,k,l} gamma_{i j k l} q_j q_k q_l
+        a_cub  = -np.einsum('ijkl,j,k,l->i', self.gamma, q, q, q)
+
+        # forcing:    f_i * cos(omega_d * t)
+        a_forc = self.f * np.cos(omega_d * t)
+
+        # total acceleration
+        a = a_lin + a_quad + a_cub + a_forc
+
+        # return [dq/dt, dv/dt]
+        return np.concatenate([v, a])
     
-    def rhs(t: float, y: np.ndarray) -> np.ndarray:
-        q  = y[:N]          # modal coordinates
-        qd = y[N:]          # modal velocities
-
-        lin_damp   = -2.0 * zeta * omega * qd
-        lin_stiff  = -np.einsum("ji,i->j",   z1, q)
-        quad_stiff = -np.einsum("jik,i,k->j", z2, q, q)
-        cub_stiff  = -np.einsum("jikl,i,k,l->j", z3, q, q, q)
-        force      =  f_vec * np.cos(drive_frequency * t)
-
-        qdd = lin_damp + lin_stiff + quad_stiff + cub_stiff + force
-        return np.concatenate([qd, qdd])
-
-    return rhs
-
-def steady_state_amp(parameters_modes: Sequence[Dict[str, np.ndarray]],
-                     drive_frequency: float,
-                     y0: np.ndarray | None = None,
-                     t_end: float = 250.0,
-                     n_steps: int = 500,
-                     discard_frac: float = 0.8) -> float:
-    """
-    Integrate the system at a given drive frequency and return
-    max(|q₁|) over the steady-state portion of the response.
-    """
-    N  = len(parameters_modes)
-    if y0 is None:
-        y0 = np.zeros(2 * N)
-
-    rhs = normal_form(parameters_modes, drive_frequency)
-    t_eval = np.linspace(0.0, t_end, n_steps)
-
-    sol = solve_ivp(rhs,
-                    t_span=(t_eval[0], t_eval[-1]),
-                    y0=y0,
-                    t_eval=t_eval,
-                    rtol=1e-5, atol=1e-7,
-                    method="RK45")          # swap for "Radau"/"BDF" if stiff
-
-    q1 = sol.y[0]                              # first modal coordinate
-    tail = q1[int(discard_frac * len(q1)):]    # discard transients
-    return float(np.max(np.abs(tail)))
-
-if __name__ == "__main__":
-    # ------ define two coupled modes ------------------------------------
-    params = [
-        dict(zeta=0.01, omega=5.0,
-             z1=np.array([10.0, 1.0]),
-             z2=np.array([[0.0, 0.5],
-                          [0.5, 0.0]]),
-             z3=np.zeros((2, 2, 2)),
-             f =1.0),
-        dict(zeta=0.02, omega=8.0,
-             z1=np.array([1.0, 12.0]),
-             z2=np.zeros((2, 2)),
-             z3=np.zeros((2, 2, 2)),
-             f =0.5)
-    ]
-
-    # ------ sweep the drive frequency -----------------------------------
-    ω_min, ω_max, n_ω = 2.0, 4.0, 300
-    ω_grid = np.linspace(ω_min, ω_max, n_ω)
-
-    current_time = time.time()
-    
-    amps = np.array([
-        steady_state_amp(params, ω_d)
-        for ω_d in ω_grid
-    ])
-    
-    print(f"Elapsed time: {time.time() - current_time:.2f} seconds")
-
-    # ------ visualize ----------------------------------------------------
-    plt.figure(figsize=(7, 4))
-    plt.plot(ω_grid, amps, "-o", markersize=1)
-    plt.xlabel(r"Drive frequency  $\omega_d$  [rad s$^{-1}$]")
-    plt.ylabel(r"Steady-state amplitude  $|q_1|_{\max}$")
-    plt.title("Frequency-response curve (SciPy integrator)")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
