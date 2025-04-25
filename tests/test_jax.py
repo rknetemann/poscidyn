@@ -1,4 +1,4 @@
-import jax
+import test_jax
 import jax.numpy as jnp
 import numpy as np
 from timeit import timeit
@@ -13,6 +13,6 @@ numpy_time = timeit(lambda: f(x), number=10)
 print("NumPy:", numpy_time)
 
 # Measure execution time using JAX with JIT
-jax_func = jax.jit(f)
+jax_func = test_jax.jit(f)
 jax_time = timeit(lambda: jax_func(jnp.array(x)), number=10)
 print("JAX + JIT:", jax_time)

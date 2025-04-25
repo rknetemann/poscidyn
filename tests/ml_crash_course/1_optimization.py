@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 import jax.numpy as jnp
-from jax import grad
+from test_jax import grad
 
 def E(y,spring,length,mass_g):
     """

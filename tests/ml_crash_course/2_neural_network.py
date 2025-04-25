@@ -1,8 +1,8 @@
 from matplotlib import pyplot as plt
 
 import jax.numpy as jnp
-from jax import grad, vmap, jit, value_and_grad
-import jax
+from test_jax import grad, vmap, jit, value_and_grad
+import test_jax
 import jax.random
 
 import optax
@@ -37,8 +37,8 @@ def NN_init_params(key, num_neurons_layers):
     params['biases'] = []
     
     for lower_layer, higher_layer in zip( num_neurons_layers[:-1], num_neurons_layers[1:] ):
-        key,subkey = jax.random.split( key )
-        params['weights'].append( jax.random.normal( subkey,
+        key,subkey = test_jax.random.split( key )
+        params['weights'].append( test_jax.random.normal( subkey,
                                         [higher_layer,lower_layer] ) /  
                                  jnp.sqrt( lower_layer ) )
         
@@ -60,7 +60,7 @@ def mse_loss_batch(x, y_target, params):
 # take gradient with respect to params (argument number '2' out of 0,1,2)
 # also return value of loss:
 mse_loss_batch_val_grad = value_and_grad(mse_loss_batch, argnums=2)
-mse_loss_batch_val_grad = jax.jit( mse_loss_batch_val_grad  )
+mse_loss_batch_val_grad = test_jax.jit( mse_loss_batch_val_grad  )
 
 
 
@@ -74,8 +74,8 @@ def F(q):
 num_hidden_1 = 30 # number of neurons in hidden layer 1
 num_hidden_2 = 20
 
-key = jax.random.key( 45 )
-subkey, key = jax.random.split(key)
+key = test_jax.random.key( 45 )
+subkey, key = test_jax.random.split(key)
 params = NN_init_params( subkey, [1, num_hidden_1, num_hidden_2, 1] )
 
 learning_rate = 1e-2
@@ -97,8 +97,8 @@ losses=[]
 for idx_batch in range(num_training_batches):
     # get training batch, by evaluating F at
     # random locations:
-    subkey,key = jax.random.split( key )
-    x = jax.random.uniform( subkey, [batchsize, 1], minval = x_range[0], maxval = x_range[1])
+    subkey,key = test_jax.random.split( key )
+    x = test_jax.random.uniform( subkey, [batchsize, 1], minval = x_range[0], maxval = x_range[1])
     y_target = F( x ) # the true values
     
     # get loss and its gradient with respect to network parameters:

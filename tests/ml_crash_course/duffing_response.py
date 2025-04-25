@@ -1,8 +1,8 @@
 from matplotlib import pyplot as plt
 
 import jax.numpy as jnp
-from jax import grad, vmap, jit, value_and_grad
-import jax
+from test_jax import grad, vmap, jit, value_and_grad
+import test_jax
 import jax.random
 import timeit
 
@@ -26,7 +26,7 @@ def runge_kutta_step_with_params(X,params,t,rhs,dt):
 # we need this partial statement to tell jax
 # that the 'rhs' argument is not an array but something
 # else!
-@partial(jax.jit,static_argnames=['rhs'])
+@partial(test_jax.jit,static_argnames=['rhs'])
 def runge_kutta_solve(X0,rhs,ts,params):
     """
     Solve the differential equation dX/dt=rhs(X,params,t), for all (equally spaced) times in ts,
@@ -62,7 +62,7 @@ def runge_kutta_solve(X0,rhs,ts,params):
         x+=runge_kutta_step_with_params(x,params,t,rhs,dt)
         return x,x
     
-    _,Xs=jax.lax.scan(loop_body,X0,xs=ts)
+    _,Xs=test_jax.lax.scan(loop_body,X0,xs=ts)
     return Xs,ts
 
 def duffing_rhs(z,rhs_params,t):
@@ -85,8 +85,8 @@ def random_parameter_vectors( key, batchsize , ranges ):
     
     Returns: list of random vectors.
     """
-    subkeys = jax.random.split( key, len(ranges) )
-    return [ jax.random.uniform( subkey, [ batchsize ], 
+    subkeys = test_jax.random.split( key, len(ranges) )
+    return [ test_jax.random.uniform( subkey, [ batchsize ], 
                                       minval = value_range[0], maxval = value_range[1] )
             for subkey, value_range in zip(subkeys, ranges) ]
     
@@ -114,10 +114,10 @@ def duffing_produce_training_batch( key, batchsize, ranges , num_frequency_bins,
     omega0s, gammas, epsilons = random_parameter_vectors( key, batchsize, ranges )
     zs,_,_ = solve_duffing_parameter_batch( 0.0+0.0j, omega0s, gammas, epsilons, 
                                  force, omega_start, omega_end, t_end, n_steps )
-    x = jax.image.resize( jnp.abs(zs), [ batchsize, num_frequency_bins ] , "linear")
+    x = test_jax.image.resize( jnp.abs(zs), [ batchsize, num_frequency_bins ] , "linear")
     return x, jnp.stack([omega0s,gammas,epsilons],1)
 
-key = jax.random.key( 44 )
+key = test_jax.random.key( 44 )
 num_panels = 100
 npixels = 200
 

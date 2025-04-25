@@ -1,4 +1,4 @@
-import jax
+import test_jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
@@ -24,7 +24,7 @@ def coupled_oscillator(state, t, f, omega, params):
     return jnp.array([dx1dt, dv1dt, dx2dt, dv2dt])
 
 # A 4th-order Runge-Kutta step for the coupled system.
-@jax.jit
+@test_jax.jit
 def rk4_step_coupled(state, t, dt, f, omega, params):
     k1 = coupled_oscillator(state, t, f, omega, params)
     k2 = coupled_oscillator(state + dt/2 * k1, t + dt/2, f, omega, params)
@@ -45,7 +45,7 @@ def simulate_time_series_coupled(f, omega, params, dt=0.01, n_steps=8000):
         # record only the displacement of the primary mode x1
         return (new_state, new_t), new_state[0]
     
-    (final_state, final_t), x1_series = jax.lax.scan(step_fn, (state, t0), None, length=n_steps)
+    (final_state, final_t), x1_series = test_jax.lax.scan(step_fn, (state, t0), None, length=n_steps)
     return x1_series
 
 # Compute the steady-state amplitude by discarding a fraction of the time series as transient.
@@ -90,7 +90,7 @@ transient_fraction = 0.5  # discard the first half as transient
 results = {}
 for f in drive_amplitudes:
     # Vectorize the computation over frequency.
-    compute_for_freq = jax.jit(jax.vmap(
+    compute_for_freq = test_jax.jit(test_jax.vmap(
         lambda omega: compute_amplitude_coupled(f, omega, coupled_params, dt, n_steps, transient_fraction)
     ))
     amps = compute_for_freq(frequencies)
