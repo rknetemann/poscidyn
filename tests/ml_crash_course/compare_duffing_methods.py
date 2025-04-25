@@ -1,4 +1,8 @@
 import time
+import os
+
+os.environ["JAX_PLATFORMS"] = "cpu"  # Force JAX to use the CPU backend
+
 import numpy as np
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
