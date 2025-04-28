@@ -26,9 +26,6 @@ def runge_kutta_step_with_params(X,params,t,rhs,dt):
     k4=rhs(X+dt*k3,params,t+dt)
     return( (dt/6.)*(k1+2*k2+2*k3+k4) )
 
-# we need this partial statement to tell jax
-# that the 'rhs' argument is not an array but something
-# else!
 @partial(jax.jit,static_argnames=['rhs'])
 def runge_kutta_solve(X0,rhs,ts,params):
     """

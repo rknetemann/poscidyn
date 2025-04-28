@@ -1,47 +1,51 @@
 !----------------------------------------------------------------------
 !  oscillators.f90  –  N-DOF nonlinear forced oscillators
 !                     q̈ + c q̇ + k q + α q² + γ q³ = f cos(ω t)
-!                     transformed to 1st order and made autonomous
+!                     turned into 1st order and made autonomous
+!                     with the harmonic pair (y1,y2) = (cos ωt, sin ωt)
 !
-!  NDIM = 2*N + 1  (q, v = q̇, ϕ)     i = 1 … N
+!  NDIM = 2*N + 2
+!         ├─ q₁…qN       (positions)
+!         ├─ v₁…vN       (velocities)
+!         └─ y1, y2      (harmonic driver variables)
 !----------------------------------------------------------------------
 
       SUBROUTINE FUNC (NDIM,U,ICP,PAR,IJAC,F,DFDU,DFDP)
-!     -----  ----
       IMPLICIT NONE
       INTEGER NDIM, IJAC, ICP(*)
       DOUBLE PRECISION U(NDIM), PAR(*), F(NDIM), DFDU(*), DFDP(*)
 
-!*--- local bookkeeping
-      INTEGER, PARAMETER      :: MAXN = 10          ! enlarge if required
-      INTEGER                 :: N, i, j, k, l, idx
-      DOUBLE PRECISION        :: mass (MAXN), damp (MAXN), forc (MAXN)
-      DOUBLE PRECISION        :: kk (MAXN,MAXN)
-      DOUBLE PRECISION        :: aa (MAXN,MAXN,MAXN)
-      DOUBLE PRECISION        :: gg (MAXN,MAXN,MAXN,MAXN)
-      DOUBLE PRECISION        :: q  (MAXN), v  (MAXN), phi, omega
-      DOUBLE PRECISION        :: s_lin, s_quad, s_cub
+!*--- bookkeeping
+      INTEGER, PARAMETER          :: MAXN = 10
+      INTEGER                     :: N, i, j, k, l, idx
+      DOUBLE PRECISION            :: mass (MAXN), damp (MAXN), forc (MAXN)
+      DOUBLE PRECISION            :: kk (MAXN,MAXN)
+      DOUBLE PRECISION            :: aa (MAXN,MAXN,MAXN)
+      DOUBLE PRECISION            :: gg (MAXN,MAXN,MAXN,MAXN)
+      DOUBLE PRECISION            :: q  (MAXN), v  (MAXN)
+      DOUBLE PRECISION            :: y1, y2, omega
+      DOUBLE PRECISION            :: s_lin, s_quad, s_cub
 
 !*--- how many oscillators?
-      N = (NDIM-1)/2
+      N = (NDIM-2)/2
 
-!*--- unpack parameters ------------------------------------------------
+!*--- unpack parameters -----------------------------------------------
       idx = 1
-! masses mass(i)
+! masses
       DO i = 1, N
          mass(i) = PAR(idx);  idx = idx + 1
       END DO
-! damping damp(i)
+! damping
       DO i = 1, N
          damp(i) = PAR(idx);  idx = idx + 1
       END DO
-! stiffness k(i,j)
+! linear stiffness
       DO i = 1, N
          DO j = 1, N
             kk(i,j) = PAR(idx); idx = idx + 1
          END DO
       END DO
-! quadratic α(i,j,k)
+! quadratic coupling
       DO i = 1, N
          DO j = 1, N
             DO k = 1, N
@@ -49,7 +53,7 @@
             END DO
          END DO
       END DO
-! cubic γ(i,j,k,l)
+! cubic coupling
       DO i = 1, N
          DO j = 1, N
             DO k = 1, N
@@ -59,27 +63,28 @@
             END DO
          END DO
       END DO
-! forcing amplitudes forc(i)
+! forcing amplitudes  fᵢ
       DO i = 1, N
          forc(i) = PAR(idx);  idx = idx + 1
       END DO
-! forcing frequency ω
+! forcing frequency  ω
       omega = PAR(idx)
 
 !*--- state variables --------------------------------------------------
       DO i = 1, N
-         q(i) = U(i)           ! positions
-         v(i) = U(N+i)         ! velocities
+         q(i) = U(i)
+         v(i) = U(N+i)
       END DO
-      phi = U(2*N+1)           ! phase variable
+      y1 = U(2*N+1)
+      y2 = U(2*N+2)
 
 !*--- equations --------------------------------------------------------
-! first N:  q̇ᵢ = vᵢ
+! q̇ᵢ = vᵢ
       DO i = 1, N
          F(i) = v(i)
       END DO
 
-! next N:  v̇ᵢ = (-cᵢ vᵢ - Σk q - Σα q² - Σγ q³ + fᵢ cosϕ) / mᵢ
+! v̇ᵢ = ( -c v  -Σk q -Σα q² -Σγ q³ + fᵢ · y1 ) / mᵢ
       DO i = 1, N
          s_lin  = 0.d0
          s_quad = 0.d0
@@ -95,12 +100,13 @@
             END DO
          END DO
 
-         F(N+i) = (-damp(i)*v(i) - s_lin - s_quad - s_cub +           &
-     &             forc(i)*COS(phi)) / mass(i)
+         F(N+i) = (-damp(i)*v(i) - s_lin - s_quad - s_cub +            &
+     &             forc(i)*y1) / mass(i)
       END DO
 
-! last one:  ϕ̇ = ω
-      F(2*N+1) = omega
+! harmonic driver:  ẏ1 = -ω y2 ,   ẏ2 = ω y1
+      F(2*N+1) = -omega * y2
+      F(2*N+2) =  omega * y1
 
       RETURN
       END SUBROUTINE FUNC
@@ -108,58 +114,50 @@
 
 
       SUBROUTINE STPNT (NDIM,U,PAR,T)
-!     ------- -----
       IMPLICIT NONE
-      INTEGER NDIM, i, j, k, l, idx, N
+      INTEGER NDIM, idx, i, j, k, l, N
       DOUBLE PRECISION U(NDIM), PAR(*), T
       INTEGER, PARAMETER :: MAXN = 10
 
-      N = (NDIM-1)/2            ! keep consistent with FUNC
+      N   = (NDIM-2)/2
       idx = 1
 
-! --- masses ----------------------------------------------------------
+! masses
       DO i = 1, N
-         PAR(idx) = 1.d0         ! mass(i)
-         idx = idx + 1
+         PAR(idx) = 1.d0 ; idx = idx + 1
       END DO
-! --- damping ---------------------------------------------------------
+! damping
       DO i = 1, N
-         PAR(idx) = 0.05d0       ! damp(i)
-         idx = idx + 1
+         PAR(idx) = 0.05d0 ; idx = idx + 1
       END DO
-! --- stiffness (unit matrix) -----------------------------------------
+! linear k = I
       DO i = 1, N
          DO j = 1, N
-            IF (i .EQ. j) THEN
-               PAR(idx) = 1.d0   ! diagonal springs
-            ELSE
-               PAR(idx) = 0.d0
-            END IF
+            PAR(idx) = MERGE(1.d0, 0.d0, i == j)
             idx = idx + 1
          END DO
       END DO
-! --- quadratic -------------------------------------------------------
+! quadratic α = 0
       DO i = 1, N*N*N
-         PAR(idx) = 0.d0
-         idx = idx + 1
+         PAR(idx) = 0.d0 ; idx = idx + 1
       END DO
-! --- cubic -----------------------------------------------------------
+! cubic γ = 0
       DO i = 1, N*N*N*N
-         PAR(idx) = 0.d0
-         idx = idx + 1
+         PAR(idx) = 0.d0 ; idx = idx + 1
       END DO
-! --- forcing amplitudes ---------------------------------------------
+! forcing amplitudes  fᵢ = 0   (we’ll increase later)
       DO i = 1, N
-         PAR(idx) = 0.d0         ! forc(i)  (change later in continuation)
-         idx = idx + 1
+         PAR(idx) = 0.d0 ; idx = idx + 1
       END DO
-! --- forcing frequency ----------------------------------------------
-      PAR(idx) = 0.d0      ! ω  = 0 → equilibrium exists
-      
-! --- initial state ---------------------------------------------------
+! forcing frequency  ω = 1
+      PAR(idx) = 1.d0
+
+! initial state  (rest, but y1 = 1, y2 = 0)
       DO i = 1, NDIM
-         U(i) = 0.d0             ! all variables start at rest
+         U(i) = 0.d0
       END DO
+      U(2*N+1) = 1.d0     ! y1
+      U(2*N+2) = 0.d0     ! y2
 
       END SUBROUTINE STPNT
 !----------------------------------------------------------------------

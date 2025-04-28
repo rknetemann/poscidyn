@@ -1,30 +1,10 @@
 from dataclasses import dataclass
+import jax
 import numpy as np
+import jax.numpy as jnp
 from scipy.integrate import solve_ivp
-from numbalsoda import lsoda_sig, lsoda
-from numba import njit, cfunc, float64, int32
-from numba.experimental import jitclass
-
-@cfunc(lsoda_sig)
-def rhs_numba(t, state, d_state, params):
-    # params: omega_d, N, c, k, alpha, gamma, f
-    omega_d = params[0]
-    N = params[1]
-    c = params[2]
-    k = params[3]
-    alpha = params[4]
-    gamma = params[5]
-    f = params[6]
-    
-    q = state[:N]
-    v = state[N:]
-
-    a_lin  = -c * v - k @ q
-    a_quad = -np.einsum('ijk,j,k->i', alpha, q, q)   # ok only if your Numba version supports einsum
-    a_cub  = -np.einsum('ijkl,j,k,l->i', gamma, q, q, q)
-    a_forc =  f * np.cos(omega_d * t)
-
-    return np.concatenate((v, a_lin + a_quad + a_cub + a_forc))
+from functools import partial
+from tqdm import tqdm
 
 class ModalEOM:
     """
@@ -36,15 +16,15 @@ class ModalEOM:
     f       : shape (N,)      — forcing amplitudes f_i
     omega_d : scalar          — driving frequency
     """
-    def __init__(self, N: int, c: np.ndarray, k: np.ndarray, 
-                 alpha: np.ndarray, gamma: np.ndarray,
-                 f: np.ndarray, omega_d: float):
+    def __init__(self, omega_d: float, N: int, c: jnp.ndarray, k: jnp.ndarray, 
+                 alpha: jnp.ndarray, gamma: jnp.ndarray,
+                 f: jnp.ndarray):
         self.N: int = N
-        self.c: np.ndarray = c
-        self.k: np.ndarray = k
-        self.alpha: np.ndarray = alpha
-        self.gamma: np.ndarray = gamma 
-        self.f: np.ndarray = f
+        self.c: jnp.ndarray = c
+        self.k: jnp.ndarray = k
+        self.alpha: jnp.ndarray = alpha
+        self.gamma: jnp.ndarray = gamma 
+        self.f: jnp.ndarray = f
         self.omega_d: float = omega_d
     
         if self.N < 1:
@@ -63,16 +43,22 @@ class ModalEOM:
     @classmethod
     def random(cls, N: int, seed: int = None) -> "ModalEOM":
         """
-        Create a ModalEOM instance with random parameters.
+        Create a ModalEOM instance with random parameters using JAX.
         """
-        rng = np.random.default_rng(seed)
-        c       = rng.uniform(0.0, 1.0, size=N)
-        k       = rng.uniform(0.0, 1.0, size=(N, N))
-        alpha   = rng.uniform(-1.0, 1.0, size=(N, N, N))
-        gamma   = rng.uniform(-1.0, 1.0, size=(N, N, N, N))
-        f       = rng.uniform(-1.0, 1.0, size=N)
-        omega_d = float(rng.uniform(0.0, 10.0))
-        return cls(N=N, c=c, k=k, alpha=alpha, gamma=gamma, f=f, omega_d=omega_d)
+        key = jax.random.PRNGKey(seed) if seed is not None else jax.random.PRNGKey(0)
+        
+        def random_array(key, shape, minval, maxval):
+            key, subkey = jax.random.split(key)
+            return jax.random.uniform(subkey, shape=shape, minval=minval, maxval=maxval), key
+
+        c, key       = random_array(key, (N,), 0.0, 1.0)
+        k, key       = random_array(key, (N, N), 0.0, 1.0)
+        alpha, key   = random_array(key, (N, N, N), -1.0, 1.0)
+        gamma, key   = random_array(key, (N, N, N, N), -1.0, 1.0)
+        f, key       = random_array(key, (N,), -1.0, 1.0)
+        omega_d, key = random_array(key, (), 0.0, 10.0)
+        
+        return cls(N=N, c=c, k=k, alpha=alpha, gamma=gamma, f=f, omega_d=float(omega_d))
     
     @classmethod
     def example(cls) -> "ModalEOM":
@@ -80,12 +66,12 @@ class ModalEOM:
         Create a ModalEOM instance with example parameters.
         """
         N = 2
-        c = np.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
-        k = np.array([[10.0, 1.0], [ 1.0,12.0]])  
-        alpha = np.zeros((N, N, N))
-        alpha[0] = np.array([[0.0, 0.5], [0.5, 0.0]])
-        gamma = np.zeros((N, N, N, N))
-        f = np.array([1.0, 0.5])
+        c = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
+        k = jnp.array([[10.0, 1.0], [ 1.0,12.0]])  
+        alpha = jnp.zeros((N, N, N))
+        alpha = alpha.at[0].set(jnp.array([[0.0, 0.5], [0.5, 0.0]]))
+        gamma = jnp.zeros((N, N, N, N))
+        f = jnp.array([1.0, 0.5])
         omega_d = 3.0
         return cls(N=N, c=c, k=k, alpha=alpha, gamma=gamma, f=f, omega_d=omega_d)
     
@@ -113,12 +99,20 @@ class ModalEOM:
         f_amp = F0 / k1 / ac
 
         # assemble arrays
-        c     = np.array([Q])
-        k     = np.array([[k1]])
-        alpha = np.zeros((N, N, N))
-        gamma = np.zeros((N, N, N, N))
-        f     = np.array([f_amp])
+        c     = jnp.array([Q])
+        k     = jnp.array([[k1]])
+        alpha = jnp.zeros((N, N, N))
+        gamma = jnp.zeros((N, N, N, N))
+        f     = jnp.array([f_amp])
         omega_d = 1.0
+
+        print("Parameters:")
+        print(f"  Damping coefficients (c): {c}")
+        print(f"  Stiffness matrix (k):\n{k}")
+        print(f"  Quadratic coefficients (alpha):\n{alpha}")
+        print(f"  Cubic coefficients (gamma):\n{gamma}")
+        print(f"  Forcing amplitudes (f): {f}")
+        print(f"  Driving frequency (omega_d): {omega_d}")
 
         return cls(N=N, c=c, k=k, alpha=alpha, gamma=gamma, f=f, omega_d=omega_d)
     
@@ -126,36 +120,13 @@ class ModalEOM:
         """
         Compute the eigenfrequencies of the system.
         """
-        # solve the eigenvalue problem
         eigvals, eigvecs = np.linalg.eig(self.k)
-        # sort eigenvalues and eigenvectors
         idx = np.argsort(eigvals)
         eigvals = eigvals[idx]
         eigvecs = eigvecs[:, idx]
-        # compute natural frequencies
         omega_n = np.sqrt(eigvals)
         return omega_n
-    
-    def rhs(self, t: float, state: np.ndarray, omega_d: float) -> np.ndarray:
-        """
-        Compute the time derivative of state = [q, v].
 
-        Parameters
-        ----------
-        t : float
-            Current time.
-        state : ndarray, shape (2*N,)
-            Concatenated [q (N,), v (N,)].
-
-        Returns
-        -------
-        dstate_dt : ndarray, shape (2*N,)
-            [v, a], where a includes linear, quadratic, cubic, and forcing terms.
-        """        
-        return rhs_numba(t, state, omega_d,
-                     self.N, self.c, self.k,
-                     self.alpha, self.gamma, self.f)
-    
     def steady_state_amp(self,
                      omega_d: float,
                      y0: np.ndarray,
@@ -168,33 +139,82 @@ class ModalEOM:
         """
         t_eval = np.linspace(0.0, t_end, n_steps)
 
-        sol = lsoda(rhs_numba,
-                    u0=y0,
-                    t_eval=t_eval,
-                    data=np.array([omega_d, self.N, self.c, self.k, self.alpha, self.gamma, self.f]),             # pass ω_d into rhs
-                    rtol=1e-5, atol=1e-7,)          # swap for "Radau"/"BDF" if stiff
+        sol = solve_ivp(
+            self._rhs_jax,
+            (0.0, t_end),
+            y0,
+            t_eval=t_eval,
+            args=(omega_d, self.c, self.k, self.alpha, self.gamma, self.f),
+            rtol=1e-5,
+            atol=1e-7,
+        )
 
         q1 = sol.y[0]                              # first modal coordinate
         tail = q1[int(discard_frac * len(q1)):]    # discard transients
         return float(np.max(np.abs(tail)))
     
     def frequency_response(self,
-                        omega_d_min: float = 0.0,
-                        omega_d_max: float = 500.0,
-                        n_omega_d: int = 50,
-                        y0: np.ndarray = None,
-                        t_end: float = 250.0,
-                        n_steps: int = 500,
-                        discard_frac: float = 0.8) -> tuple:
+                           omega_d_min: float,
+                           omega_d_max: float,
+                           n_omega_d: int,
+                           y0: np.ndarray,
+                           t_end: float,
+                           n_steps: int,
+                           discard_frac: float) -> tuple:
         """
         Compute the frequency response of the system.
         """
-        if y0 is None:
-            y0 = np.zeros(2 * self.N)
+        DEVICE = jax.default_backend().upper()
+        print(f"\nCalculating frequency response using {DEVICE}...")
 
         omega_d_grid = np.linspace(omega_d_min, omega_d_max, n_omega_d)
-        amps = np.array([
-            self.steady_state_amp(omega_d, y0, t_end, n_steps, discard_frac)
-            for omega_d in omega_d_grid
-        ])
-        return omega_d_grid, amps
+        amps = []
+        # wrap the grid in tqdm to get a progress bar
+        for ω in tqdm(omega_d_grid, desc="-> Frequency response", unit="ω"):
+            amps.append(
+                self.steady_state_amp(ω, y0, t_end, n_steps, discard_frac)
+            )
+        return omega_d_grid, np.array(amps)
+
+    @staticmethod
+    @partial(jax.jit)
+    def _rhs_jax(t:float,
+                 state: jnp.ndarray, 
+                 omega_d:float, 
+                 c: jnp.ndarray, 
+                 k: jnp.ndarray, 
+                 alpha: jnp.ndarray, 
+                 gamma: jnp.ndarray, 
+                 f: jnp.ndarray):
+        """
+        Compute the right-hand side (RHS) of the equations of motion using JAX for efficient computation.
+
+        This static method calculates the acceleration and velocity of a system based on its current state,
+        damping, stiffness, nonlinear coefficients, and external forcing. 
+        `
+        Example state: state = [q1, q2, v1, v2], where q1 and q2 are the generalized coordinates
+
+        Args:
+            t (float): The current time.
+            state (jax.numpy.ndarray): The current state vector of the system, where the first half represents
+                the generalized coordinates (q) and the second half represents the generalized velocities (v).
+            omega_d (float): The driving frequency of the external force.
+            c (jax.numpy.ndarray): The damping coefficients (1D array of size N).
+            k (jax.numpy.ndarray): The stiffness matrix (2D array of shape NxN).
+            alpha (jax.numpy.ndarray): The quadratic nonlinear coefficients (3D array of shape NxN).
+            gamma (jax.numpy.ndarray): The cubic nonlinear coefficients (4D array of shape NxNxN).
+            f (jax.numpy.ndarray): The amplitude of the external forcing (1D array of size N).
+
+        Returns:
+            jax.numpy.ndarray: The concatenated array of velocities and accelerations, representing the
+            time derivative of the state vector.
+        """
+    
+        N = c.shape[0]
+        q = state[:N] # example 2 DOF: q = [q1, q2]
+        v = state[N:] # example 2 DOF: v = [v1, v2]
+        a_lin  = -c * v - k @ q
+        a_quad = -jnp.einsum('ijk,j,k->i', alpha, q, q)
+        a_cub  = -jnp.einsum('ijkl,j,k,l->i', gamma, q, q, q)
+        a_forc =  f * jnp.cos(omega_d * t)
+        return jnp.concatenate((v, a_lin + a_quad + a_cub + a_forc))

@@ -1,0 +1,48 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: hopf - Win32 Debug--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\Users\Ata\AppData\Local\Temp\RSP544.tmp" with contents
+[
+/check:bounds /compile_only /debug:full /extend_source:132 /nologo /traceback /warn:argument_checking /warn:nofileopt /module:"Release/" /object:"Release/" /pdbfile:"Release/DF60.PDB" 
+"C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\eispack.f"
+"C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib5.f"
+"C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib4.f"
+"C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib3.f"
+"C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib2.f"
+"C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib1.f"
+]
+Creating temporary file "C:\Users\Ata\AppData\Local\Temp\RSP545.tmp" with contents
+[
+kernel32.lib /nologo /subsystem:console /incremental:yes /pdb:"Release/hopf.pdb" /debug /machine:I386 /out:"Release/hopf.exe" /pdbtype:sept 
+".\Release\autlib1.obj"
+".\Release\autlib2.obj"
+".\Release\autlib3.obj"
+".\Release\autlib4.obj"
+".\Release\autlib5.obj"
+".\Release\eispack.obj"
+".\Release\hopf.obj"
+]
+Creating command line "link.exe @C:\Users\Ata\AppData\Local\Temp\RSP545.tmp"
+<h3>Output Window</h3>
+Compiling Fortran...
+C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\eispack.f
+C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib5.f
+C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib4.f
+C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib3.f
+C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib2.f
+C:\Users\Ata\Desktop\PhD\Codes\Fortran All\For Ata-Hopf\autlib1.f
+Linking...
+Release/hopf.exe : warning LNK4084: total image size 856694784 exceeds max (268435456); image may not run
+
+
+
+<h3>Results</h3>
+hopf.exe - 0 error(s), 1 warning(s)
+</pre>
+</body>
+</html>
