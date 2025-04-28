@@ -104,11 +104,11 @@ class ModalEOM:
                 solver,
                 t0   = 0.0,
                 t1   = t_end,
-                dt0  = 1e-2,
+                dt0  = 1e-3,
                 max_steps=10000,
                 y0   = y0,
                 saveat = saveat,
-                stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
+                stepsize_controller=diffrax.PIDController(rtol=1e-6, atol=1e-8),
                 args  = (ω,))
             q1 = sol.ys[:, 0]
             return jnp.max(jnp.abs(q1[int(discard_frac * q1.size):]))
