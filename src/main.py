@@ -23,8 +23,8 @@ if __name__ == "__main__":
     
     driving_freq_min, driving_freq_max, driving_freq_n = 0, 1, 1000
     y0 = np.zeros(2*N)
-    t_end = 250.0
-    n_steps = 5000
+    t_end = 500.0
+    n_steps = 3000
     discard_frac = 0.9
     
     number_of_calculations = driving_freq_n * n_steps

@@ -105,7 +105,7 @@ class ModalEOM:
                 t0   = 0.0,
                 t1   = t_end,
                 dt0  = 1e-3,
-                max_steps=10000,
+                max_steps=50000,
                 y0   = y0,
                 saveat = saveat,
                 stepsize_controller=diffrax.PIDController(rtol=1e-6, atol=1e-8),
