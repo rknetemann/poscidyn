@@ -3,20 +3,25 @@ import time
 import matplotlib.pyplot as plt
 
 from modal_eom import ModalEOM
+from modal_eom_diffrax import ModalEOM as ModalEOMDiffrax
 
 if __name__ == "__main__":
     # Example usage
-    N = 1
+    N = 2
     #modal_eom = ModalEOM.random(N, seed=33)
     #modal_eom = ModalEOM.example()
-    modal_eom = ModalEOM.duffing()
+    #modal_eom = ModalEOM.duffing()
+    
+    modal_eom = ModalEOMDiffrax.example()
+    #modal_eom = ModalEOMDiffrax.random(N, seed=33)
+    #modal_eom = ModalEOMDiffrax.duffing()
     
     eig_freqs = modal_eom.eigenfrequencies()
     print("Eigenfrequencies (Hz):")
     for idx, freq in enumerate(eig_freqs, start=1):
         print(f"- Mode {idx}: {(freq / (2 * np.pi)):.2f} Hz")
     
-    driving_freq_min, driving_freq_max, driving_freq_n = 0, 5, 100
+    driving_freq_min, driving_freq_max, driving_freq_n = 0, 1, 1000
     y0 = np.zeros(2*N)
     t_end = 250.0
     n_steps = 500

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import jax
+
 import numpy as np
 import jax.numpy as jnp
 from scipy.integrate import solve_ivp
@@ -166,8 +167,10 @@ class ModalEOM:
         """
         DEVICE = jax.default_backend().upper()
         print(f"\nCalculating frequency response using {DEVICE}...")
+    
 
         omega_d_grid = np.linspace(omega_d_min, omega_d_max, n_omega_d)
+        
         amps = []
         # wrap the grid in tqdm to get a progress bar
         for ω in tqdm(omega_d_grid, desc="-> Frequency response", unit="ω"):
