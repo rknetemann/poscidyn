@@ -10,13 +10,15 @@ from utils.random import random_uniform
 
 @dataclass(eq=False)
 class ModalEOM:
-    N:     int
-    c:     jax.Array            # (N,)
-    k:     jax.Array            # (N,N)
-    alpha: jax.Array            # (N,N,N)
-    gamma: jax.Array            # (N,N,N,N)
-    f:     jax.Array            # (N,)
-    name:  str = "modal_system"
+    N:         int
+    c:         jax.Array            # (N,)
+    k:         jax.Array            # (N,N)
+    alpha:     jax.Array            # (N,N,N)
+    gamma:     jax.Array            # (N,N,N,N)
+    f_amp:     jax.Array            # (N,)
+    f_omega:   jax.Array            # (1,)
+    
+    name:      str = "modal_system"
 
     rhs_jit: callable = field(init=False, repr=False)
 
@@ -28,8 +30,10 @@ class ModalEOM:
         k,       key = random_uniform(key, (N, N),         0.0, 1.0)
         alpha,   key = random_uniform(key, (N, N, N),     -1.0, 1.0)
         gamma,   key = random_uniform(key, (N, N, N, N),  -1.0, 1.0)
-        f,       key = random_uniform(key, (N,),          -1.0, 1.0)
-        return cls(N, c, k, alpha, gamma, f, name="from_random")
+        f_amp,   key = random_uniform(key, (N,),          -1.0, 1.0)
+        f_omega, key = random_uniform(key, (1,),          0.0, 10.0)
+        
+        return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_random")
 
     @classmethod
     def from_example(cls) -> "ModalEOM":
@@ -40,20 +44,23 @@ class ModalEOM:
         alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
                                                           [0.5, 0.0]]))
         gamma = jnp.zeros((N, N, N, N))
-        f     = jnp.array([15.0, 0.5])     # drive only mode 1
-        return cls(N, c, k, alpha, gamma, f, name="from_example")
+        f_amp = jnp.array([15.0, 0.5]) 
+        f_omega = jnp.array([1.0])
+        
+        return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
     
     @classmethod
     def from_duffing(cls) -> "ModalEOM":
         N = 2
-        c     = jnp.array([0.1, 0.1])
-        k     = jnp.array([[1.0, 0.0],
+        c       = jnp.array([0.1, 0.1])
+        k       = jnp.array([[1.0, 0.0],
                            [0.0, 1.0]])
-        alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
+        alpha   = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
                                                           [0.5, 0.0]]))
-        gamma = jnp.zeros((N, N, N, N))
-        f     = jnp.array([1.0, 1.0])
-        return cls(N, c, k, alpha, gamma, f, name="from_duffing")
+        gamma   = jnp.zeros((N, N, N, N))
+        f_amp   = jnp.array([1.0, 1.0])
+        f_omega = jnp.array([1.0])
+        return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_duffing")
     
     # --------------------------------------------------- helpers
     
@@ -65,22 +72,26 @@ class ModalEOM:
 
     def _build_rhs(self):
         @jax.jit
-        def rhs(t, y, args):
-            ω_d, f_amp = args      # drive frequency and force amplitude
-            q, v = jnp.split(y, 2)
+        def rhs(t, state, args):
+            f_omega, f_amp = args
+            
+            f_omega = jnp.atleast_1d(f_omega)
+            f_amp   = jnp.atleast_1d(f_amp)
+            
+            q, v = jnp.split(state, 2)
 
             a = (- self.c * v
                  - self.k @ q
                  - jnp.einsum("ijk,j,k->i",    self.alpha, q, q)
                  - jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q)
-                 + self.f.at[0].set(f_amp) * jnp.cos(ω_d * t))
+                 + f_amp * jnp.cos(f_omega * t))
 
             return jnp.concatenate([v, a])
 
         self.rhs_jit = rhs
         
     # --------------------------------------------------- internal solvers
-    @partial(jax.jit, static_argnames=("self", "y0", "t_end", "n_steps"))
+    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
     def _solve_rhs(
         self,
         f_omega: jax.Array,
@@ -117,30 +128,17 @@ class ModalEOM:
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
     def time_response(
         self,
-        f_omega: jax.Array,
-        f_amp: jax.Array,
         y0: jax.Array,
         t_end: float,
         n_steps: int,
+        f_amp: jax.Array = None,
+        f_omega: jax.Array = None,
     ) -> jax.Array:
         
-        def solve_rhs(f_omega, f_amp):
-            return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
-        
-        amplitude_responses = jax.vmap(solve_rhs)(f_omega, f_amp)
-        
-        return amplitude_responses
-    
-    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
-    def frequency_response(
-        self,
-        f_omega: jax.Array,
-        f_amp : jax.Array,
-        y0: jax.Array,
-        t_end: float,
-        n_steps: int,
-        discard_frac: float,
-    ) -> tuple:
+        if f_amp is None:
+            f_amp = self.f_amp
+        if f_omega is None:
+            f_omega = self.f_omega
         
         f_omega = jnp.atleast_1d(f_omega)
         f_amp = jnp.atleast_1d(f_amp)
@@ -148,7 +146,34 @@ class ModalEOM:
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        amplitude_responses = jax.vmap(solve_rhs)(f_omega, f_amp)
+        amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
+        amplitude_responses = jnp.abs(amplitude_responses)
+        
+        return amplitude_responses
+    
+    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
+    def frequency_response(
+        self,
+        y0: jax.Array,
+        t_end: float,
+        n_steps: int,
+        discard_frac: float,
+        f_amp : jax.Array = None,
+        f_omega: jax.Array = None,
+    ) -> tuple:
+        
+        if f_amp is None:
+            f_amp = self.f_amp
+        if f_omega is None:
+            f_omega = self.f_omega
+        
+        f_omega = jnp.atleast_1d(f_omega)
+        f_amp = jnp.atleast_1d(f_amp)
+        
+        def solve_rhs(f_omega, f_amp):
+            return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
+        
+        amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
         amplitude_responses_steady_state = amplitude_responses[:, int(discard_frac * n_steps):]
         max_amplitudes = jnp.max(jnp.abs(amplitude_responses_steady_state), axis=1)
         

@@ -23,20 +23,41 @@ if __name__ == "__main__":
     for idx, freq in enumerate(eig_freqs, start=1):
         print(f"- Mode {idx}: {(freq / (2 * np.pi)):.2f} Hz")
     
-    f_omega_min, f_omega_max, f_omega_n = 0, 1, 1000
+    f_omega_min, f_omega_max, f_omega_n = 0, 1 * 2 * jnp.pi, 1000
+    f_omega = jnp.linspace(f_omega_min, f_omega_max, f_omega_n)
+    
+    f_amp_min, f_amp_max, f_amp_n = 0, 15, 15
+    f_amp = jnp.linspace(f_amp_min, f_amp_max, f_amp_n) 
+    
     y0 = jnp.zeros(2*N)
     t_end = 500.0
-    n_steps = 3000
+    n_steps = 1500
     discard_frac = 0.9
     
-    number_of_calculations = driving_freq_n * n_steps
+    number_of_calculations = f_omega_n * n_steps
     print(f"\nNumber of calculations: {number_of_calculations}")
 
     current_time = time.time()
     
+    amp = modal_eom.time_response(
+        y0=y0,
+        t_end=t_end,
+        n_steps=n_steps,
+    )
+    
+    print((amp))
+
+    plt.figure(figsize=(7, 4))
+    plt.plot(amp[0], label="Time Response")
+    plt.xlabel("Time")
+    plt.ylabel("Amplitude")
+    plt.title("Time Response of the System")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    
     omega_d, amp = modal_eom.frequency_response(
-        f_omega=jnp.linspace(f_omega_min, f_omega_max, f_omega_n),
-        n_omega_d=driving_freq_n,
+        f_omega=f_omega,
         y0=y0,
         t_end=t_end,
         n_steps=n_steps,
