@@ -1,28 +1,30 @@
 import numpy as np
+import jax.numpy as jnp
 import time
 import matplotlib.pyplot as plt
 
 from modal_eom import ModalEOM
 from modal_eom_diffrax import ModalEOM as ModalEOMDiffrax
+from modal_eom_improved import ModalEOM as ModalEOMImproved
 
 if __name__ == "__main__":
     # Example usage
     N = 2
-    #modal_eom = ModalEOM.random(N, seed=33)
-    #modal_eom = ModalEOM.example()
-    #modal_eom = ModalEOM.duffing()
+    #modal_eom = ModalEOM.from_random(N, seed=33)
+    #modal_eom = ModalEOM.from_example()
+    #modal_eom = ModalEOM.from_duffing()
     
-    modal_eom = ModalEOMDiffrax.example()
-    #modal_eom = ModalEOMDiffrax.random(N, seed=33)
-    #modal_eom = ModalEOMDiffrax.duffing()
+    modal_eom = ModalEOMImproved.from_example()
+    #modal_eom = ModalEOMDiffrax.from_random(N, seed=33)
+    #modal_eom = ModalEOMDiffrax.from_duffing()
     
     eig_freqs = modal_eom.eigenfrequencies()
     print("Eigenfrequencies (Hz):")
     for idx, freq in enumerate(eig_freqs, start=1):
         print(f"- Mode {idx}: {(freq / (2 * np.pi)):.2f} Hz")
     
-    driving_freq_min, driving_freq_max, driving_freq_n = 0, 1, 1000
-    y0 = np.zeros(2*N)
+    f_omega_min, f_omega_max, f_omega_n = 0, 1, 1000
+    y0 = jnp.zeros(2*N)
     t_end = 500.0
     n_steps = 3000
     discard_frac = 0.9
@@ -33,8 +35,7 @@ if __name__ == "__main__":
     current_time = time.time()
     
     omega_d, amp = modal_eom.frequency_response(
-        omega_d_min=driving_freq_min*2*np.pi,
-        omega_d_max=driving_freq_max*2*np.pi,
+        f_omega=jnp.linspace(f_omega_min, f_omega_max, f_omega_n),
         n_omega_d=driving_freq_n,
         y0=y0,
         t_end=t_end,
@@ -64,3 +65,5 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+    
+    
