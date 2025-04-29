@@ -8,15 +8,9 @@ from modal_eom_diffrax import ModalEOM as ModalEOMDiffrax
 from modal_eom_improved import ModalEOM as ModalEOMImproved
 
 if __name__ == "__main__":
-    # Example usage
     N = 2
-    #modal_eom = ModalEOM.from_random(N, seed=33)
-    #modal_eom = ModalEOM.from_example()
-    #modal_eom = ModalEOM.from_duffing()
-    
     modal_eom = ModalEOMImproved.from_example()
-    #modal_eom = ModalEOMDiffrax.from_random(N, seed=33)
-    #modal_eom = ModalEOMDiffrax.from_duffing()
+    #modal_eom = ModalEOMImproved.from_random(N, seed=0)
     
     eig_freqs = modal_eom.eigenfrequencies()
     print("Eigenfrequencies (Hz):")
@@ -30,47 +24,50 @@ if __name__ == "__main__":
     f_amp = jnp.linspace(f_amp_min, f_amp_max, f_amp_n) 
     
     y0 = jnp.zeros(2*N)
-    t_end = 500.0
-    n_steps = 1500
-    discard_frac = 0.9
+    t_end = 100.0
+    n_steps = 500
+    discard_frac = 0.8
     
     number_of_calculations = f_omega_n * n_steps
     print(f"\nNumber of calculations: {number_of_calculations}")
 
+    # print("\nCalculating time response...")
+    # current_time = time.time()
+    # time_response = modal_eom.time_response(
+    #     y0=y0,
+    #     t_end=t_end,
+    #     n_steps=n_steps,
+    # )
+    # elapsed_time = time.time() - current_time
+    # print(f"-> Time response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
+    
+    print("\nCalculating frequency response...")
     current_time = time.time()
-    
-    amp = modal_eom.time_response(
-        y0=y0,
-        t_end=t_end,
-        n_steps=n_steps,
-    )
-    
-    print((amp))
-
-    plt.figure(figsize=(7, 4))
-    plt.plot(amp[0], label="Time Response")
-    plt.xlabel("Time")
-    plt.ylabel("Amplitude")
-    plt.title("Time Response of the System")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-    
-    omega_d, amp = modal_eom.frequency_response(
+    omega_d, frequency_response = modal_eom.frequency_response(
         f_omega=f_omega,
         y0=y0,
         t_end=t_end,
         n_steps=n_steps,
         discard_frac=discard_frac
     )
-    
     elapsed_time = time.time() - current_time
-    print(f"\nElapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
-
+    print(f"-> Frequency response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
+    
     # ------ visualize ----------------------------------------------------
+
+    # # plot time response
+    # plt.figure(figsize=(7, 4))
+    # plt.plot(time_response[0], label="Time Response")
+    # plt.xlabel("Time")
+    # plt.ylabel("Amplitude")
+    # plt.title("Time Response of the System")
+    # plt.grid(True)
+    # plt.tight_layout()
+    # plt.show()
+
+    # plot frequency response
     plt.figure(figsize=(7, 4))
-    plt.plot(omega_d, amp, "-o", markersize=1)
-    # add eigenfrequency lines
+    plt.plot(omega_d, frequency_response, "-o", markersize=1)
     for idx, f in enumerate(eig_freqs):
         plt.axvline(
             f,

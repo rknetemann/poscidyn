@@ -44,7 +44,7 @@ class ModalEOM:
         alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
                                                           [0.5, 0.0]]))
         gamma = jnp.zeros((N, N, N, N))
-        f_amp = jnp.array([15.0, 0.5]) 
+        f_amp = jnp.array([1.0, 0.5]) 
         f_omega = jnp.array([1.0])
         
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
@@ -80,11 +80,12 @@ class ModalEOM:
             
             q, v = jnp.split(state, 2)
 
-            a = (- self.c * v
-                 - self.k @ q
+            a = (- jnp.multiply(self.c, v) # (N,) * (N,) = (N,)
+                 - jnp.matmul(self.k, q)   # (N,N) @ (N,) = (N,)
                  - jnp.einsum("ijk,j,k->i",    self.alpha, q, q)
                  - jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q)
-                 + f_amp * jnp.cos(f_omega * t))
+                 + jnp.multiply(f_amp, jnp.cos(f_omega * t))
+                )
 
             return jnp.concatenate([v, a])
 
@@ -108,11 +109,11 @@ class ModalEOM:
             solver=diffrax.Tsit5(),
             t0=0.0,
             t1=t_end,
-            dt0=1e-1,
+            dt0=1e-3,
             max_steps=500_000,
             y0=y0,
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
+            stepsize_controller=diffrax.PIDController(rtol=1e-6, atol=1e-8),
             args=(f_omega, f_amp),
         )
         q1 = sol.ys[:, 0]
@@ -166,7 +167,7 @@ class ModalEOM:
             f_amp = self.f_amp
         if f_omega is None:
             f_omega = self.f_omega
-        
+            
         f_omega = jnp.atleast_1d(f_omega)
         f_amp = jnp.atleast_1d(f_amp)
         
