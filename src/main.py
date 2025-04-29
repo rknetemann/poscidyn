@@ -6,22 +6,22 @@ import matplotlib.pyplot as plt
 from modal_eom import ModalEOM
 from modal_eom_diffrax import ModalEOM as ModalEOMDiffrax
 from modal_eom_improved import ModalEOM as ModalEOMImproved
+from mpl_toolkits.mplot3d import Axes3D      # added for 3D plotting
 
 if __name__ == "__main__":
     N = 2
     modal_eom = ModalEOMImproved.from_example()
-    #modal_eom = ModalEOMImproved.from_random(N, seed=0)
+    #modal_eom = ModalEOMImproved.from_random(N, seed=33)
     
     eig_freqs = modal_eom.eigenfrequencies()
     print("Eigenfrequencies (Hz):")
     for idx, freq in enumerate(eig_freqs, start=1):
         print(f"- Mode {idx}: {(freq / (2 * np.pi)):.2f} Hz")
     
-    f_omega_min, f_omega_max, f_omega_n = 0, 1 * 2 * jnp.pi, 1000
-    f_omega = jnp.linspace(f_omega_min, f_omega_max, f_omega_n)
-    
-    f_amp_min, f_amp_max, f_amp_n = 0, 15, 15
-    f_amp = jnp.linspace(f_amp_min, f_amp_max, f_amp_n) 
+    f_omega_min, f_omega_max, f_omega_n = 0 * 2 * jnp.pi, 1 * 2 * jnp.pi, 1000
+    f_omega_sweep = jnp.linspace(f_omega_min, f_omega_max, f_omega_n)
+    f_amp_sweep = jnp.array([[0.0, 0.5],[1.0, 0.5], [5.0, 0.5], [10.0, 0.5], [15.0, 0.5], [16.5, 0.5]])
+    f_omega_time_response = jnp.array([0.49 * 2 * np.pi])
     
     y0 = jnp.zeros(2*N)
     t_end = 100.0
@@ -31,20 +31,21 @@ if __name__ == "__main__":
     number_of_calculations = f_omega_n * n_steps
     print(f"\nNumber of calculations: {number_of_calculations}")
 
-    # print("\nCalculating time response...")
-    # current_time = time.time()
-    # time_response = modal_eom.time_response(
-    #     y0=y0,
-    #     t_end=t_end,
-    #     n_steps=n_steps,
-    # )
-    # elapsed_time = time.time() - current_time
-    # print(f"-> Time response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
+    print("\nCalculating time response...")
+    current_time = time.time()
+    time_response = modal_eom.time_response(
+        f_omega=f_omega_time_response,
+        y0=y0,
+        t_end=t_end,
+        n_steps=n_steps,
+    )
+    elapsed_time = time.time() - current_time
+    print(f"-> Time response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
     
     print("\nCalculating frequency response...")
     current_time = time.time()
     omega_d, frequency_response = modal_eom.frequency_response(
-        f_omega=f_omega,
+        f_omega=f_omega_sweep,
         y0=y0,
         t_end=t_end,
         n_steps=n_steps,
@@ -53,22 +54,42 @@ if __name__ == "__main__":
     elapsed_time = time.time() - current_time
     print(f"-> Frequency response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
     
+    print("\nCalculating force sweep...")
+    current_time = time.time()
+    omega_d, frequency_response_force = modal_eom.force_sweep(
+        f_omega=f_omega_sweep,
+        f_amp=f_amp_sweep,
+        y0=y0,
+        t_end=t_end,
+        n_steps=n_steps,
+        discard_frac=discard_frac
+    )
+    # swap axes to have shape (n_omega, n_forces, n_modes)
+    frequency_response_force = frequency_response_force.transpose(1, 0, 2)
+    elapsed_time = time.time() - current_time
+    print(f"-> Frequency response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
+    
     # ------ visualize ----------------------------------------------------
 
-    # # plot time response
-    # plt.figure(figsize=(7, 4))
-    # plt.plot(time_response[0], label="Time Response")
-    # plt.xlabel("Time")
-    # plt.ylabel("Amplitude")
-    # plt.title("Time Response of the System")
-    # plt.grid(True)
-    # plt.tight_layout()
-    # plt.show()
+    # plot time response
+    plt.figure(figsize=(7, 4))                 # unpack times and modal amplitudes
+    for idx in range(time_response.shape[0]):
+        plt.plot(time_response[idx], label=f"Mode {idx+1}")
+    plt.xlabel("Time")
+    plt.ylabel("Amplitude")
+    plt.title("Time Response of the System")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
     # plot frequency response
     plt.figure(figsize=(7, 4))
-    plt.plot(omega_d, frequency_response, "-o", markersize=1)
-    for idx, f in enumerate(eig_freqs):
+    omega_d_hz = omega_d / (2 * np.pi)
+    eig_freqs_hz = eig_freqs / (2 * np.pi)
+    for idx in range(frequency_response.shape[1]):
+        plt.plot(omega_d_hz, frequency_response[:, idx], "-o", markersize=1, label=f"Mode {idx+1}")
+    for idx, f in enumerate(eig_freqs_hz):
         plt.axvline(
             f,
             color='r',
@@ -77,11 +98,48 @@ if __name__ == "__main__":
             label='Eigenfrequency' if idx == 0 else ""
         )
     plt.legend()
-    plt.xlabel(r"Drive frequency  $\omega_d$  [rad s$^{-1}$]")
+    plt.xlabel(r"Drive frequency  $f_d$  [Hz]")
     plt.ylabel(r"Steady-state amplitude  $|q_1|_{\max}$")
     plt.title("Frequency-response curve (SciPy integrator)")
     plt.grid(True)
     plt.tight_layout()
     plt.show()
-    
-    
+
+    # plot force sweep with separate mode‐planes and force lines
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # prepare data
+    omega_d_hz = omega_d / (2 * np.pi)
+    f_amps = np.array(f_amp_sweep)[:, 0]
+    n_modes = frequency_response_force.shape[2]
+    n_forces = len(f_amps)
+    # choose a colormap for the forces
+    cmap = plt.cm.viridis(np.linspace(0, 1, n_forces))
+
+    # for each mode, draw a constant‐y plane (mode index)
+    for mode_idx in range(n_modes):
+        y_plane = np.full_like(omega_d_hz, mode_idx, dtype=float)
+        for i, (force, color) in enumerate(zip(f_amps, cmap)):
+            zs = frequency_response_force[:, i, mode_idx]
+            ax.plot(
+                omega_d_hz,
+                y_plane,
+                zs,
+                color=color,
+                label=f"{force:.2f}" if mode_idx == 0 else ""
+            )
+
+    # axis labels and ticks
+    ax.set_xlabel("Drive frequency $f_d$ [Hz]")
+    ax.set_ylabel("Mode index")
+    ax.set_zlabel("Steady‐state amplitude")
+    ax.set_yticks(np.arange(n_modes))
+    ax.set_yticklabels([f"Mode {i+1}" for i in range(n_modes)])
+
+    # legend for force amplitudes
+    ax.legend(title="Force amp", loc="upper left", bbox_to_anchor=(1.05, 1))
+
+    ax.set_title("Force‐sweep frequency‐response lines per mode")
+    plt.tight_layout()
+    plt.show()

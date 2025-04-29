@@ -109,16 +109,17 @@ class ModalEOM:
             solver=diffrax.Tsit5(),
             t0=0.0,
             t1=t_end,
-            dt0=1e-3,
+            dt0=None,
             max_steps=500_000,
             y0=y0,
+            progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-6, atol=1e-8),
+            stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
             args=(f_omega, f_amp),
         )
-        q1 = sol.ys[:, 0]
-        
-        return q1
+
+        qs = sol.ys[:, : self.N]
+        return qs
     
     # --------------------------------------------------- public wrappers
     def eigenfrequencies(self) -> jax.Array:
@@ -159,14 +160,12 @@ class ModalEOM:
         t_end: float,
         n_steps: int,
         discard_frac: float,
+        f_omega: jax.Array,
         f_amp : jax.Array = None,
-        f_omega: jax.Array = None,
     ) -> tuple:
         
         if f_amp is None:
             f_amp = self.f_amp
-        if f_omega is None:
-            f_omega = self.f_omega
             
         f_omega = jnp.atleast_1d(f_omega)
         f_amp = jnp.atleast_1d(f_amp)
@@ -179,4 +178,36 @@ class ModalEOM:
         max_amplitudes = jnp.max(jnp.abs(amplitude_responses_steady_state), axis=1)
         
         return f_omega, max_amplitudes
+    
+    def force_sweep(
+        self,
+        y0: jax.Array,
+        t_end: float,
+        n_steps: int,
+        discard_frac: float,
+        f_amp : jax.Array,
+        f_omega: jax.Array,
+    ) -> tuple:
+        
+        f_omega = jnp.atleast_1d(f_omega)
+        f_amp = jnp.atleast_1d(f_amp)
+        
+        def solve_rhs(f_omega, f_amp):
+            return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
+        
+        amplitude_responses_forces = []
+        
+        for amp in f_amp:
+            # compute response for each frequency at the current force amplitude vector
+            amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
+            # discard transient
+            idx = int(discard_frac * n_steps)
+            steady = amplitude_responses[:, idx:]
+            # max steady‐state amplitude for each ω
+            max_amplitudes = jnp.max(jnp.abs(steady), axis=1)
+            amplitude_responses_forces.append(max_amplitudes)
+        # shape: (n_forces, n_omegas)
+        amplitude_responses_forces = jnp.stack(amplitude_responses_forces, axis=0)
+            
+        return f_omega, amplitude_responses_forces
 
