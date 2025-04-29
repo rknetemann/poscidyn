@@ -87,9 +87,18 @@ class ModalEOM:
                  + jnp.multiply(f_amp, jnp.cos(f_omega * t))
                 )
 
-            return jnp.concatenate([v, a])
+            return jnp.concatenate([v, a]) # The solver will integrate to get q and v
 
         self.rhs_jit = rhs
+        
+    def _get_steady_state(self, q, v, discard_frac):
+        n_steps = q.shape[1]
+        
+        q_steady = q[:, int(discard_frac * n_steps):]
+        q_steady = jnp.max(jnp.abs(q_steady), axis=1)
+        v_steady = v[:, int(discard_frac * n_steps):]
+        v_steady = jnp.max(jnp.abs(v_steady), axis=1)
+        return q_steady, v_steady
         
     # --------------------------------------------------- internal solvers
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
@@ -120,7 +129,8 @@ class ModalEOM:
         
         ts = sol.ts
         qs = sol.ys[:, : self.N]
-        return ts, qs
+        vs = sol.ys[:, self.N :]
+        return ts, qs, vs
     
     # --------------------------------------------------- public wrappers
     def eigenfrequencies(self) -> jax.Array:
@@ -149,10 +159,11 @@ class ModalEOM:
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        t_s, amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
-        amplitude_responses = jnp.abs(amplitude_responses)
+        ts, qs, vs = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
+        qs = jnp.abs(qs)
+        vs = jnp.abs(vs)
         
-        return t_s, amplitude_responses
+        return ts, qs, vs
     
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
     def frequency_response(
@@ -174,12 +185,12 @@ class ModalEOM:
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        t_s, amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
-        amplitude_responses_steady_state = amplitude_responses[:, int(discard_frac * n_steps):]
-        max_amplitudes = jnp.max(jnp.abs(amplitude_responses_steady_state), axis=1)
+        t, q, v = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
+        q_steady, v_steady = self._get_steady_state(q, v, discard_frac)
         
-        return f_omega, max_amplitudes
+        return f_omega, q_steady, v_steady
     
+    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
     def force_sweep(
         self,
         y0: jax.Array,
@@ -196,16 +207,14 @@ class ModalEOM:
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        amplitude_responses_forces = []
+        qs_steady_forces = []
         
         for amp in f_amp:
-            t_s, amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
-            idx = int(discard_frac * n_steps)
-            steady = amplitude_responses[:, idx:]
-            max_amplitudes = jnp.max(jnp.abs(steady), axis=1)
-            amplitude_responses_forces.append(max_amplitudes)
+            t, q, v = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
+            q_steady, v_steady = self._get_steady_state(q, v, discard_frac)
+            qs_steady_forces.append(q_steady)
 
-        amplitude_responses_forces = jnp.stack(amplitude_responses_forces, axis=0)
+        amplitude_responses_forces = jnp.stack(qs_steady_forces, axis=0)
             
         return f_omega, amplitude_responses_forces
 

@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     print("\nCalculating time response...")
     current_time = time.time()
-    t_s, time_response = modal_eom.time_response(
+    ts, qs, vs = modal_eom.time_response(
         f_omega=f_omega_time_response,
         y0=y0,
         t_end=t_end,
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     
     print("\nCalculating frequency response...")
     current_time = time.time()
-    omega_d, frequency_response = modal_eom.frequency_response(
+    omega_d, q_steady, v_steady = modal_eom.frequency_response(
         f_omega=f_omega_sweep,
         y0=y0,
         t_end=t_end,
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     
     print("\nCalculating force sweep...")
     current_time = time.time()
-    omega_d, frequency_response_force = modal_eom.force_sweep(
+    omega_d, q_steady_forces= modal_eom.force_sweep(
         f_omega=f_omega_sweep,
         f_amp=f_amp_sweep,
         y0=y0,
@@ -65,7 +65,7 @@ if __name__ == "__main__":
         discard_frac=discard_frac
     )
     # swap axes to have shape (n_omega, n_forces, n_modes)
-    frequency_response_force = frequency_response_force.transpose(1, 0, 2)
+    frequency_response_force = q_steady_forces.transpose(1, 0, 2)
     elapsed_time = time.time() - current_time
     print(f"-> Frequency response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
     
@@ -73,8 +73,8 @@ if __name__ == "__main__":
 
     # plot time response
     plt.figure(figsize=(7, 4))                 # unpack times and modal amplitudes
-    for idx in range(time_response.shape[0]):
-        plt.plot(t_s[0], time_response[idx], label=f"Mode {idx+1}")
+    for idx in range(qs.shape[0]):
+        plt.plot(ts[0], qs[idx], label=f"Mode {idx+1}")
     plt.xlabel("Time")
     plt.ylabel("Amplitude")
     plt.title("Time Response of the System")
@@ -87,8 +87,8 @@ if __name__ == "__main__":
     plt.figure(figsize=(7, 4))
     omega_d_hz = omega_d / (2 * np.pi)
     eig_freqs_hz = eig_freqs / (2 * np.pi)
-    for idx in range(frequency_response.shape[1]):
-        plt.plot(omega_d_hz, frequency_response[:, idx], "-o", markersize=1, label=f"Mode {idx+1}")
+    for idx in range(q_steady.shape[1]):
+        plt.plot(omega_d_hz, q_steady[:, idx], "-o", markersize=1, label=f"Mode {idx+1}")
     for idx, f in enumerate(eig_freqs_hz):
         plt.axvline(
             f,
