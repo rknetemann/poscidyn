@@ -20,7 +20,7 @@ if __name__ == "__main__":
     
     f_omega_min, f_omega_max, f_omega_n = 0 * 2 * jnp.pi, 1 * 2 * jnp.pi, 1000
     f_omega_sweep = jnp.linspace(f_omega_min, f_omega_max, f_omega_n)
-    f_amp_sweep = jnp.array([[0.0, 0.5],[1.0, 0.5], [5.0, 0.5], [10.0, 0.5], [15.0, 0.5], [16.5, 0.5]])
+    f_amp_sweep = jnp.array([[0.0, 0.5],[1.0, 0.5], [5.0, 0.5], [10.0, 0.5], [15.0, 0.5], [16.5, 0.5], [16.9, 0.5]])
     f_omega_time_response = jnp.array([0.49 * 2 * np.pi])
     
     y0 = jnp.zeros(2*N)
