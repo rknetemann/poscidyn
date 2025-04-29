@@ -198,15 +198,12 @@ class ModalEOM:
         amplitude_responses_forces = []
         
         for amp in f_amp:
-            # compute response for each frequency at the current force amplitude vector
             amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
-            # discard transient
             idx = int(discard_frac * n_steps)
             steady = amplitude_responses[:, idx:]
-            # max steady‐state amplitude for each ω
             max_amplitudes = jnp.max(jnp.abs(steady), axis=1)
             amplitude_responses_forces.append(max_amplitudes)
-        # shape: (n_forces, n_omegas)
+
         amplitude_responses_forces = jnp.stack(amplitude_responses_forces, axis=0)
             
         return f_omega, amplitude_responses_forces
