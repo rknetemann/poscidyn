@@ -63,12 +63,8 @@ class ModalEOM:
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_duffing")
     
     # --------------------------------------------------- helpers
-    
     def __post_init__(self):
         self._build_rhs()
-
-    def __hash__(self):
-        return id(self)
 
     def _build_rhs(self):
         @jax.jit
