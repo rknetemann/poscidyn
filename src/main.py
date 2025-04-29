@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     print("\nCalculating time response...")
     current_time = time.time()
-    time_response = modal_eom.time_response(
+    t_s, time_response = modal_eom.time_response(
         f_omega=f_omega_time_response,
         y0=y0,
         t_end=t_end,
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # plot time response
     plt.figure(figsize=(7, 4))                 # unpack times and modal amplitudes
     for idx in range(time_response.shape[0]):
-        plt.plot(time_response[idx], label=f"Mode {idx+1}")
+        plt.plot(t_s[0], time_response[idx], label=f"Mode {idx+1}")
     plt.xlabel("Time")
     plt.ylabel("Amplitude")
     plt.title("Time Response of the System")

@@ -117,9 +117,10 @@ class ModalEOM:
             stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
             args=(f_omega, f_amp),
         )
-
+        
+        ts = sol.ts
         qs = sol.ys[:, : self.N]
-        return qs
+        return ts, qs
     
     # --------------------------------------------------- public wrappers
     def eigenfrequencies(self) -> jax.Array:
@@ -148,10 +149,10 @@ class ModalEOM:
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
+        t_s, amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
         amplitude_responses = jnp.abs(amplitude_responses)
         
-        return amplitude_responses
+        return t_s, amplitude_responses
     
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
     def frequency_response(
@@ -173,7 +174,7 @@ class ModalEOM:
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
+        t_s, amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
         amplitude_responses_steady_state = amplitude_responses[:, int(discard_frac * n_steps):]
         max_amplitudes = jnp.max(jnp.abs(amplitude_responses_steady_state), axis=1)
         
@@ -198,7 +199,7 @@ class ModalEOM:
         amplitude_responses_forces = []
         
         for amp in f_amp:
-            amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
+            t_s, amplitude_responses = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
             idx = int(discard_frac * n_steps)
             steady = amplitude_responses[:, idx:]
             max_amplitudes = jnp.max(jnp.abs(steady), axis=1)
