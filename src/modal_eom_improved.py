@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from functools import partial
 import numpy as np
 import jax
+jax.config.update("jax_enable_x64", False)
 import jax.numpy as jnp
 import diffrax
 
@@ -41,17 +42,18 @@ class ModalEOM:
             c     = jnp.array([2.0 * 0.01 * 5.0])
             k     = jnp.array([[10.0]])
             alpha = jnp.zeros((N, N, N))
-            gamma = jnp.zeros((N, N, N, N))
+            gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1]]))
             f_amp = jnp.array([15.0]) 
             f_omega = jnp.array([1.0])
         elif N == 2:
             c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
-            k     = jnp.array([[10.0, 1.0],
-                            [ 1.0,12.0]])
-            alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
-                                                            [0.5, 0.0]]))
-            gamma = jnp.zeros((N, N, N, N))
-            f_amp = jnp.array([15.0, 0.5]) 
+            k     = jnp.array([[10.0, 0],
+                               [0, 12.0]])
+            alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.0],
+                                                            [0.0, 0.0]]))
+            gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1, 0.0],
+                                                            [0.0, 0.0]]))
+            f_amp = jnp.array([15.0, 4.0]) 
             f_omega = jnp.array([1.0])
         elif N == 3:
             c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0, 2.0 * 0.03 * 10.0])
@@ -129,15 +131,17 @@ class ModalEOM:
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(self.rhs_jit),
+            #solver=diffrax.ImplicitEuler(root_finder=diffrax.VeryChord(rtol=1e-8, atol=1e-8)),
+            #solver=diffrax.Kvaerno5(),
             solver=diffrax.Tsit5(),
             t0=0.0,
             t1=t_end,
             dt0=None,
-            max_steps=500_000,
+            max_steps=4096,
             y0=y0,
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
+            stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
             args=(f_omega, f_amp),
         )
         
@@ -151,6 +155,12 @@ class ModalEOM:
         eigvals, _ = jnp.linalg.eig(jnp.asarray(self.k))
         idx = jnp.argsort(eigvals)
         return jnp.abs(jnp.sqrt(eigvals[idx]))
+    
+    def quality_factors(self) -> jax.Array:
+        eigvals, _ = jnp.linalg.eig(jnp.asarray(self.k))
+        idx = jnp.argsort(eigvals)
+        eigvals = eigvals[idx]
+        return 2 * jnp.pi * jnp.abs(eigvals) / (2 * jnp.pi * self.c)
     
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
     def time_response(

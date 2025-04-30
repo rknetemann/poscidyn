@@ -1,7 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
 import jax
-jax.config.update("jax_enable_x64", False)
 import time
 import matplotlib.pyplot as plt
 
@@ -19,6 +18,29 @@ if __name__ == "__main__":
     print("Eigenfrequencies (Hz):")
     for idx, freq in enumerate(eig_freqs, start=1):
         print(f"- Mode {idx}: {(freq / (2 * np.pi)):.2f} Hz")
+
+    largest_eigenfrequency = jnp.max(eig_freqs)
+    print(f"\nLargest eigenfrequency (Hz): {(largest_eigenfrequency / (2 * np.pi)):.2f} Hz")
+    
+    time_scale = 1 / (2 * np.pi * largest_eigenfrequency)
+    print(f"Time scale: {time_scale:.2f} s")
+    
+    stiffness_matrix = modal_eom.k
+    stiffness_reference = jnp.max(jnp.abs(stiffness_matrix))
+    print(f"\nMax stiffness in stiffness matrix: {stiffness_reference:.2f}")
+    
+    force = modal_eom.f_amp
+    force_reference = jnp.max(jnp.abs(force))
+    print(f"Max force in force vector: {force_reference:.2f}")
+    
+    displacement_scale = force_reference / stiffness_reference
+    print(f"Displacement scale: {displacement_scale:.2f}")
+        
+    quality_factors = modal_eom.quality_factors()
+    print("\nQuality factors:")
+    for idx, q in enumerate(quality_factors, start=1):
+        print(f"- Mode {idx}: {q:.2f}")
+        
     
     f_omega_min, f_omega_max, f_omega_n = 0 * 2 * jnp.pi, 1 * 2 * jnp.pi, 1000
     f_omega_sweep = jnp.linspace(f_omega_min, f_omega_max, f_omega_n)
@@ -26,12 +48,9 @@ if __name__ == "__main__":
     f_omega_time_response = jnp.array([0.49 * 2 * np.pi])
     
     y0 = jnp.zeros(2*N)
-    t_end = 100.0
-    n_steps = 500
+    t_end = 200.0
+    n_steps = 5000
     discard_frac = 0.8
-    
-    number_of_calculations = f_omega_n * n_steps
-    print(f"\nNumber of calculations: {number_of_calculations}")
 
     print("\nCalculating time response...")
     ts, qs, vs = modal_eom.time_response(
@@ -50,17 +69,17 @@ if __name__ == "__main__":
         discard_frac=discard_frac
     )
     
-    print("\nCalculating force sweep...")
-    omega_d, q_steady_forces= modal_eom.force_sweep(
-        f_omega=f_omega_sweep,
-        f_amp=f_amp_sweep,
-        y0=y0,
-        t_end=t_end,
-        n_steps=n_steps,
-        discard_frac=discard_frac
-    )
-    # swap axes to have shape (n_omega, n_forces, n_modes)
-    frequency_response_force = q_steady_forces.transpose(1, 0, 2)
+    # print("\nCalculating force sweep...")
+    # omega_d, q_steady_forces= modal_eom.force_sweep(
+    #     f_omega=f_omega_sweep,
+    #     f_amp=f_amp_sweep,
+    #     y0=y0,
+    #     t_end=t_end,
+    #     n_steps=n_steps,
+    #     discard_frac=discard_frac
+    # )
+    # # swap axes to have shape (n_omega, n_forces, n_modes)
+    # frequency_response_force = q_steady_forces.transpose(1, 0, 2)
         
     # ------ visualize ----------------------------------------------------
 
