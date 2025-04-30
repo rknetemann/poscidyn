@@ -1,3 +1,4 @@
+# ───────────────────────── modal_eom_improved.py ──────────────────────────
 from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import partial
@@ -10,7 +11,7 @@ import diffrax
 from utils.random import random_uniform
 
 @dataclass(eq=False)
-class ModalEOM:
+class Model:
     N:         int
     c:         jax.Array            # (N,)
     k:         jax.Array            # (N,N)
@@ -22,10 +23,14 @@ class ModalEOM:
     name:      str = "modal_system"
 
     rhs_jit: callable = field(init=False, repr=False)
-
+    
+    # Non-dimensionalisation factors
+    T0: float = field(init=False, repr=False)
+    Q0: float = field(init=False, repr=False)
+    
     # --------------------------------------------------- constructors
     @classmethod
-    def from_random(cls, N: int, seed: int = 0) -> "ModalEOM":
+    def from_random(cls, N: int, seed: int = 0) -> "Model":
         key = jax.random.PRNGKey(seed)
         c,       key = random_uniform(key, (N,),           0.0, 1.0)
         k,       key = random_uniform(key, (N, N),         0.0, 1.0)
@@ -37,7 +42,7 @@ class ModalEOM:
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_random")
 
     @classmethod
-    def from_example(cls, N) -> "ModalEOM":
+    def from_example(cls, N) -> "Model":
         if N == 1:
             c     = jnp.array([2.0 * 0.01 * 5.0])
             k     = jnp.array([[10.0]])
@@ -70,7 +75,7 @@ class ModalEOM:
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
     
     @classmethod
-    def from_duffing(cls) -> "ModalEOM":
+    def from_duffing(cls) -> "Model":
         N = 2
         c       = jnp.array([0.1, 0.1])
         k       = jnp.array([[1.0, 0.0],
@@ -151,6 +156,34 @@ class ModalEOM:
         return ts, qs, vs
     
     # --------------------------------------------------- public wrappers
+    
+    def non_dimensionalise(self) -> tuple[float, float]:
+        """Convert *this very instance* to hat-units in place.
+        Returns
+        -------
+        T0, Q0  :  the time and displacement scales that were used.
+        """
+        # -- pick scales --------------------------------------------------
+        omega_max = jnp.max(self.eigenfrequencies())      # rad/s
+        self.T0   = float(1.0 / omega_max)                # s
+
+        k_ref     = float(jnp.max(jnp.abs(self.k)))       # stiffness
+        f_ref     = float(jnp.max(jnp.abs(self.f_amp)))   # force
+        self.Q0   = f_ref / k_ref                        # m (or unit of q)
+
+        # -- rescale coefficients in place --------------------------------
+        self.c      = self.c * self.T0
+        self.k      = self.k * self.T0**2
+        self.alpha  = self.alpha * self.Q0 * self.T0**2
+        self.gamma  = self.gamma * self.Q0**2 * self.T0**2
+        self.f_amp  = self.f_amp * self.T0**2 / self.Q0
+        self.f_omega = self.f_omega * self.T0           # rad ∙ ŝ⁻¹
+
+        # -- rebuild RHS with the new parameters --------------------------
+        self._build_rhs()
+
+        return self
+    
     def eigenfrequencies(self) -> jax.Array:
         eigvals, _ = jnp.linalg.eig(jnp.asarray(self.k))
         idx = jnp.argsort(eigvals)
