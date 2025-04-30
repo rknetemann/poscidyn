@@ -36,16 +36,34 @@ class ModalEOM:
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_random")
 
     @classmethod
-    def from_example(cls) -> "ModalEOM":
-        N = 2
-        c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
-        k     = jnp.array([[10.0, 1.0],
-                           [ 1.0,12.0]])
-        alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
-                                                          [0.5, 0.0]]))
-        gamma = jnp.zeros((N, N, N, N))
-        f_amp = jnp.array([1.0, 0.5]) 
-        f_omega = jnp.array([1.0])
+    def from_example(cls, N) -> "ModalEOM":
+        if N == 1:
+            c     = jnp.array([2.0 * 0.01 * 5.0])
+            k     = jnp.array([[10.0]])
+            alpha = jnp.zeros((N, N, N))
+            gamma = jnp.zeros((N, N, N, N))
+            f_amp = jnp.array([15.0]) 
+            f_omega = jnp.array([1.0])
+        elif N == 2:
+            c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
+            k     = jnp.array([[10.0, 1.0],
+                            [ 1.0,12.0]])
+            alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
+                                                            [0.5, 0.0]]))
+            gamma = jnp.zeros((N, N, N, N))
+            f_amp = jnp.array([15.0, 0.5]) 
+            f_omega = jnp.array([1.0])
+        elif N == 3:
+            c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0, 2.0 * 0.03 * 10.0])
+            k     = jnp.array([[10.0, 1.0, 0.5],
+                            [1.0,12.0, 1.5],
+                            [0.5, 1.5,13.0]])
+            alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5, 1.5],
+                                                            [0.5, 0.0, 1.5],
+                                                            [1.5, 1.5, 0.0]]))
+            gamma = jnp.zeros((N, N, N, N))
+            f_amp = jnp.array([15.0, 10.0, 5.0]) 
+            f_omega = jnp.array([1.0])
         
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
     

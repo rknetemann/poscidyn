@@ -10,7 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D      # added for 3D plotting
 
 if __name__ == "__main__":
     N = 2
-    modal_eom = ModalEOMImproved.from_example()
+    modal_eom = ModalEOMImproved.from_example(N)
     #modal_eom = ModalEOMImproved.from_random(N, seed=33)
     
     eig_freqs = modal_eom.eigenfrequencies()
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     f_omega_min, f_omega_max, f_omega_n = 0 * 2 * jnp.pi, 1 * 2 * jnp.pi, 1000
     f_omega_sweep = jnp.linspace(f_omega_min, f_omega_max, f_omega_n)
     f_amp_sweep = jnp.array([[0.0, 0.5],[1.0, 0.5], [5.0, 0.5], [10.0, 0.5], [15.0, 0.5], [16.5, 0.5], [16.9, 0.5]])
-    f_omega_time_response = jnp.array([0.49 * 2 * np.pi])
+    f_omega_time_response = jnp.array([0.001 * 2 * np.pi])
     
     y0 = jnp.zeros(2*N)
     t_end = 100.0
@@ -32,18 +32,14 @@ if __name__ == "__main__":
     print(f"\nNumber of calculations: {number_of_calculations}")
 
     print("\nCalculating time response...")
-    current_time = time.time()
     ts, qs, vs = modal_eom.time_response(
         f_omega=f_omega_time_response,
         y0=y0,
         t_end=t_end,
         n_steps=n_steps,
     )
-    elapsed_time = time.time() - current_time
-    print(f"-> Time response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
     
     print("\nCalculating frequency response...")
-    current_time = time.time()
     omega_d, q_steady, v_steady = modal_eom.frequency_response(
         f_omega=f_omega_sweep,
         y0=y0,
@@ -51,11 +47,8 @@ if __name__ == "__main__":
         n_steps=n_steps,
         discard_frac=discard_frac
     )
-    elapsed_time = time.time() - current_time
-    print(f"-> Frequency response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
     
     print("\nCalculating force sweep...")
-    current_time = time.time()
     omega_d, q_steady_forces= modal_eom.force_sweep(
         f_omega=f_omega_sweep,
         f_amp=f_amp_sweep,
@@ -66,9 +59,7 @@ if __name__ == "__main__":
     )
     # swap axes to have shape (n_omega, n_forces, n_modes)
     frequency_response_force = q_steady_forces.transpose(1, 0, 2)
-    elapsed_time = time.time() - current_time
-    print(f"-> Frequency response elapsed time: {elapsed_time:.2f} seconds. ({(number_of_calculations / elapsed_time):.2f} calculations/s)")
-    
+        
     # ------ visualize ----------------------------------------------------
 
     # plot time response
@@ -100,7 +91,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.xlabel(r"Drive frequency  $f_d$  [Hz]")
     plt.ylabel(r"Steady-state amplitude  $|q_1|_{\max}$")
-    plt.title("Frequency-response curve (SciPy integrator)")
+    plt.title("Frequency-response curve")
     plt.grid(True)
     plt.tight_layout()
     plt.show()
@@ -141,5 +132,22 @@ if __name__ == "__main__":
     ax.legend(title="Force amp", loc="upper left", bbox_to_anchor=(1.05, 1))
 
     ax.set_title("Force‐sweep frequency‐response lines per mode")
+    plt.tight_layout()
+    plt.show()
+
+    # separate 2D plot for the first mode across all force amplitudes
+    plt.figure(figsize=(7, 4))
+    for i, force in enumerate(f_amps):
+        plt.plot(
+            omega_d_hz,
+            frequency_response_force[:, i, 0],
+            color=cmap[i],
+            label=f"Force {force:.2f}"
+        )
+    plt.xlabel("Drive frequency $f_d$ [Hz]")
+    plt.ylabel("Steady‐state amplitude (Mode 1)")
+    plt.title("Force‐sweep response for Mode 1")
+    plt.legend(title="Force amp")
+    plt.grid(True)
     plt.tight_layout()
     plt.show()
