@@ -10,13 +10,12 @@ from modal_eom_improved import Model as ModalEOM
 RUN_TIME   = False     # single-tone time trace
 RUN_FREQ   = True      # frequency-response curve
 RUN_FORCE  = False     # force-sweep surface
-PLOT_DIMLESS = False   # False → physical units, True → dimensionless
+PLOT_DIMLESS = True   # False→ physical units, True → dimensionless
 
 # ────────────── build & scale model ─────────────────────────
-N   = 2
+N   = 4
 mdl = ModalEOM.from_example(N).non_dimensionalise()    # returns itself
 T0, Q0 = mdl.T0, mdl.Q0
-print(f"Non-dimensionalised with  T0 = {T0:.3e} s   Q0 = {Q0:.3e}")
 
 # helpers ----------------------------------------------------
 to_hat  = lambda x, unit: x * unit       # phys → hat
@@ -59,12 +58,12 @@ if RUN_TIME:
 # =============== study 2: frequency sweep ===================
 if RUN_FREQ:
     print("\nCalculating frequency response …")
-    w_min, w_max, n_w = 0.0, 1.0*2*np.pi, 1000        # phys rad/s
+    w_min, w_max, n_w = 0.0, 1*2*np.pi, 100        # phys rad/s
     w_sweep_hat = jnp.linspace(w_min, w_max, n_w) * T0
 
-    y0_hat, t_end_hat = jnp.zeros(2*N), to_hat(200.0, 1/T0)
+    y0_hat, t_end_hat = jnp.zeros(2*N), to_hat(100.0, 1/T0)
     _, q_st_hat, _ = mdl.frequency_response(
-        y0=y0_hat, t_end=t_end_hat, n_steps=5000,
+        y0=y0_hat, t_end=t_end_hat, n_steps=2000,
         discard_frac=0.8, f_omega=w_sweep_hat
     )
 

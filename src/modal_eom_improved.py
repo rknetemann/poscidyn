@@ -71,8 +71,24 @@ class Model:
             gamma = jnp.zeros((N, N, N, N))
             f_amp = jnp.array([15.0, 10.0, 5.0]) 
             f_omega = jnp.array([1.0])
+        elif N == 4:
+            c     = jnp.array([2.0 * 0.05 * 5.0, 2.0 * 0.05 * 8.0, 2.0 * 0.06 * 10.0, 2.0 * 0.06 * 12.0])
+            k     = jnp.array([[10.0, 1.0, 0.5, 0],
+                            [1.0,12.0, 1.5, 1],
+                            [0.5, 1.5,13.0, 1],
+                            [0,   1,   1,   14]])
+            alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5, 1.5, 2],
+                                                            [0.5, 0.0, 1.5, 2],
+                                                            [1.5, 1.5, 0.0, 2],
+                                                            [2,   2,   2,   0]]))
+            gamma = jnp.zeros((N, N, N, N))
+            f_amp = jnp.array([15.0, 10.0, 5.0, 2.0])  # Fixed to have 4 elements
+            f_omega = jnp.array([1.0])
+        else:
+            raise ValueError("N must be 1, 2, 3, 4 or 5")
         
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
+    
     
     @classmethod
     def from_duffing(cls) -> "Model":
@@ -92,7 +108,6 @@ class Model:
         self._build_rhs()
 
     def _build_rhs(self):
-        @jax.jit
         def rhs(t, state, args):
             f_omega, f_amp = args
             
@@ -142,7 +157,7 @@ class Model:
             t0=0.0,
             t1=t_end,
             dt0=None,
-            max_steps=4096,
+            max_steps=400096,
             y0=y0,
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
