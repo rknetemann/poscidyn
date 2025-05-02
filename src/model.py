@@ -172,7 +172,6 @@ class Model:
         return q_steady, v_steady
         
     # --------------------------------------------------- internal solver
-    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
     def _solve_rhs(
         self,
         f_omega_rad: jax.Array,
