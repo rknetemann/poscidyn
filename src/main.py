@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D        # noqa: F401
 
-from modal_eom_improved import Model as ModalEOM
+from model import Model
 
 # ────────────── switches ────────────────────────────────────
 RUN_TIME   = False     # single-tone time trace
@@ -13,8 +13,8 @@ RUN_FORCE  = True     # force-sweep surface
 
 # ────────────── build & scale model ─────────────────────────
 N   = 4
-mdl = ModalEOM.from_example(N)
-#mdl = ModalEOM.from_random(N)
+mdl = Model.from_example(N)
+#mdl = Model.from_random(N)
 #print(mdl)
 
 # ────────────── eigenfrequencies ─────────────────────────
