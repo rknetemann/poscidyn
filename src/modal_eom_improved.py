@@ -89,19 +89,9 @@ class Model:
         
         return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
     
-    
     @classmethod
-    def from_duffing(cls) -> "Model":
-        N = 2
-        c       = jnp.array([0.1, 0.1])
-        k       = jnp.array([[1.0, 0.0],
-                           [0.0, 1.0]])
-        alpha   = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5],
-                                                          [0.5, 0.0]]))
-        gamma   = jnp.zeros((N, N, N, N))
-        f_amp   = jnp.array([1.0, 1.0])
-        f_omega = jnp.array([1.0])
-        return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_duffing")
+    def from_file(cls, path:str) -> "Model":
+        raise NotImplementedError("Loading from file is not implemented yet.")
     
     # --------------------------------------------------- helpers
     def __post_init__(self):
@@ -260,7 +250,9 @@ class Model:
         t, q, v = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
         q_steady, v_steady = self._get_steady_state(q, v, discard_frac)
         
-        return f_omega, q_steady, v_steady
+        q_steady_total = jnp.sum(q_steady, axis=1)
+        
+        return f_omega, q_steady, q_steady_total, v_steady
     
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
     def force_sweep(

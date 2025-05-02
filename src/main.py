@@ -62,7 +62,7 @@ if RUN_FREQ:
     w_sweep_hat = jnp.linspace(w_min, w_max, n_w) * T0
 
     y0_hat, t_end_hat = jnp.zeros(2*N), to_hat(100.0, 1/T0)
-    _, q_st_hat, _ = mdl.frequency_response(
+    _, q_st_hat, q_st_total, _ = mdl.frequency_response(
         y0=y0_hat, t_end=t_end_hat, n_steps=2000,
         discard_frac=0.8, f_omega=w_sweep_hat
     )
@@ -86,6 +86,7 @@ if RUN_FREQ:
         plt.plot(freq, amps[:, m], label=f"Mode {m+1}")
     for f in eig_lines:
         plt.axvline(f, ls="--", color="r", alpha=.6)
+    plt.plot(freq, q_st_total, label="Total Response", color="k", lw=2, alpha=0.8)
     plt.xlabel(xlabel); plt.ylabel(amp_label)
     plt.title("Frequency response"); plt.legend(); plt.grid(True)
     plt.tight_layout(); plt.show()
