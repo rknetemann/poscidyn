@@ -47,11 +47,9 @@ if RUN_TIME:
 if RUN_FREQ:
     print("\nCalculating frequency response …")
     f_omega_sweep_hz = jnp.linspace(0.0, 1, 400)
-    y0, t_end = jnp.zeros(2*N), 100.0
     
     f_omega_hz, q_steady, q_steady_total, _ = mdl.frequency_response(
-        y0, n_steps=2000,
-        discard_frac=0.8, f_omega_hz=f_omega_sweep_hz
+        f_omega_hz=f_omega_sweep_hz
     )
     
     plt.figure(figsize=(7,4))

@@ -282,14 +282,15 @@ class Model:
     
     def frequency_response(
         self,
-        y0: jax.Array,
-        n_steps: int,
-        discard_frac: float,
         f_omega_hz: jax.Array,
+        y0: jax.Array = None,
+        discard_frac: float = 0.8,
         t_end: float = None,
         f_amp : jax.Array = None,
     ) -> tuple:
         
+        if y0 is None:
+            y0 = jnp.zeros(2 * self.N)
         if t_end is None:
             t_end = self._get_steady_state_t_end()
         if f_amp is None:
@@ -297,6 +298,8 @@ class Model:
             
         f_omega_rad_dl = jnp.atleast_1d(f_omega_hz) *  2 * np.pi * self.non_dimensionalised_model.T0
         f_amp_dl = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
+        
+        n_steps = len(f_omega_rad_dl)
         
         def solve_rhs(f_omega_rad_dl, f_amp_dl):
             return self._solve_rhs(f_omega_rad_dl, f_amp_dl, y0, t_end, n_steps, steady_state=False)
