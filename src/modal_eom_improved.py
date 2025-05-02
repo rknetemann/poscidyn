@@ -4,34 +4,54 @@ from dataclasses import dataclass, field
 from functools import partial
 import numpy as np
 import jax
-jax.config.update("jax_enable_x64", False)
 import jax.numpy as jnp
 import diffrax
-
 from utils.random import random_uniform
 
+jax.config.update("jax_enable_x64", False)
+CALCULATE_DIMMLESS = True
+    
 @dataclass(eq=False)
-class Model:
+class NonDimensionalisedModel:  
+    N:          int
+    zeta:       jax.Array            # (N,)
+    K:          jax.Array            # (N,)
+    A:          jax.Array            # (N,)
+    G:          jax.Array            # (N,N,N)
+    F_amp:      jax.Array            # (N,)
+    F_omega:    jax.Array            # (1,)
+
+    T0:         float
+    Q0:         float
+    
+    eigenfrequencies_rad: jax.Array
+    
+    name:      str = "modal_system"
+    
+@dataclass(eq=False)
+class Model:       
     N:         int
+    m:         jax.Array            # (N,)
     c:         jax.Array            # (N,)
-    k:         jax.Array            # (N,N)
+    k:         jax.Array            # (N,)
     alpha:     jax.Array            # (N,N,N)
     gamma:     jax.Array            # (N,N,N,N)
     f_amp:     jax.Array            # (N,)
-    f_omega:   jax.Array            # (1,)
+    f_omega_rad:   jax.Array            # (1,)
     
     name:      str = "modal_system"
-
-    rhs_jit: callable = field(init=False, repr=False)
     
-    # Non-dimensionalisation factors
-    T0: float = field(init=False, repr=False)
-    Q0: float = field(init=False, repr=False)
+    eigenfrequencies_rad: jax.Array = field(init=False, repr=False)
+    
+    non_dimensionalised_model: NonDimensionalisedModel = field(init=False, repr=False)
+    
+    rhs_jit: callable = field(init=False, repr=False)
     
     # --------------------------------------------------- constructors
     @classmethod
     def from_random(cls, N: int, seed: int = 0) -> "Model":
         key = jax.random.PRNGKey(seed)
+        m,       key = random_uniform(key, (N,),           0.1, 10.0)
         c,       key = random_uniform(key, (N,),           0.0, 1.0)
         k,       key = random_uniform(key, (N, N),         0.0, 1.0)
         alpha,   key = random_uniform(key, (N, N, N),     -1.0, 1.0)
@@ -39,11 +59,12 @@ class Model:
         f_amp,   key = random_uniform(key, (N,),          -1.0, 1.0)
         f_omega, key = random_uniform(key, (1,),          0.0, 10.0)
         
-        return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_random")
+        return cls(N, m, c, k, alpha, gamma, f_amp, f_omega, name="from_random")
 
     @classmethod
     def from_example(cls, N) -> "Model":
         if N == 1:
+            m     = jnp.array([1.0])
             c     = jnp.array([2.0 * 0.01 * 5.0])
             k     = jnp.array([[10.0]])
             alpha = jnp.zeros((N, N, N))
@@ -51,6 +72,7 @@ class Model:
             f_amp = jnp.array([15.0]) 
             f_omega = jnp.array([1.0])
         elif N == 2:
+            m     = jnp.array([1.0, 2.0])
             c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
             k     = jnp.array([[10.0, 0],
                                [0, 12.0]])
@@ -60,18 +82,8 @@ class Model:
                                                             [0.0, 0.0]]))
             f_amp = jnp.array([15.0, 4.0]) 
             f_omega = jnp.array([1.0])
-        elif N == 3:
-            c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0, 2.0 * 0.03 * 10.0])
-            k     = jnp.array([[10.0, 1.0, 0.5],
-                            [1.0,12.0, 1.5],
-                            [0.5, 1.5,13.0]])
-            alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.5, 1.5],
-                                                            [0.5, 0.0, 1.5],
-                                                            [1.5, 1.5, 0.0]]))
-            gamma = jnp.zeros((N, N, N, N))
-            f_amp = jnp.array([15.0, 10.0, 5.0]) 
-            f_omega = jnp.array([1.0])
         elif N == 4:
+            m     = jnp.array([1.0, 2.0, 3.0, 4.0])
             c     = jnp.array([2.0 * 0.05 * 5.0, 2.0 * 0.05 * 8.0, 2.0 * 0.06 * 10.0, 2.0 * 0.06 * 12.0])
             k     = jnp.array([[10.0, 1.0, 0.5, 0],
                             [1.0,12.0, 1.5, 1],
@@ -87,7 +99,7 @@ class Model:
         else:
             raise ValueError("N must be 1, 2, 3, 4 or 5")
         
-        return cls(N, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
+        return cls(N, m, c, k, alpha, gamma, f_amp, f_omega, name="from_example")
     
     @classmethod
     def from_file(cls, path:str) -> "Model":
@@ -95,28 +107,61 @@ class Model:
     
     # --------------------------------------------------- helpers
     def __post_init__(self):
+        self._calc_eigenfrequencies()
+        self._non_dimensionalise()
         self._build_rhs()
+        
+    def _calc_eigenfrequencies(self):
+        M_inv_K = self.k / self.m[:, None]          # (N,N)
+        eigvals, _ = jnp.linalg.eig(M_inv_K)
+        idx       = jnp.argsort(eigvals)
+        self.eigenfrequencies_rad = jnp.sqrt(jnp.abs(eigvals[idx]))
+    
+    def _non_dimensionalise(self):
+        T0 = 1.0 / jnp.max(self.eigenfrequencies_rad)
+        Q0 = jnp.max(self.f_amp) / jnp.min(jnp.diag(self.k))
+        
+        eigenfrequencies_rad = self.eigenfrequencies_rad * T0
+        
+        zeta = self.c * T0 / (2.0 * self.m)
+        K = self.k * T0**2 / self.m[:, None]
+        A = self.alpha * Q0 * T0**2 / self.m[:, None, None]
+        G = self.gamma * Q0**2 * T0**2 / self.m[:, None, None, None]
+        F_amp = self.f_amp * T0**2 / (self.m * Q0)
+        F_omega_rad = self.f_omega_rad * T0
+        
+        self.non_dimensionalised_model = NonDimensionalisedModel(
+            N=self.N,
+            zeta=zeta,
+            K=K,
+            A=A,
+            G=G,
+            F_amp=F_amp,
+            F_omega=F_omega_rad,
+            T0=float(T0),
+            Q0=float(Q0),
+            eigenfrequencies_rad=eigenfrequencies_rad,
+        )
 
     def _build_rhs(self):
-        def rhs(t, state, args):
-            f_omega, f_amp = args
-            
-            f_omega = jnp.atleast_1d(f_omega)
-            f_amp   = jnp.atleast_1d(f_amp)
-            
-            q, v = jnp.split(state, 2)
+        def _rhs(t, state, args):
+            f_omega_rad_dl, f_amp_dl = args
+            q, v   = jnp.split(state, 2)
 
-            a = (- jnp.multiply(self.c, v) # (N,) * (N,) = (N,)
-                 - jnp.matmul(self.k, q)   # (N,N) @ (N,) = (N,)
-                 - jnp.einsum("ijk,j,k->i",    self.alpha, q, q)
-                 - jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q)
-                 + jnp.multiply(f_amp, jnp.cos(f_omega * t))
+            a = (-2.0 * self.non_dimensionalised_model.zeta * v
+                - jnp.matmul(self.non_dimensionalised_model.K, q)
+                - jnp.einsum("ijk,j,k->i",    self.non_dimensionalised_model.A, q, q)
+                - jnp.einsum("ijkl,j,k,l->i", self.non_dimensionalised_model.G, q, q, q)
+                + f_amp_dl * jnp.cos(f_omega_rad_dl * t)
                 )
-
-            return jnp.concatenate([v, a]) # The solver will integrate to get q and v
-
-        self.rhs_jit = rhs
+            return jnp.concatenate([v, a])
         
+        self.rhs_jit = jax.jit(_rhs)
+
+    def _get_steady_state_t_end(self) -> float:
+        t_end_dl = 10 / jnp.max(self.non_dimensionalised_model.zeta * self.non_dimensionalised_model.eigenfrequencies_rad)
+        return t_end_dl * self.non_dimensionalised_model.T0
+            
     def _get_steady_state(self, q, v, discard_frac):
         n_steps = q.shape[1]
         
@@ -126,23 +171,21 @@ class Model:
         v_steady = jnp.max(jnp.abs(v_steady), axis=1)
         return q_steady, v_steady
         
-    # --------------------------------------------------- internal solvers
+    # --------------------------------------------------- internal solver
     @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
     def _solve_rhs(
         self,
-        f_omega: jax.Array,
+        f_omega_rad: jax.Array,
         f_amp: jax.Array,
         y0: jax.Array,
         t_end: float,
         n_steps: int,
     ) -> jax.Array:
         
-        f_omega = jnp.atleast_1d(f_omega)
+        f_omega_rad = jnp.atleast_1d(f_omega_rad)
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(self.rhs_jit),
-            #solver=diffrax.ImplicitEuler(root_finder=diffrax.VeryChord(rtol=1e-8, atol=1e-8)),
-            #solver=diffrax.Kvaerno5(),
             solver=diffrax.Tsit5(),
             t0=0.0,
             t1=t_end,
@@ -152,133 +195,130 @@ class Model:
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
             stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
-            args=(f_omega, f_amp),
+            args=(f_omega_rad, f_amp),
         )
         
-        ts = sol.ts
-        qs = sol.ys[:, : self.N]
-        vs = sol.ys[:, self.N :]
-        return ts, qs, vs
+        t = sol.ts
+        q = sol.ys[:, : self.N]
+        v = sol.ys[:, self.N :]
+        return t, q, v
     
     # --------------------------------------------------- public wrappers
     
-    def non_dimensionalise(self) -> tuple[float, float]:
-        """Convert *this very instance* to hat-units in place.
-        Returns
-        -------
-        T0, Q0  :  the time and displacement scales that were used.
-        """
-        # -- pick scales --------------------------------------------------
-        omega_max = jnp.max(self.eigenfrequencies())      # rad/s
-        self.T0   = float(1.0 / omega_max)                # s
-
-        k_ref     = float(jnp.max(jnp.abs(self.k)))       # stiffness
-        f_ref     = float(jnp.max(jnp.abs(self.f_amp)))   # force
-        self.Q0   = f_ref / k_ref                        # m (or unit of q)
-
-        # -- rescale coefficients in place --------------------------------
-        self.c      = self.c * self.T0
-        self.k      = self.k * self.T0**2
-        self.alpha  = self.alpha * self.Q0 * self.T0**2
-        self.gamma  = self.gamma * self.Q0**2 * self.T0**2
-        self.f_amp  = self.f_amp * self.T0**2 / self.Q0
-        self.f_omega = self.f_omega * self.T0           # rad ∙ ŝ⁻¹
-
-        # -- rebuild RHS with the new parameters --------------------------
-        self._build_rhs()
-
-        return self
-    
     def eigenfrequencies(self) -> jax.Array:
-        eigvals, _ = jnp.linalg.eig(jnp.asarray(self.k))
-        idx = jnp.argsort(eigvals)
-        return jnp.abs(jnp.sqrt(eigvals[idx]))
+        eigenfrequencies_rad = self.non_dimensionalised_model.eigenfrequencies_rad
+
+        return eigenfrequencies_rad
     
     def quality_factors(self) -> jax.Array:
-        eigvals, _ = jnp.linalg.eig(jnp.asarray(self.k))
-        idx = jnp.argsort(eigvals)
-        eigvals = eigvals[idx]
-        return 2 * jnp.pi * jnp.abs(eigvals) / (2 * jnp.pi * self.c)
+        raise NotImplementedError("Quality factors are not implemented yet.")
     
-    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps"))
     def time_response(
         self,
         y0: jax.Array,
-        t_end: float,
         n_steps: int,
+        t_end: float = None,
         f_amp: jax.Array = None,
-        f_omega: jax.Array = None,
+        f_omega_hz: jax.Array = None,
     ) -> jax.Array:
         
+        if t_end is None:
+            t_end_dl = float(self._get_steady_state_t_end()) * 2
+        else:
+            t_end_dl = t_end / self.non_dimensionalised_model.T0
         if f_amp is None:
             f_amp = self.f_amp
-        if f_omega is None:
-            f_omega = self.f_omega
+        if f_omega_hz is None:
+            f_omega_hz = self.f_omega_rad / (2 * np.pi)
+            
         
-        f_omega = jnp.atleast_1d(f_omega)
-        f_amp = jnp.atleast_1d(f_amp)
+        f_omega_dl = jnp.atleast_1d(f_omega_hz) *  2 * np.pi * self.non_dimensionalised_model.T0
+        f_amp_dl = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
+                
+        def solve_rhs(f_omega_dl, f_amp_dl):
+            return self._solve_rhs(f_omega_dl, f_amp_dl, y0, t_end_dl, n_steps)
         
-        def solve_rhs(f_omega, f_amp):
-            return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
+        t_dl, q_dl, v_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_dl, f_amp_dl)
+        q_dl,v_dl = jnp.abs(q_dl), jnp.abs(v_dl)
         
-        ts, qs, vs = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
-        qs = jnp.abs(qs)
-        vs = jnp.abs(vs)
-        
-        return ts, qs, vs
+        return t_dl, q_dl, v_dl
     
-    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
     def frequency_response(
         self,
         y0: jax.Array,
-        t_end: float,
         n_steps: int,
         discard_frac: float,
-        f_omega: jax.Array,
+        f_omega_hz: jax.Array,
+        t_end: float = None,
         f_amp : jax.Array = None,
     ) -> tuple:
         
+        if t_end is None:
+            t_end = self._get_steady_state_t_end()
         if f_amp is None:
             f_amp = self.f_amp
             
-        f_omega = jnp.atleast_1d(f_omega)
-        f_amp = jnp.atleast_1d(f_amp)
+        f_omega_rad_dl = jnp.atleast_1d(f_omega_hz) *  2 * np.pi * self.non_dimensionalised_model.T0
+        f_amp_dl = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
         
-        def solve_rhs(f_omega, f_amp):
-            return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
+        def solve_rhs(f_omega_rad_dl, f_amp_dl):
+            return self._solve_rhs(f_omega_rad_dl, f_amp_dl, y0, t_end, n_steps)
         
-        t, q, v = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, f_amp)
-        q_steady, v_steady = self._get_steady_state(q, v, discard_frac)
+        t, q_dl, v_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_rad_dl, f_amp_dl)
+        q_steady_dl, v_steady_dl = self._get_steady_state(q_dl, v_dl, discard_frac)
         
-        q_steady_total = jnp.sum(q_steady, axis=1)
+        q_steady_total_dl = jnp.sum(q_steady_dl, axis=1)
         
-        return f_omega, q_steady, q_steady_total, v_steady
+        return f_omega_rad_dl, q_steady_dl, q_steady_total_dl, v_steady_dl
     
-    @partial(jax.jit, static_argnames=("self", "t_end", "n_steps", "discard_frac"))
     def force_sweep(
         self,
         y0: jax.Array,
-        t_end: float,
         n_steps: int,
         discard_frac: float,
-        f_amp : jax.Array,
-        f_omega: jax.Array,
+        f_amp: jax.Array,
+        f_amp_levels: jax.Array,
+        f_omega_hz: jax.Array,
+        t_end: float = None,
     ) -> tuple:
         
-        f_omega = jnp.atleast_1d(f_omega)
-        f_amp = jnp.atleast_1d(f_amp)
+        if t_end is None:
+            t_end = float(self._get_steady_state_t_end())
+        else:
+            t_end = t_end / self.non_dimensionalised_model.T0
+        
+        f_omega_rad_dl = jnp.atleast_1d(f_omega_hz) * 2 * np.pi * self.non_dimensionalised_model.T0
+        f_amp_dl_base = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
+        
+        q_st_forces_dl = []
         
         def solve_rhs(f_omega, f_amp):
             return self._solve_rhs(f_omega, f_amp, y0, t_end, n_steps)
         
-        qs_steady_forces = []
-        
-        for amp in f_amp:
-            t, q, v = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega, amp)
-            q_steady, v_steady = self._get_steady_state(q, v, discard_frac)
-            qs_steady_forces.append(q_steady)
-
-        amplitude_responses_forces = jnp.stack(qs_steady_forces, axis=0)
+        for level in f_amp_levels:
+            f_amp_dl = f_amp_dl_base * level
             
-        return f_omega, amplitude_responses_forces
+            t_dl, q_dl, v_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_rad_dl, f_amp_dl)
+            
+            q_st_dl, v_st_dl = self._get_steady_state(q_dl, v_dl, discard_frac)
+            q_st_forces_dl.append(q_st_dl)
+
+        amplitude_responses_forces = jnp.stack(q_st_forces_dl, axis=0)
+            
+        return f_omega_rad_dl, amplitude_responses_forces
+    
+    def __repr__(self):
+        return f"Model(N={self.N}, name={self.name})"
+    
+    def __str__(self):
+        return (
+            f"Model(N={self.N}, name={self.name})\n"
+            f"Masses (m):\n{self.m}\n\n"
+            f"Damping Coefficients (c):\n{self.c}\n\n"
+            f"Stiffness Matrix (k):\n{self.k}\n\n"
+            f"Nonlinear Coefficients (alpha):\n{self.alpha}\n\n"
+            f"Nonlinear Coefficients (gamma):\n{self.gamma}\n\n"
+            f"Force Amplitudes (f_amp):\n{self.f_amp}\n\n"
+            f"Force Frequencies (f_omega_rad):\n{self.f_omega_rad}\n"
+        )
 
