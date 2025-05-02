@@ -52,12 +52,12 @@ class Model:
     def from_random(cls, N: int, seed: int = 0) -> "Model":
         key = jax.random.PRNGKey(seed)
         m,       key = random_uniform(key, (N,),           0.1, 10.0)
-        c,       key = random_uniform(key, (N,),           0.0, 1.0)
-        k,       key = random_uniform(key, (N, N),         0.0, 1.0)
+        c,       key = random_uniform(key, (N,),           20.0, 30.0)
+        k,       key = random_uniform(key, (N, N),         0.4, 1.0)
         alpha,   key = random_uniform(key, (N, N, N),     -1.0, 1.0)
         gamma,   key = random_uniform(key, (N, N, N, N),  -1.0, 1.0)
-        f_amp,   key = random_uniform(key, (N,),          -1.0, 1.0)
-        f_omega, key = random_uniform(key, (1,),          0.0, 10.0)
+        f_amp,   key = random_uniform(key, (N,),          0.5, 1.0)
+        f_omega, key = random_uniform(key, (1,),          2.0, 10.0)
         
         return cls(N, m, c, k, alpha, gamma, f_amp, f_omega, name="from_random")
 
@@ -81,6 +81,16 @@ class Model:
             gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1, 0.0],
                                                             [0.0, 0.0]]))
             f_amp = jnp.array([15.0, 4.0]) 
+            f_omega = jnp.array([1.0])
+        elif N == 3:
+            m     = jnp.array([0.204, 0.195, 0.183])
+            c     = jnp.array([1.0, 1.0, 1.0])
+            k     = jnp.array([[5.78, 0.0, 0],
+                               [0.0,16.5, 0],
+                               [0,   0,   34.6]])
+            alpha = jnp.zeros((N, N, N))
+            gamma = jnp.zeros((N, N, N, N))
+            f_amp = jnp.array([15.0, 10.0, 5.0]) 
             f_omega = jnp.array([1.0])
         elif N == 4:
             m     = jnp.array([1.0, 2.0, 3.0, 4.0])
