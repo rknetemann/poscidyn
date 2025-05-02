@@ -159,7 +159,7 @@ class Model:
         self.rhs_jit = jax.jit(_rhs)
 
     def _get_steady_state_t_end(self) -> float:
-        t_end_dl = 10 / jnp.max(self.non_dimensionalised_model.zeta * self.non_dimensionalised_model.eigenfrequencies_rad)
+        t_end_dl = 7 / jnp.max(self.non_dimensionalised_model.zeta * self.non_dimensionalised_model.eigenfrequencies_rad)
         return t_end_dl * self.non_dimensionalised_model.T0
             
     def _get_steady_state(self, q, v, discard_frac):
