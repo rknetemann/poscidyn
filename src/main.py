@@ -8,8 +8,8 @@ from model import Model
 
 # ────────────── switches ────────────────────────────────────
 RUN_TIME   = False     # single-tone time trace
-RUN_FREQ   = False      # frequency-response curve
-RUN_FORCE  = True     # force-sweep surface
+RUN_FREQ   = True      # frequency-response curve
+RUN_FORCE  = False     # force-sweep surface
 
 # ────────────── build & scale model ─────────────────────────
 N   = 4

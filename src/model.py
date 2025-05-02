@@ -171,6 +171,12 @@ class Model:
         v_steady = jnp.max(jnp.abs(v_steady), axis=1)
         return q_steady, v_steady
         
+    def _steady_state_event(self, t, state, args, **kwargs) -> jax.Array:
+        del kwargs
+        t_theoretical_steady_state = self._get_steady_state_t_end()
+        
+        return t > t_theoretical_steady_state
+        
     # --------------------------------------------------- internal solver
     def _solve_rhs(
         self,
@@ -179,27 +185,49 @@ class Model:
         y0: jax.Array,
         t_end: float,
         n_steps: int,
+        steady_state: bool = False,
     ) -> jax.Array:
         
         f_omega_rad = jnp.atleast_1d(f_omega_rad)
         
-        sol = diffrax.diffeqsolve(
-            terms=diffrax.ODETerm(self.rhs_jit),
-            solver=diffrax.Tsit5(),
-            t0=0.0,
-            t1=t_end,
-            dt0=None,
-            max_steps=400096,
-            y0=y0,
-            progress_meter=diffrax.TqdmProgressMeter(),
-            saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
-            args=(f_omega_rad, f_amp),
-        )
+        if steady_state:
+            sol = diffrax.diffeqsolve(
+                terms=diffrax.ODETerm(self.rhs_jit),
+                solver=diffrax.Tsit5(),
+                t0=0.0,
+                t1=jnp.inf,
+                dt0=None,
+                max_steps=None,
+                y0=y0,
+                event=diffrax.Event(cond_fn=self._steady_state_event),
+                adjoint=diffrax.ImplicitAdjoint(),
+                progress_meter=diffrax.TqdmProgressMeter(),
+                saveat=diffrax.SaveAt(t1=True),
+                stepsize_controller=diffrax.PIDController(rtol=1e-3, atol=1e-7),
+                args=(f_omega_rad, f_amp),
+            )
+            t = sol.ts
+            q = sol.ys[:, :self.N]
+            v = sol.ys[:, self.N:]
+            
+        else:
+            sol = diffrax.diffeqsolve(
+                terms=diffrax.ODETerm(self.rhs_jit),
+                solver=diffrax.Tsit5(),
+                t0=0.0,
+                t1=t_end,
+                dt0=None,
+                max_steps=400096,
+                y0=y0,
+                progress_meter=diffrax.TqdmProgressMeter(),
+                saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
+                stepsize_controller=diffrax.PIDController(rtol=1e-3, atol=1e-7),
+                args=(f_omega_rad, f_amp),
+            )
+            t = sol.ts
+            q = sol.ys[:, : self.N]
+            v = sol.ys[:, self.N :]
         
-        t = sol.ts
-        q = sol.ys[:, : self.N]
-        v = sol.ys[:, self.N :]
         return t, q, v
     
     # --------------------------------------------------- public wrappers
@@ -235,7 +263,7 @@ class Model:
         f_amp_dl = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
                 
         def solve_rhs(f_omega_dl, f_amp_dl):
-            return self._solve_rhs(f_omega_dl, f_amp_dl, y0, t_end_dl, n_steps)
+            return self._solve_rhs(f_omega_dl, f_amp_dl, y0, t_end_dl, n_steps, steady_state=False)
         
         t_dl, q_dl, v_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_dl, f_amp_dl)
         q_dl,v_dl = jnp.abs(q_dl), jnp.abs(v_dl)
@@ -261,14 +289,17 @@ class Model:
         f_amp_dl = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
         
         def solve_rhs(f_omega_rad_dl, f_amp_dl):
-            return self._solve_rhs(f_omega_rad_dl, f_amp_dl, y0, t_end, n_steps)
+            return self._solve_rhs(f_omega_rad_dl, f_amp_dl, y0, t_end, n_steps, steady_state=False)
         
-        t, q_dl, v_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_rad_dl, f_amp_dl)
-        q_steady_dl, v_steady_dl = self._get_steady_state(q_dl, v_dl, discard_frac)
+        t_dl, q_dl, v_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_rad_dl, f_amp_dl)
+        q_st_dl, v_st_dl = self._get_steady_state(q_dl, v_dl, discard_frac)
         
-        q_steady_total_dl = jnp.sum(q_steady_dl, axis=1)
+        # t_dl, q_st_dl, v_st_dl = jax.vmap(solve_rhs, in_axes=(0, None))(f_omega_rad_dl, f_amp_dl)
+        # q_st_dl, v_st_dl = jnp.abs(q_st_dl), jnp.abs(v_st_dl)
+
+        q_st_total_dl = jnp.sum(q_st_dl, axis=1)
         
-        return f_omega_rad_dl, q_steady_dl, q_steady_total_dl, v_steady_dl
+        return f_omega_rad_dl, q_st_dl, q_st_total_dl, v_st_dl
     
     def force_sweep(
         self,
