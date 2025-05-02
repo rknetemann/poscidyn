@@ -169,7 +169,7 @@ class Model:
         self.rhs_jit = jax.jit(_rhs)
 
     def _get_steady_state_t_end(self) -> float:
-        t_end_dl = 7 / jnp.max(self.non_dimensionalised_model.zeta * self.non_dimensionalised_model.eigenfrequencies_rad)
+        t_end_dl = 8 / jnp.max(self.non_dimensionalised_model.zeta * self.non_dimensionalised_model.eigenfrequencies_rad)
         return t_end_dl * self.non_dimensionalised_model.T0
             
     def _get_steady_state(self, q, v, discard_frac):
@@ -231,7 +231,7 @@ class Model:
                 y0=y0,
                 progress_meter=diffrax.TqdmProgressMeter(),
                 saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
-                stepsize_controller=diffrax.PIDController(rtol=1e-3, atol=1e-7),
+                stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
                 args=(f_omega_rad, f_amp),
             )
             t = sol.ts
@@ -284,6 +284,7 @@ class Model:
         self,
         f_omega_hz: jax.Array,
         y0: jax.Array = None,
+        n_steps: int = None,
         discard_frac: float = 0.8,
         t_end: float = None,
         f_amp : jax.Array = None,
@@ -291,6 +292,8 @@ class Model:
         
         if y0 is None:
             y0 = jnp.zeros(2 * self.N)
+        if n_steps is None:
+            n_steps = len(f_omega_hz) * 5
         if t_end is None:
             t_end = self._get_steady_state_t_end()
         if f_amp is None:
@@ -298,8 +301,6 @@ class Model:
             
         f_omega_rad_dl = jnp.atleast_1d(f_omega_hz) *  2 * np.pi * self.non_dimensionalised_model.T0
         f_amp_dl = jnp.atleast_1d(f_amp) * self.non_dimensionalised_model.T0**2 / (self.m * self.non_dimensionalised_model.Q0)
-        
-        n_steps = len(f_omega_rad_dl)
         
         def solve_rhs(f_omega_rad_dl, f_amp_dl):
             return self._solve_rhs(f_omega_rad_dl, f_amp_dl, y0, t_end, n_steps, steady_state=False)

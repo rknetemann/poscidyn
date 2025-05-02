@@ -12,7 +12,7 @@ RUN_FREQ   = True      # frequency-response curve
 RUN_FORCE  = False     # force-sweep surface
 
 # ────────────── build & scale model ─────────────────────────
-N   = 4
+N   = 1
 mdl = Model.from_example(N)
 #mdl = Model.from_random(N)
 #print(mdl)
@@ -46,10 +46,10 @@ if RUN_TIME:
 # =============== study 2: frequency sweep ===================
 if RUN_FREQ:
     print("\nCalculating frequency response …")
-    f_omega_sweep_hz = jnp.linspace(0.0, 1, 400)
+    f_omega_sweep_hz = jnp.linspace(0.0, 1.0, 400)
     
     f_omega_hz, q_steady, q_steady_total, _ = mdl.frequency_response(
-        f_omega_hz=f_omega_sweep_hz
+        f_omega_hz=f_omega_sweep_hz, t_end=1000,
     )
     
     plt.figure(figsize=(7,4))
