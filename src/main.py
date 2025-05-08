@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D        # noqa: F401
 
-from model import Model
+from model_other_dimensionalisation import Model
 
 # ────────────── switches ────────────────────────────────────
 RUN_TIME   = False     # single-tone time trace
@@ -12,25 +12,30 @@ RUN_FREQ   = True      # frequency-response curve
 RUN_FORCE  = False     # force-sweep surface
 
 # ────────────── build & scale model ─────────────────────────
-N   = 1
+N   = 4
 mdl = Model.from_example(N)
 #mdl = Model.from_random(N)
 #print(mdl)
 
 # ────────────── eigenfrequencies ─────────────────────────
 
-eigenfreq = mdl.eigenfrequencies()
+eigenfreq = mdl.non_dimensionalised_model.omega_0_hat
+quality_factors = mdl.non_dimensionalised_model.Q
+print(f"Eigenfrequencies: {eigenfreq}")
+print(f"Quality factors: {quality_factors}")
+
 
 # =============== study 1: time response =====================
 if RUN_TIME:
     print("\nCalculating time response …")
     y0      = jnp.zeros(2*N)
     t_end   = 50  
-    f_omega_hz = 0.49
+    F_omega_hz = 0.49
 
     ts, qs, _ = mdl.time_response(
         y0=y0, n_steps=4000,
-        f_omega_hz=jnp.array([f_omega_hz]),
+        F_omega_hz=jnp.array([F_omega_hz]),
+        t_end=t_end,
     )
 
     t_plot = ts[0]
@@ -46,18 +51,19 @@ if RUN_TIME:
 # =============== study 2: frequency sweep ===================
 if RUN_FREQ:
     print("\nCalculating frequency response …")
-    f_omega_sweep_hz = jnp.linspace(0.0, 1.0, 400)
+    F_omega_hat = jnp.linspace(0.0, 2.0, 300)
+    tau_end = 200
     
-    f_omega_hz, q_steady, q_steady_total, _ = mdl.frequency_response(
-        f_omega_hz=f_omega_sweep_hz, t_end=1000,
+    F_omega_hat, q_steady, q_steady_total, _ = mdl.frequency_response(
+        F_omega_hat=F_omega_hat, tau_end=tau_end,
     )
     
     plt.figure(figsize=(7,4))
     for m in range(N):
-        plt.plot(f_omega_hz, q_steady[:, m], label=f"Mode {m+1}")
+        plt.plot(F_omega_hat, q_steady[:, m], label=f"Mode {m+1}")
     for f in eigenfreq:
         plt.axvline(f, ls="--", color="r", alpha=.6)
-    plt.plot(f_omega_hz, q_steady_total, label="Total Response", color="k", lw=2, alpha=0.8)
+    plt.plot(F_omega_hat, q_steady_total, label="Total Response", color="k", lw=2, alpha=0.8)
     plt.xlabel("Non-dimensionalized drive frequency"); plt.ylabel("Non-dimensionalized amplitude")
     plt.title("Frequency response"); plt.legend(); plt.grid(True)
     plt.tight_layout(); plt.show()

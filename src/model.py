@@ -242,13 +242,18 @@ class Model:
     
     # --------------------------------------------------- public wrappers
     
-    def eigenfrequencies(self) -> jax.Array:
-        eigenfrequencies_rad = self.non_dimensionalised_model.eigenfrequencies_rad
+    def eigenfrequencies(self, dimensionless=True) -> jax.Array:
+        if dimensionless: 
+            eigenfrequencies_rad = self.non_dimensionalised_model.eigenfrequencies_rad
+        else:
+            eigenfrequencies_rad = self.eigenfrequencies_rad 
 
         return eigenfrequencies_rad
     
     def quality_factors(self) -> jax.Array:
-        raise NotImplementedError("Quality factors are not implemented yet.")
+        eigenfreq = self.eigenfrequencies(dimensionless=False)
+        Q = self.m * eigenfreq / self.c
+        return Q
     
     def time_response(
         self,
@@ -365,4 +370,3 @@ class Model:
             f"Force Amplitudes (f_amp):\n{self.f_amp}\n\n"
             f"Force Frequencies (f_omega_rad):\n{self.f_omega_rad}\n"
         )
-
