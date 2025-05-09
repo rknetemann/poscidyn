@@ -14,8 +14,9 @@ RUN_FORCE  = False     # force-sweep surface
 RUN_PHASE_SPACE = True # phase space plot
 
 # ────────────── build & scale model ─────────────────────────
-N   = 4
-mdl = PhysicalModel.from_example(N).non_dimensionalise()
+N   = 2
+#mdl = PhysicalModel.from_example(N).non_dimensionalise()
+mdl = NonDimensionalisedModel.from_random(N)
 nld = NonlinearDynamics(mdl)
 #mdl = Model.from_random(N)
 
@@ -31,7 +32,7 @@ print(f"Non-dimensionalised x_ref: {x_ref}")
 # =============== frequency sweep ===================
 if RUN_FREQ:
     print("\nCalculating frequency response…")
-    tau_end = 100
+    tau_end = 500
     y0_hat = jnp.zeros(2 * N)
     y0_hat = y0_hat.at[0].set(.0)
     y0_hat = y0_hat.at[1].set(0)

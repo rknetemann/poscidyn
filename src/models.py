@@ -83,7 +83,7 @@ class PhysicalModel:
     def from_random(cls, N: int, seed: int = 0) -> "PhysicalModel":
         key = jax.random.PRNGKey(seed)
         m,       key = random_uniform(key, (N,),           0.1, 10.0)
-        c,       key = random_uniform(key, (N,),           20.0, 30.0)
+        c,       key = random_uniform(key, (N,),           80.0, 100.0)
         k,       key = random_uniform(key, (N, N),         0.4, 1.0)
         alpha,   key = random_uniform(key, (N, N, N),     -1.0, 1.0)
         gamma,   key = random_uniform(key, (N, N, N, N),  -1.0, 1.0)
