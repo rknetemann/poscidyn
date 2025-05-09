@@ -140,3 +140,47 @@ class NonlinearDynamics:
         q_st_total = jnp.sum(q_st, axis=1)
         
         return F_omega_hat, q_st, q_st_total, v_st
+
+    def phase_portrait(
+        self,
+        F_omega_hat: jax.Array = None,
+        F_amp_hat: jax.Array = None,
+        y0_hat: jax.Array = None,
+        tau_end: float = None,
+        n_steps: int = None,
+        calculate_dimless: bool = True, # Currently, only non-dimensionalised is robustly supported for simulation
+    ) -> tuple[jax.Array, jax.Array, jax.Array]:
+        
+        if not calculate_dimless:
+            # Physical model simulation path might need review of PhysicalModel._build_rhs
+            raise NotImplementedError("Phase portrait for physical model directly is not fully verified.")
+
+        model_to_use = self.non_dimensionalised_model
+        N = model_to_use.N
+
+        if F_omega_hat is None:
+            F_omega_hat = model_to_use.F_omega_hat
+        
+        if F_amp_hat is None:
+            F_amp_hat = model_to_use.F_amp_hat
+
+        if y0_hat is None:
+            y0_hat = jnp.zeros(2 * N)
+            
+        if tau_end is None:
+            tau_end = 200.0 # Default non-dimensional time
+            
+        if n_steps is None:
+            n_steps = 4000 # Default number of steps
+
+        # Call _solve_rhs directly, no vmap needed for a single phase portrait
+        tau, q, v = self._solve_rhs(
+            F_omega=F_omega_hat, # Passed as F_omega to _solve_rhs, interpreted as F_omega_hat by model
+            F_amp=F_amp_hat,     # Passed as F_amp to _solve_rhs, interpreted as F_amp_hat by model
+            y0=y0_hat,
+            t_end=tau_end,
+            n_steps=n_steps,
+            calculate_dimless=calculate_dimless,
+        )
+        
+        return tau, q, v
