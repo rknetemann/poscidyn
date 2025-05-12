@@ -8,13 +8,13 @@ from models import PhysicalModel, NonDimensionalisedModel
 from nonlinear_dynamics import NonlinearDynamics
 
 # ────────────── switches ────────────────────────────────────
-RUN_TIME   = False     # single-tone time trace
-RUN_FREQ   = True      # frequency-response curve
-RUN_FORCE  = False     # force-sweep surface
-RUN_PHASE_SPACE = False # phase space plot
+RUN_TIME_RESPONSE   = False     # single-tone time trace
+RUN_FREQUENCY_RESPONSE   = True      # frequency-response curve
+RUN_FORCE_SWEEP  = False     # force-sweep surface
+RUN_PHASE_SPACE = True # phase space plot
 
 # ────────────── build & scale model ─────────────────────────
-N   = 1
+N   = 4
 mdl = PhysicalModel.from_example(N).non_dimensionalise()
 #mdl = PhysicalModel.from_random(N).non_dimensionalise()
 nld = NonlinearDynamics(mdl)
@@ -30,7 +30,7 @@ print(f"Quality factors: {quality_factors}")
 print(f"Non-dimensionalised x_ref: {x_ref}")
 
 # =============== frequency sweep ===================
-if RUN_FREQ:
+if RUN_FREQUENCY_RESPONSE:
     print("\nCalculating frequency response…")
     F_omega_hat, q_steady, q_steady_total, _ = nld.frequency_response()
     
