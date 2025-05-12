@@ -4,6 +4,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import diffrax
+import optimistix
 
 from models import PhysicalModel, NonDimensionalisedModel
 
@@ -58,7 +59,7 @@ class NonlinearDynamics:
             y0=y0,
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
+            stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
             args=(F_omega, F_amp),
         )
         t = sol.ts
@@ -112,6 +113,7 @@ class NonlinearDynamics:
         if y0_hat is None:
             if y0 is None:
                 y0 = jnp.zeros(2 * N)
+                print("-> Using default initial conditions y0 = 0.")
             
             q0 = y0[:N] / self.non_dimensionalised_model.x_ref
             v0 = y0[N:] / (self.non_dimensionalised_model.x_ref * self.non_dimensionalised_model.omega_ref)
@@ -122,14 +124,22 @@ class NonlinearDynamics:
             
         if tau_end is None:
             if t_end is None:
-                t_end = float(self._get_steady_state_t_end())
-            tau_end = self.non_dimensionalised_model.omega_ref * t_end    
+                damping_ratio = 1 / (2 * self.non_dimensionalised_model.Q)
+                tau_end = jnp.max(3.9 / (self.non_dimensionalised_model.omega_0_hat * damping_ratio))
+                tau_end = jnp.max(tau_end) * 1.1 # 10% margin
+                print(f"-> Using estimated tau_end = {tau_end:.2f} for steady state.")
+            else:
+                tau_end = self.non_dimensionalised_model.omega_ref * t_end    
             
         if n_steps is None:
-            n_steps = 4000        
+            n_steps = 2000 
+            print(f"-> Using default n_steps = {n_steps}.")       
             
         if discard_frac is None:
-            discard_frac = 0.8
+            T_hat = 2*jnp.pi / self.non_dimensionalised_model.omega_0_hat
+            steady_state_frac = 5 * T_hat / tau_end # 5 periods are considered for steady state
+            discard_frac = jnp.max(1 - steady_state_frac)
+            print(f"-> Using estimated discard_frac = {discard_frac:.2f}.")
 
         def solve_rhs(F_omega_hat, F_amp_hat):
             return self._solve_rhs(F_omega_hat, F_amp_hat, y0_hat, tau_end, n_steps)

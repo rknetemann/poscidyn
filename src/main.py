@@ -11,12 +11,12 @@ from nonlinear_dynamics import NonlinearDynamics
 RUN_TIME   = False     # single-tone time trace
 RUN_FREQ   = True      # frequency-response curve
 RUN_FORCE  = False     # force-sweep surface
-RUN_PHASE_SPACE = True # phase space plot
+RUN_PHASE_SPACE = False # phase space plot
 
 # ────────────── build & scale model ─────────────────────────
-N   = 2
-#mdl = PhysicalModel.from_example(N).non_dimensionalise()
-mdl = NonDimensionalisedModel.from_random(N)
+N   = 1
+mdl = PhysicalModel.from_example(N).non_dimensionalise()
+#mdl = PhysicalModel.from_random(N).non_dimensionalise()
 nld = NonlinearDynamics(mdl)
 #mdl = Model.from_random(N)
 
@@ -32,14 +32,7 @@ print(f"Non-dimensionalised x_ref: {x_ref}")
 # =============== frequency sweep ===================
 if RUN_FREQ:
     print("\nCalculating frequency response…")
-    tau_end = 500
-    y0_hat = jnp.zeros(2 * N)
-    y0_hat = y0_hat.at[0].set(.0)
-    y0_hat = y0_hat.at[1].set(0)
-    
-    F_omega_hat, q_steady, q_steady_total, _ = nld.frequency_response(
-        tau_end=tau_end, y0_hat=y0_hat
-    )
+    F_omega_hat, q_steady, q_steady_total, _ = nld.frequency_response()
     
     plt.figure(figsize=(7,4))
     for m in range(N):
@@ -67,7 +60,7 @@ if RUN_PHASE_SPACE:
     # For example, if RUN_FREQ was true:
     # F_omega_hat_single = F_omega_hat[len(F_omega_hat) // 2] # Middle frequency
     
-    print(f"Using F_omega_hat = {F_omega_hat_single:.4f} for phase portrait.")
+    print(f"-> Using F_omega_hat = {F_omega_hat_single:.4f} for phase portrait.")
 
     tau_phase, q_phase, v_phase = nld.phase_portrait(
         F_omega_hat=jnp.array([F_omega_hat_single]), # Ensure it's an array
