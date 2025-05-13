@@ -14,7 +14,7 @@ RUN_FORCE_SWEEP  = False     # force-sweep surface
 RUN_PHASE_SPACE = False # phase space plot
 
 # ────────────── build & scale model ─────────────────────────
-N   = 2
+N   = 1
 mdl = PhysicalModel.from_example(N).non_dimensionalise()
 nld = NonlinearDynamics(mdl)
 
