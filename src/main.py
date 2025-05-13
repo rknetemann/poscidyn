@@ -11,10 +11,10 @@ from nonlinear_dynamics import NonlinearDynamics
 RUN_TIME_RESPONSE   = False     # single-tone time trace
 RUN_FREQUENCY_RESPONSE   = True      # frequency-response curve
 RUN_FORCE_SWEEP  = False     # force-sweep surface
-RUN_PHASE_SPACE = True # phase space plot
+RUN_PHASE_SPACE = False # phase space plot
 
 # ────────────── build & scale model ─────────────────────────
-N   = 4
+N   = 1
 mdl = PhysicalModel.from_example(N).non_dimensionalise()
 #mdl = PhysicalModel.from_random(N).non_dimensionalise()
 nld = NonlinearDynamics(mdl)
@@ -25,18 +25,14 @@ nld = NonlinearDynamics(mdl)
 eigenfreq = mdl.omega_0_hat
 quality_factors = mdl.Q
 x_ref = mdl.x_ref
-print(f"Eigenfrequencies: {eigenfreq}")
-print(f"Quality factors: {quality_factors}")
-print(f"Non-dimensionalised x_ref: {x_ref}")
-
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    print("\nCalculating frequency response…")
-    F_omega_hat, q_steady, q_steady_total, _ = nld.frequency_response()
+    F_omega_hat, q_steady, q_steady_total, _, y0_hat_grid = nld.frequency_response()
     
     plt.figure(figsize=(7,4))
     for m in range(N):
         plt.plot(F_omega_hat, q_steady[:, m], label=f"Mode {m+1}")
+        plt.scatter(F_omega_hat, y0_hat_grid[:, m], label=f"q0 Mode {m+1}", s=10, alpha=0.7)
     for f in eigenfreq:
         plt.axvline(f, ls="--", color="r", alpha=.6)
     plt.plot(F_omega_hat, q_steady_total, label="Total Response", color="k", lw=2, alpha=0.8)
@@ -48,7 +44,7 @@ if RUN_FREQUENCY_RESPONSE:
 if RUN_PHASE_SPACE:
     print("\nCalculating phase portrait...")
     
-    # Select a forcing frequency (e.g., near a resonance or from F_omega_hat array)
+    # Select a forcing frequency (e.g., near a resonance or from F_oega_hat array)
     # For demonstration, let's pick the model's default F_omega_hat if available,
     # or a value known to be interesting (e.g., first eigenfrequency).
     if mdl.F_omega_hat is not None and mdl.F_omega_hat.size > 0:
