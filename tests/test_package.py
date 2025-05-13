@@ -4,7 +4,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from nonlinear_oscillators.models import PhysicalModel, NonDimensionalisedModel
-from nonlinear_oscillators.nonlinear_dynamics import NonlinearDynamics, Sweep
+from nonlinear_oscillators.nonlinear_dynamics import NonlinearDynamics
+from nonlinear_oscillators import Sweep
 
 # ────────────── switches ────────────────────────────────────
 RUN_FREQUENCY_RESPONSE   = True

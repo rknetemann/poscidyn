@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import diffrax
 from typing import Tuple
 
-from .models import PhysicalModel, NonDimensionalisedModel
-from .constants import Sweep, Y0_HAT_COARSE_N, F_OMEGA_HAT_COARSE_N
+from nonlinear_oscillators.models import PhysicalModel, NonDimensionalisedModel
+import nonlinear_oscillators.constants as const
 
 jax.config.update("jax_enable_x64", False)
 
@@ -36,7 +36,7 @@ class NonlinearDynamics:
         tau_end:    float,
         n_steps:    int,
         discard_frac: float,
-        sweep_direction: Sweep = Sweep.FORWARD,
+        sweep_direction: const.Sweep = const.Sweep.FORWARD,
         calculate_dimless: bool = True,
     ) -> Tuple[jax.Array, jax.Array]:
         
@@ -89,9 +89,9 @@ class NonlinearDynamics:
         v_steady_state = v_steady.reshape(F_omega_hat_n, q0_hat_n, N)
 
         norm = jnp.linalg.norm(q_steady_state, axis=-1)            # (freq , n_init)
-        if sweep_direction == Sweep.FORWARD:
+        if sweep_direction == const.Sweep.FORWARD:
             sel = jnp.argmax(norm, axis=1)                         # large branch
-        elif sweep_direction == Sweep.BACKWARD:
+        elif sweep_direction == const.Sweep.BACKWARD:
             sel = jnp.argmin(norm, axis=1)                         # small branch
 
         rows = jnp.arange(F_omega_hat_n)
@@ -164,7 +164,7 @@ class NonlinearDynamics:
         n_steps: int = None,
         discard_frac: float = None,
         calculate_dimless: bool = True,
-        sweep_direction: Sweep = Sweep.FORWARD,
+        sweep_direction: const.Sweep = const.Sweep.FORWARD,
     ) -> tuple:
         print("\n Calculating frequency response:")
         
