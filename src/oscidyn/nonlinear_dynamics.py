@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import diffrax
 from typing import Tuple
 
-from nonlinear_oscillators.models import PhysicalModel, NonDimensionalisedModel
-import nonlinear_oscillators.constants as const
+from oscidyn.models import PhysicalModel, NonDimensionalisedModel
+import oscidyn.constants as const
 
 jax.config.update("jax_enable_x64", False)
 
@@ -69,7 +69,7 @@ class NonlinearDynamics:
             v0 = jnp.zeros((N,))
             y0 = jnp.concatenate([q0, v0])
             return self._solve_rhs(
-                f_omega_hat, F_amp_hat, y0, tau_end * 2, n_steps,
+                f_omega_hat, F_amp_hat, y0, tau_end * 1, n_steps,
                 calculate_dimless=calculate_dimless,
             )
 

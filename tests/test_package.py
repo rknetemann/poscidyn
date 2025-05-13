@@ -3,9 +3,7 @@ import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from nonlinear_oscillators.models import PhysicalModel, NonDimensionalisedModel
-from nonlinear_oscillators.nonlinear_dynamics import NonlinearDynamics
-from nonlinear_oscillators import Sweep
+import oscidyn
 
 # ────────────── switches ────────────────────────────────────
 RUN_FREQUENCY_RESPONSE   = True
@@ -13,13 +11,13 @@ RUN_PHASE_SPACE = False
 
 # ────────────── build & scale model ─────────────────────────
 N   = 1
-mdl = PhysicalModel.from_example(N).non_dimensionalise()
-nld = NonlinearDynamics(mdl)
+mdl = oscidyn.PhysicalModel.from_example(N).non_dimensionalise()
+nld = oscidyn.NonlinearDynamics(mdl)
 
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=Sweep.FORWARD)
-    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=Sweep.BACKWARD)
+    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD)
+    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD)
     
     plt.figure(figsize=(7, 4))
     colors = plt.cm.tab10.colors  # Use a colormap for distinct colors
