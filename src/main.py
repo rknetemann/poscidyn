@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D        # noqa: F401
 
 from models import PhysicalModel, NonDimensionalisedModel
-from nonlinear_dynamics import NonlinearDynamics
+from nonlinear_dynamics import NonlinearDynamics, ForwardSweep, BackwardSweep
 
 # ────────────── switches ────────────────────────────────────
 RUN_TIME_RESPONSE   = False     # single-tone time trace
@@ -14,11 +14,9 @@ RUN_FORCE_SWEEP  = False     # force-sweep surface
 RUN_PHASE_SPACE = False # phase space plot
 
 # ────────────── build & scale model ─────────────────────────
-N   = 1
+N   = 2
 mdl = PhysicalModel.from_example(N).non_dimensionalise()
-#mdl = PhysicalModel.from_random(N).non_dimensionalise()
 nld = NonlinearDynamics(mdl)
-#mdl = Model.from_random(N)
 
 # ────────────── eigenfrequencies ─────────────────────────
 
@@ -27,18 +25,33 @@ quality_factors = mdl.Q
 x_ref = mdl.x_ref
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    F_omega_hat, q_steady, q_steady_total, _, y0_hat_grid = nld.frequency_response()
+    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=ForwardSweep())
+    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=BackwardSweep())
     
-    plt.figure(figsize=(7,4))
+    
+    plt.figure(figsize=(7, 4))
+    colors = plt.cm.tab10.colors  # Use a colormap for distinct colors
+
     for m in range(N):
-        plt.plot(F_omega_hat, q_steady[:, m], label=f"Mode {m+1}")
-        plt.scatter(F_omega_hat, y0_hat_grid[:, m], label=f"q0 Mode {m+1}", s=10, alpha=0.7)
+        # Forward sweep
+        plt.plot(F_omega_hat_fw, q_steady_fw[:, m], label=f"Mode {m+1} (Forward)", color=colors[m % len(colors)], alpha=0.7)
+        # Backward sweep
+        plt.plot(F_omega_hat_bw, q_steady_bw[:, m], label=f"Mode {m+1} (Backward)", color=colors[m % len(colors)], alpha=0.4)
+
     for f in eigenfreq:
-        plt.axvline(f, ls="--", color="r", alpha=.6)
-    plt.plot(F_omega_hat, q_steady_total, label="Total Response", color="k", lw=2, alpha=0.8)
-    plt.xlabel("Non-dimensionalized drive frequency"); plt.ylabel("Non-dimensionalized amplitude")
-    plt.title("Frequency response"); plt.legend(); plt.grid(True)
-    plt.tight_layout(); plt.show()
+        plt.axvline(f, ls="--", color="r", alpha=0.6)
+
+    # Total response
+    plt.plot(F_omega_hat_fw, q_steady_total_fw, label="Total Response (Forward)", color="k", lw=2, alpha=0.8)
+    plt.plot(F_omega_hat_bw, q_steady_total_bw, label="Total Response (Backward)", color="gray", lw=2, alpha=0.5)
+
+    plt.xlabel("Non-dimensionalized drive frequency")
+    plt.ylabel("Non-dimensionalized amplitude")
+    plt.title("Frequency Response")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 # =============== phase space plot ===================
 if RUN_PHASE_SPACE:
