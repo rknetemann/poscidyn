@@ -2,16 +2,15 @@
 import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D        # noqa: F401
 
-from models import PhysicalModel, NonDimensionalisedModel
-from nonlinear_dynamics import NonlinearDynamics, ForwardSweep, BackwardSweep
+from nonlinear_oscillators.models import PhysicalModel, NonDimensionalisedModel
+from nonlinear_oscillators.nonlinear_dynamics import NonlinearDynamics, Sweep
 
 # ────────────── switches ────────────────────────────────────
-RUN_TIME_RESPONSE   = False     # single-tone time trace
-RUN_FREQUENCY_RESPONSE   = True      # frequency-response curve
-RUN_FORCE_SWEEP  = False     # force-sweep surface
-RUN_PHASE_SPACE = False # phase space plot
+RUN_TIME_RESPONSE   = False
+RUN_FREQUENCY_RESPONSE   = True
+RUN_FORCE_SWEEP  = False
+RUN_PHASE_SPACE = False
 
 # ────────────── build & scale model ─────────────────────────
 N   = 1
@@ -25,8 +24,8 @@ quality_factors = mdl.Q
 x_ref = mdl.x_ref
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=ForwardSweep())
-    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=BackwardSweep())
+    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=Sweep.FORWARD)
+    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=Sweep.BACKWARD)
     
     
     plt.figure(figsize=(7, 4))

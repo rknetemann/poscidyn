@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import jax
 import jax.numpy as jnp
-from utils.random import random_uniform
+from .utils.random import random_uniform
     
 @dataclass(eq=False)
 class NonDimensionalisedModel: 

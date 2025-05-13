@@ -1,23 +1,15 @@
 # ───────────────────────── nonlinear_dynamics.py ──────────────────────────
 from __future__ import annotations
-import numpy as np
 import jax
 import jax.numpy as jnp
 import diffrax
-import optimistix
 from typing import Tuple
 
-from models import PhysicalModel, NonDimensionalisedModel
+from .models import PhysicalModel, NonDimensionalisedModel
+from .utils.initial_guesses import select_branches
+from .constants import Sweep, Y0_HAT_COARSE_N, F_OMEGA_HAT_COARSE_N
 
 jax.config.update("jax_enable_x64", False)
-
-class ForwardSweep:
-    def __init__(self):
-        pass
-    
-class BackwardSweep:
-    def __init__(self):
-        pass
 
 class NonlinearDynamics:
     def __init__(self, model: PhysicalModel | NonDimensionalisedModel):
@@ -45,18 +37,10 @@ class NonlinearDynamics:
         tau_end:    float,
         n_steps:    int,
         discard_frac: float,
-        sweep_direction: ForwardSweep | BackwardSweep = ForwardSweep(),
+        sweep_direction: Sweep = Sweep.FORWARD,
         calculate_dimless: bool = True,
         use_linear_interp: bool = True,         # ← choose linear vs. nearest-neighbour
     ) -> Tuple[jax.Array, jax.Array]:
-        """
-        Build steady-state initial guesses *q0*, *v0* on the fine frequency grid.
-
-        Returned shapes
-        ---------------
-        q0 : (len(F_omega_hat), N)   # displacement  guess per mode & fine freq
-        v0 : (len(F_omega_hat), N)   # velocity      guess per mode & fine freq
-        """
         
         def _pick_inphase_sample(tau, q, v, ω_F):
             """
@@ -117,9 +101,9 @@ class NonlinearDynamics:
 
             
         norm = jnp.linalg.norm(q_steady_state, axis=-1)            # (freq , n_init)
-        if isinstance(sweep_direction, ForwardSweep):
+        if sweep_direction == Sweep.FORWARD:
             sel = jnp.argmax(norm, axis=1)                         # large branch
-        else:
+        elif sweep_direction == Sweep.BACKWARD:
             sel = jnp.argmin(norm, axis=1)                         # small branch
 
         rows = jnp.arange(F_omega_hat_n)
@@ -206,7 +190,7 @@ class NonlinearDynamics:
         n_steps: int = None,
         discard_frac: float = None,
         calculate_dimless: bool = True,
-        sweep_direction: ForwardSweep | BackwardSweep = ForwardSweep(),
+        sweep_direction: Sweep = Sweep.FORWARD,
     ) -> tuple:
         print("\n Calculating frequency response:")
         
