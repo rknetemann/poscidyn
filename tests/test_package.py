@@ -7,9 +7,7 @@ from nonlinear_oscillators.models import PhysicalModel, NonDimensionalisedModel
 from nonlinear_oscillators.nonlinear_dynamics import NonlinearDynamics, Sweep
 
 # ────────────── switches ────────────────────────────────────
-RUN_TIME_RESPONSE   = False
 RUN_FREQUENCY_RESPONSE   = True
-RUN_FORCE_SWEEP  = False
 RUN_PHASE_SPACE = False
 
 # ────────────── build & scale model ─────────────────────────
@@ -17,16 +15,10 @@ N   = 1
 mdl = PhysicalModel.from_example(N).non_dimensionalise()
 nld = NonlinearDynamics(mdl)
 
-# ────────────── eigenfrequencies ─────────────────────────
-
-eigenfreq = mdl.omega_0_hat
-quality_factors = mdl.Q
-x_ref = mdl.x_ref
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
     F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=Sweep.FORWARD)
     F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=Sweep.BACKWARD)
-    
     
     plt.figure(figsize=(7, 4))
     colors = plt.cm.tab10.colors  # Use a colormap for distinct colors
@@ -37,7 +29,7 @@ if RUN_FREQUENCY_RESPONSE:
         # Backward sweep
         plt.plot(F_omega_hat_bw, q_steady_bw[:, m], label=f"Mode {m+1} (Backward)", color=colors[m % len(colors)], alpha=0.4)
 
-    for f in eigenfreq:
+    for f in mdl.omega_0_hat:
         plt.axvline(f, ls="--", color="r", alpha=0.6)
 
     # Total response

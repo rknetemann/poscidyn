@@ -6,7 +6,6 @@ import diffrax
 from typing import Tuple
 
 from .models import PhysicalModel, NonDimensionalisedModel
-from .utils.initial_guesses import select_branches
 from .constants import Sweep, Y0_HAT_COARSE_N, F_OMEGA_HAT_COARSE_N
 
 jax.config.update("jax_enable_x64", False)
@@ -32,26 +31,18 @@ class NonlinearDynamics:
     
     def _initial_guesses(
         self,
-        F_omega_hat: jax.Array,                 # fine-grid frequencies (x,)
+        F_omega_hat: jax.Array,
         F_amp_hat:  jax.Array,
         tau_end:    float,
         n_steps:    int,
         discard_frac: float,
         sweep_direction: Sweep = Sweep.FORWARD,
         calculate_dimless: bool = True,
-        use_linear_interp: bool = True,         # ← choose linear vs. nearest-neighbour
     ) -> Tuple[jax.Array, jax.Array]:
         
         def _pick_inphase_sample(tau, q, v, ω_F):
-            """
-            tau : (n_steps,)          time vector of one simulation
-            q,v : (n_steps, N)        displacement & velocity time histories
-            ω_F : float               drive frequency used in that simulation
-            returns q0, v0            one snapshot with cos(ω_F tau) ≈ 1
-            """
-            # phase of the drive signal
-            phase = (ω_F * tau) % (2 * jnp.pi)        # 0 … 2π
-            k = jnp.argmin(jnp.abs(phase))            # index closest to 0
+            phase = (ω_F * tau) % (2 * jnp.pi)
+            k = jnp.argmin(jnp.abs(phase))
             return q[k], v[k]
 
         N = self.non_dimensionalised_model.N
@@ -67,7 +58,6 @@ class NonlinearDynamics:
         q0_hat_n   = 30
         q0_hat     = jnp.linspace(0.0, 1.0, q0_hat_n)
 
-        # Create meshgrid only with q0_hat (not the concatenated y0_hat)
         F_omega_hat_mesh, q0_hat_mesh = jnp.meshgrid(
             F_omega_hat_coarse, q0_hat, indexing="ij"
         )
@@ -75,7 +65,6 @@ class NonlinearDynamics:
         q0_hat_flat = q0_hat_mesh.ravel()
 
         def solve_case(f_omega_hat, q0_hat_val):
-            # Create initial conditions with the scalar q0_hat value
             q0 = jnp.full((N,), q0_hat_val)
             v0 = jnp.zeros((N,))
             y0 = jnp.concatenate([q0, v0])
@@ -99,7 +88,6 @@ class NonlinearDynamics:
         q_steady_state = q_steady.reshape(F_omega_hat_n, q0_hat_n, N)
         v_steady_state = v_steady.reshape(F_omega_hat_n, q0_hat_n, N)
 
-            
         norm = jnp.linalg.norm(q_steady_state, axis=-1)            # (freq , n_init)
         if sweep_direction == Sweep.FORWARD:
             sel = jnp.argmax(norm, axis=1)                         # large branch
@@ -110,33 +98,19 @@ class NonlinearDynamics:
         q0_coarse = q_steady_state[rows, sel, :]                   # (freq , N)
         v0_coarse = v_steady_state[rows, sel, :]                   # (freq , N)
 
-        if use_linear_interp:
-            # ---------- smooth linear interpolation ----------
-            interp = lambda y: jnp.interp(
-                F_omega_hat_fine,           # x-length target
-                F_omega_hat_coarse,         # 50-length source x
-                y                           # 50-length values
-            )
-            # vmap over mode axis  (in_axes=1 because (50,N): axis-1 is modes)
-            q0 = jax.vmap(interp, in_axes=1, out_axes=1)(q0_coarse)  # (x,N)
-            v0 = jax.vmap(interp, in_axes=1, out_axes=1)(v0_coarse)
-        else:
-            # ---------- nearest-neighbour reuse ----------
-            idx = jnp.round(
-                jnp.interp(
-                    F_omega_hat_fine,
-                    (F_omega_hat_coarse[0], F_omega_hat_coarse[-1]),
-                    (0., F_omega_hat_coarse.size - 1)
-                )
-            ).astype(jnp.int32)                          # (x,)
-            q0 = q0_coarse[idx]                          # (x,N)
-            v0 = v0_coarse[idx]
+        interp = lambda y: jnp.interp(
+            F_omega_hat_fine,           # x-length target
+            F_omega_hat_coarse,         # 50-length source x
+            y                           # 50-length values
+        )
+       
+        q0 = jax.vmap(interp, in_axes=1, out_axes=1)(q0_coarse)  # (x,N)
+        v0 = jax.vmap(interp, in_axes=1, out_axes=1)(v0_coarse)
             
         y0 = jnp.concatenate([q0, v0], axis=-1)            # (x,2N)
         
         return y0
         
-
     # --------------------------------------------------- internal solver
     def _solve_rhs(
         self,
