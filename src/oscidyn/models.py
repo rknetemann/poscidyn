@@ -170,7 +170,7 @@ class PhysicalModel:
             elif self.c == Damping.LIGHTLY_DAMPED:
                 self.c = 2.0 * 0.1 * jnp.sqrt(jnp.matmul(self.m, self.k))
             elif self.c == Damping.MODERATELY_DAMPED:
-                self.c = 2.0 * 0.2 * self.m
+                self.c = 2.0 * 0.2 * jnp.sqrt(jnp.matmul(self.m, self.k))
             else:
                 raise ValueError(f"Unknown damping type: {self.c}")
             
