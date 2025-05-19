@@ -29,6 +29,73 @@ class NonlinearDynamics:
         v_steady = jnp.max(jnp.abs(v_steady), axis=1)
         return q_steady, v_steady
     
+    def _extract_phase_lag(self, tau, q, F_omega_hat, discard_frac=0.8):
+        """
+        Extract the phase lag between the forcing and the displacement response
+        using Fast Fourier Transform with improved noise reduction.
+        
+        Args:
+            tau: Time array (shape: [n_cases, n_steps])
+            q: Displacement array (shape: [n_cases, n_steps, N])
+            F_omega_hat: Non-dimensionalized forcing frequency (shape: [n_cases])
+            discard_frac: Fraction of the time series to discard for steady state
+            
+        Returns:
+            phase_lag: Phase lag in radians (shape: [n_cases, N])
+        """
+        n_cases, n_steps, N = q.shape
+        
+        # Extract steady state portion - use more data for better frequency resolution
+        start_idx = int(discard_frac * n_steps)
+        q_ss = q[:, start_idx:, :]
+        tau_ss = tau[:, start_idx:]
+        
+        # Function to calculate phase lag for one case
+        def _get_phase_for_case(q_case, t_case, omega):
+            # Time parameters
+            dt = t_case[1] - t_case[0]
+            n_samples = len(t_case)
+            
+            # Create Hann window for reducing spectral leakage
+            window = 0.5 - 0.5 * jnp.cos(2 * jnp.pi * jnp.arange(n_samples) / (n_samples - 1))
+            
+            # Reference forcing signal (sine wave at forcing frequency)
+            forcing = jnp.sin(omega * t_case) * window
+            
+            # Get frequency bin corresponding to forcing frequency
+            freq_res = 1.0 / (n_samples * dt)
+            target_bin = jnp.round(omega / (2 * jnp.pi * freq_res)).astype(jnp.int32)
+            
+            # Function to get phase without dynamic slicing
+            def _get_phase_for_oscillator(q_osc):
+                # Apply windowing
+                q_windowed = q_osc * window
+                
+                # Apply FFT
+                q_fft = jnp.fft.rfft(q_windowed)
+                f_fft = jnp.fft.rfft(forcing)
+                
+                # Get the complex values at the target frequency bin
+                # Using direct indexing (static) instead of dynamic slicing
+                q_complex = q_fft[target_bin]
+                f_complex = f_fft[target_bin]
+                
+                # Calculate phase using the complex product
+                phase_diff = jnp.angle(f_complex * jnp.conj(q_complex))
+                
+                # Ensure phase is in [-π, π]
+                phase_diff = (phase_diff + jnp.pi) % (2 * jnp.pi) - jnp.pi
+                
+                return phase_diff
+            
+            # Apply for each oscillator
+            return jax.vmap(_get_phase_for_oscillator)(q_case.T)
+        
+        # Apply the function for each case
+        phase_lag = jax.vmap(_get_phase_for_case)(q_ss, tau_ss, F_omega_hat)
+        
+        return phase_lag
+    
     def _initial_guesses(
         self,
         F_omega_hat: jax.Array,
@@ -47,7 +114,7 @@ class NonlinearDynamics:
 
         N = self.non_dimensionalised_model.N
         F_omega_hat_fine = F_omega_hat                   
-        
+
         F_omega_hat_n   = 50
         F_omega_hat_min = jnp.min(F_omega_hat_fine)
         F_omega_hat_max = jnp.max(F_omega_hat_fine)
@@ -237,9 +304,11 @@ class NonlinearDynamics:
         tau, q, v = jax.vmap(solve_rhs, in_axes=(0, None, 0))(F_omega_hat_grid, F_amp_hat_grid, y0_hat_grid)
         q_st, v_st = self._get_steady_state(q, v, discard_frac)
         
+        phase = self._extract_phase_lag(tau, q, F_omega_hat_grid, discard_frac)
+        
         q_st_total = jnp.sum(q_st, axis=1)
         
-        return F_omega_hat_grid, q_st, q_st_total, v_st, y0_hat_grid
+        return F_omega_hat_grid, q_st, q_st_total, v_st, phase, y0_hat_grid
 
     def phase_portrait(
         self,

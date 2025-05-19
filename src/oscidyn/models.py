@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import jax
 import jax.numpy as jnp
 from .utils.random import random_uniform
+from .constants import Damping
     
 @dataclass(eq=False)
 class NonDimensionalisedModel: 
@@ -153,7 +154,7 @@ class PhysicalModel:
             F_amp = jnp.array([20.0, 15.0, 10.0, 5.0])
             F_omega = jnp.array([8.0])  # Forcing frequency
         else:
-            raise ValueError("N must be 1, 2, 3, 4 or 5")
+            raise ValueError("Example not found for N={N}.")
         
         return cls(N, m, c, k, alpha, gamma, F_amp, F_omega)
     
@@ -163,6 +164,16 @@ class PhysicalModel:
     
     # --------------------------------------------------- helpers
     def __post_init__(self):
+        if isinstance(self.c, Damping):
+            if self.c == Damping.NONE:
+                self.c = jnp.zeros(self.N)
+            elif self.c == Damping.LIGHTLY_DAMPED:
+                self.c = 2.0 * 0.1 * jnp.sqrt(jnp.matmul(self.m, self.k))
+            elif self.c == Damping.MODERATELY_DAMPED:
+                self.c = 2.0 * 0.2 * self.m
+            else:
+                raise ValueError(f"Unknown damping type: {self.c}")
+            
         self._calc_eigenfrequencies()
         self._build_rhs()
         

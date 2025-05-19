@@ -5,41 +5,62 @@ import matplotlib.pyplot as plt
 
 import oscidyn
 
+from farbod_model import mdl_farbod
+
 # ────────────── switches ────────────────────────────────────
 RUN_FREQUENCY_RESPONSE   = True
 RUN_PHASE_SPACE = False
 
 # ────────────── build & scale model ─────────────────────────
-N   = 1
-mdl = oscidyn.PhysicalModel.from_example(N).non_dimensionalise()
+mdl = oscidyn.PhysicalModel.from_example(2).non_dimensionalise()
+mdl = mdl_farbod
 nld = oscidyn.NonlinearDynamics(mdl)
+N = mdl.N
 
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD)
-    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD)
+    F_omega_hat_grid = jnp.linspace(0.1, 2.0, 1000)  # Define a range of frequencies
+    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(F_omega_hat_grid=F_omega_hat_grid, sweep_direction=oscidyn.Sweep.FORWARD)
+    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(F_omega_hat_grid=F_omega_hat_grid, sweep_direction=oscidyn.Sweep.BACKWARD)
     
-    plt.figure(figsize=(7, 4))
+    # Create figure with 2 subplots - one for amplitude, one for phase
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
     colors = plt.cm.tab10.colors  # Use a colormap for distinct colors
 
+    # Plot amplitude response on the first subplot
     for m in range(N):
         # Forward sweep
-        plt.plot(F_omega_hat_fw, q_steady_fw[:, m], label=f"Mode {m+1} (Forward)", color=colors[m % len(colors)], alpha=0.7)
+        ax1.plot(F_omega_hat_fw, q_steady_fw[:, m], label=f"Mode {m+1} (Forward)", color=colors[m % len(colors)], alpha=0.7)
         # Backward sweep
-        plt.plot(F_omega_hat_bw, q_steady_bw[:, m], label=f"Mode {m+1} (Backward)", color=colors[m % len(colors)], alpha=0.4)
+        ax1.plot(F_omega_hat_bw, q_steady_bw[:, m], label=f"Mode {m+1} (Backward)", color=colors[m % len(colors)], alpha=0.4)
 
     for f in mdl.omega_0_hat:
-        plt.axvline(f, ls="--", color="r", alpha=0.6)
+        ax1.axvline(f, ls="--", color="r", alpha=0.6)
+        ax2.axvline(f, ls="--", color="r", alpha=0.6)  # Add to phase plot too
 
     # Total response
-    plt.plot(F_omega_hat_fw, q_steady_total_fw, label="Total Response (Forward)", color="k", lw=2, alpha=0.8)
-    plt.plot(F_omega_hat_bw, q_steady_total_bw, label="Total Response (Backward)", color="gray", lw=2, alpha=0.5)
+    ax1.plot(F_omega_hat_fw, q_steady_total_fw, label="Total Response (Forward)", color="k", lw=2, alpha=0.8)
+    ax1.plot(F_omega_hat_bw, q_steady_total_bw, label="Total Response (Backward)", color="gray", lw=2, alpha=0.5)
 
-    plt.xlabel("Non-dimensionalized drive frequency")
-    plt.ylabel("Non-dimensionalized amplitude")
-    plt.title("Frequency Response")
-    plt.legend()
-    plt.grid(True)
+    ax1.set_ylabel("Non-dimensionalized amplitude")
+    ax1.set_title("Frequency Response - Amplitude")
+    ax1.grid(True)
+    ax1.legend()
+
+    # Plot phase response on the second subplot
+    for m in range(N):
+        # Forward sweep - convert phase to degrees for better readability
+        ax2.plot(F_omega_hat_fw, np.rad2deg(phase_fw), label=f"Phase (Forward)", color="k", alpha=0.7)
+        # Backward sweep
+        ax2.plot(F_omega_hat_bw, np.rad2deg(phase_bw), label=f"Phase (Backward)", color="gray", alpha=0.4)
+
+    ax2.set_xlabel("Non-dimensionalized drive frequency")
+    ax2.set_ylabel("Phase (degrees)")
+    ax2.set_title("Frequency Response - Phase")
+    ax2.set_ylim(-180, 180)
+    ax2.grid(True)
+    #ax2.legend()
+
     plt.tight_layout()
     plt.show()
 
