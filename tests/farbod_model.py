@@ -49,7 +49,7 @@ k = jnp.array([[4.93, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 38.2, 0],
                 [0, 0, 0, 0, 0, 0, 44.2]])
 alpha = jnp.zeros((N, N, N))
-F_amp = jnp.array([0.63, 0.002, 0.004, 0.0025, 0.0035, 0.003, 0.0045])
+F_amp = jnp.array([0.83, 0.002, 0.004, 0.0025, 0.0035, 0.003, 0.0045])
 F_omega = jnp.array([1.0])
 
 mdl_farbod = oscidyn.PhysicalModel(

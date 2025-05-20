@@ -36,9 +36,9 @@ class NonDimensionalisedModel:
             q, v   = jnp.split(state, 2)
             F_omega_hat_arg, F_amp_hat_arg = args
             
-            damping_term = (self.omega_0_hat / self.Q) * v
+            damping_term = (self.omega_0_hat) * (1 / self.Q) * v
             
-            linear_stiffness_term = (self.kappa**2 * q)
+            linear_stiffness_term = (self.kappa * q)
 
             quadratic_stiffness_term = jnp.einsum("ijk,j,k->i",    self.alpha, q, q)
             
@@ -209,15 +209,12 @@ class PhysicalModel:
 
         self.rhs_jit = jax.jit(_rhs)
         
-    def get_steady_state_t_end(self) -> float:
-        raise NotImplementedError("get_steady_state_t_end is not implemented yet.")
-        
     def non_dimensionalise(self) -> NonDimensionalisedModel:
         omega_0_1 = self.omega_0[0]
-        Q_1 = self.m[0] * omega_0_1 / self.c[0]
-        
         omega_ref = omega_0_1
-        x_ref = self.F_amp[0] * Q_1 / omega_0_1**2
+        
+        Q_1 = self.m[0] * omega_0_1 / self.c[0]
+        x_ref = self.F_amp[0] * Q_1 / omega_ref**2
         
         Q = self.m * self.omega_0 / self.c
         kappa = self.omega_0 / omega_ref
