@@ -3,6 +3,9 @@ import jax.numpy as jnp
 import diffrax
 
 from .models import PhysicalModel, NonDimensionalisedModel
+#from .utils.rbf_coll_solver import RBFColl
+
+jax.config.update("jax_enable_x64", False)
 
 def solve_rhs(
         model: PhysicalModel | NonDimensionalisedModel,

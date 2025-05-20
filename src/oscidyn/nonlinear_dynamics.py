@@ -9,8 +9,6 @@ from oscidyn.models import PhysicalModel, NonDimensionalisedModel
 import oscidyn.constants as const
 import oscidyn
 
-jax.config.update("jax_enable_x64", True)
-
 class NonlinearDynamics:
     def __init__(self, model: PhysicalModel | NonDimensionalisedModel):
         if isinstance(model, PhysicalModel):
@@ -185,6 +183,7 @@ class NonlinearDynamics:
         return y0
     
     # --------------------------------------------------- public wrappers
+    
     def frequency_response(
         self,
         F_omega_grid: jax.Array = None,
@@ -227,7 +226,7 @@ class NonlinearDynamics:
         elif tau_end is None and t_end is None:
             damping_ratio = 1 / (2 * self.non_dimensionalised_model.Q)
             tau_end = jnp.max(3.9 / (self.non_dimensionalised_model.omega_0_hat * damping_ratio))
-            tau_end = jnp.max(tau_end) * 1.1 # 10% margin
+            tau_end = jnp.max(tau_end) * 1.3 # 10% margin
             print(f"-> Using estimated tau_end = {tau_end:.2f} for steady state.")
         elif t_end is not None:
             tau_end = self.non_dimensionalised_model.omega_ref * t_end   
@@ -326,6 +325,125 @@ class NonlinearDynamics:
             F_amp=F_amp_hat,     # Passed as F_amp to _solve_rhs, interpreted as F_amp_hat by model
             y0=y0_hat,
             t_end=tau_end,
+            n_steps=n_steps,
+            calculate_dimless=calculate_dimless,
+        )
+        
+        return tau, q, v
+
+    def time_response(
+        self,
+        F_omega: jax.Array = None,
+        F_omega_hat: jax.Array = None,
+        F_amp: jax.Array = None,
+        F_amp_hat: jax.Array = None,
+        y0: jax.Array = None,
+        y0_hat: jax.Array = None,
+        t_end: float = None,
+        tau_end: float = None,
+        n_steps: int = None,
+        calculate_dimless: bool = True,
+    ) -> tuple[jax.Array, jax.Array, jax.Array]:
+        """
+        Compute the time response of the system for a given set of parameters.
+        
+        Args:
+            F_omega: Dimensional forcing frequency
+            F_omega_hat: Non-dimensional forcing frequency
+            F_amp: Dimensional forcing amplitude
+            F_amp_hat: Non-dimensional forcing amplitude
+            y0: Dimensional initial condition [q0, v0]
+            y0_hat: Non-dimensional initial condition [q0_hat, v0_hat]
+            t_end: End time (dimensional)
+            tau_end: End time (non-dimensional)
+            n_steps: Number of time steps
+            calculate_dimless: Whether to calculate in non-dimensional form
+            
+        Returns:
+            tau/t: Time array (non-dimensional/dimensional)
+            q: Displacement array (shape: [n_steps+1, N])
+            v: Velocity array (shape: [n_steps+1, N])
+        """
+        print("\n Calculating time response:")
+        
+        if calculate_dimless:
+            model = self.non_dimensionalised_model
+        else:
+            model = self.physical_model
+        
+        N = model.N
+        
+        # Handle frequency parameters
+        if F_omega is not None and F_omega_hat is not None:
+            raise ValueError("Either F_omega or F_omega_hat must be provided, not both.")
+        elif F_omega_hat is None and F_omega is None:
+            F_omega_hat = model.F_omega_hat
+        elif F_omega is not None and calculate_dimless:
+            F_omega_hat = F_omega / self.non_dimensionalised_model.omega_ref
+        elif F_omega_hat is not None and not calculate_dimless:
+            F_omega = F_omega_hat * self.non_dimensionalised_model.omega_ref
+        
+        # Handle amplitude parameters
+        if F_amp is not None and F_amp_hat is not None:
+            raise ValueError("Either F_amp or F_amp_hat must be provided, not both.")
+        elif F_amp_hat is None and F_amp is None:
+            F_amp_hat = model.F_amp_hat
+        elif F_amp is not None and calculate_dimless:
+            F_amp_hat = F_amp / (self.non_dimensionalised_model.m * 
+                               self.non_dimensionalised_model.omega_ref**2 * 
+                               self.non_dimensionalised_model.x_ref)
+        elif F_amp_hat is not None and not calculate_dimless:
+            F_amp = F_amp_hat * (self.non_dimensionalised_model.m * 
+                               self.non_dimensionalised_model.omega_ref**2 * 
+                               self.non_dimensionalised_model.x_ref)
+        
+        # Handle time parameters
+        if tau_end is not None and t_end is not None:
+            raise ValueError("Either t_end or tau_end must be provided, not both.")
+        elif tau_end is None and t_end is None:
+            tau_end = 100.0  # Default non-dimensional time
+        elif t_end is not None and calculate_dimless:
+            tau_end = self.non_dimensionalised_model.omega_ref * t_end
+        elif tau_end is not None and not calculate_dimless:
+            t_end = tau_end / self.non_dimensionalised_model.omega_ref
+        
+        if n_steps is None:
+            n_steps = 2000  # Default number of steps
+        
+        # Handle initial conditions
+        if y0_hat is not None and y0 is not None:
+            raise ValueError("Either y0 or y0_hat must be provided, not both.")
+        elif y0_hat is None and y0 is None:
+            y0_hat = jnp.zeros(2 * N)  # Default zero initial conditions
+        elif y0 is not None and calculate_dimless:
+            q0 = y0[:N] / self.non_dimensionalised_model.x_ref
+            v0 = y0[N:] / (
+                self.non_dimensionalised_model.x_ref
+                * self.non_dimensionalised_model.omega_ref
+            )
+            y0_hat = jnp.concatenate([q0, v0])
+        elif y0_hat is not None and not calculate_dimless:
+            q0 = y0_hat[:N] * self.non_dimensionalised_model.x_ref
+            v0 = y0_hat[N:] * (
+                self.non_dimensionalised_model.x_ref
+                * self.non_dimensionalised_model.omega_ref
+            )
+            y0 = jnp.concatenate([q0, v0])
+        
+        # Use appropriate parameters based on calculate_dimless
+        F_param = F_omega_hat if calculate_dimless else F_omega
+        F_amp_param = F_amp_hat if calculate_dimless else F_amp
+        y0_param = y0_hat if calculate_dimless else y0
+        t_param = tau_end if calculate_dimless else t_end
+        
+        # Solve the system
+        print(f"-> Solving time response with {n_steps} steps...")
+        tau, q, v = oscidyn.solve_rhs(
+            model=model,
+            F_omega=F_param,
+            F_amp=F_amp_param,
+            y0=y0_param,
+            t_end=t_param,
             n_steps=n_steps,
             calculate_dimless=calculate_dimless,
         )

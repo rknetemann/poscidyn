@@ -35,8 +35,6 @@ for line in processed_text.splitlines():
     for i, val in enumerate(values):
         gamma = gamma.at[i, j, k, l].set(float(val))
 
-#  γ is now ready for use
-print(gamma.shape)        # (7, 7, 7, 7)
 
 N = 7
 m = jnp.array([0.204, 0.195, 0.183, 0.103, 0.192, 0.118, 0.0698])
@@ -49,16 +47,16 @@ k = jnp.array([[4.93, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 38.2, 0],
                 [0, 0, 0, 0, 0, 0, 44.2]])
 alpha = jnp.zeros((N, N, N))
-F_amp = jnp.array([0.83, 0.002, 0.004, 0.0025, 0.0035, 0.003, 0.0045])
+F_amp = jnp.array([1.53, 0.002, 0.004, 0.0025, 0.0035, 0.003, 0.0045])
 F_omega = jnp.array([1.0])
 
 mdl_farbod = oscidyn.PhysicalModel(
     N=N,
     m=m,
     c=oscidyn.Damping.MODERATELY_DAMPED,
-    k=k,
-    a=alpha,
-    g=gamma,
+    k_1=k,
+    k_2=alpha,
+    k_3=gamma,
     F_amp=F_amp,
     F_omega=F_omega
 ).non_dimensionalise()

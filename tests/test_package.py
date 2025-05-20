@@ -9,14 +9,78 @@ from farbod_model import mdl_farbod
 
 
 # ────────────── switches ────────────────────────────────────
+RUN_TIME_RESPONSE = True
 RUN_FREQUENCY_RESPONSE   = True
 RUN_PHASE_SPACE = False
 
+
 # ────────────── build & scale model ─────────────────────────
-mdl = oscidyn.PhysicalModel.from_example(1).non_dimensionalise()
+mdl = oscidyn.PhysicalModel.from_example(4).non_dimensionalise()
 mdl = mdl_farbod
 nld = oscidyn.NonlinearDynamics(mdl)
-N = mdl.N
+
+# =============== time-response ===================
+if RUN_TIME_RESPONSE:
+    print("\nCalculating time response...")
+    
+    # Define parameters for time response
+    F_omega_hat_value = mdl.omega_0_hat[0] * 1.0  # Slightly below first natural frequency
+    F_amp_hat_value = mdl.F_amp_hat               # Use model's default amplitude
+    
+    # Initial displacement (small perturbation) and zero velocity
+    n_modes = mdl.N
+    q0_hat = jnp.ones(n_modes) * 0.1              # Small initial displacement
+    v0_hat = jnp.zeros(n_modes)                   # Zero initial velocity
+    y0_hat = jnp.concatenate([q0_hat, v0_hat])    # Combined initial state
+    
+    # Calculate time response
+    tau, q, v = nld.time_response(
+        F_omega_hat=jnp.array([F_omega_hat_value]),
+        F_amp_hat=F_amp_hat_value,
+        y0_hat=y0_hat,
+        n_steps=4000,                             # More steps for smoother curves
+        calculate_dimless=True                    # Use non-dimensional equations
+    )
+    
+    # Create figure for plotting time response
+    fig, axes = plt.subplots(n_modes + 1, 1, figsize=(10, 2.5 * (n_modes + 1)), sharex=True)
+    
+    # Colors for different modes
+    colors = plt.cm.tab10.colors
+    
+    # Plot each mode's displacement
+    for i in range(n_modes):
+        axes[i].plot(tau, q[:, i], label=f"Mode {i+1}", color=colors[i % len(colors)])
+        axes[i].set_ylabel(f"$q_{i+1}$")
+        axes[i].grid(True)
+        axes[i].legend(loc='upper right')
+    
+    # Plot total displacement (sum of all modes) at the bottom
+    q_total = jnp.sum(q, axis=1)
+    axes[-1].plot(tau, q_total, label="Total", color='black', linewidth=1.5)
+    axes[-1].set_ylabel("$q_{total}$")
+    axes[-1].set_xlabel("Non-dimensional time $\\tau$")
+    axes[-1].grid(True)
+    axes[-1].legend(loc='upper right')
+    
+    # Add forcing frequency information to the title
+    plt.suptitle(f"Time Response at $\\hat{{\\omega}}_F = {F_omega_hat_value:.4f}$", fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Make room for the suptitle
+    plt.show()
+    
+    # Optional: Phase space trajectory of first mode from time response data
+    plt.figure(figsize=(8, 6))
+    plt.plot(q[:, 0], v[:, 0], lw=0.8)
+    plt.plot(q[0, 0], v[0, 0], 'go', label='Start')
+    plt.plot(q[-1, 0], v[-1, 0], 'ro', label='End')
+    plt.xlabel("Displacement $q_1$")
+    plt.ylabel("Velocity $v_1$")
+    plt.title(f"Phase Portrait of Mode 1 from Time Response at $\\hat{{\\omega}}_F = {F_omega_hat_value:.4f}$")
+    plt.grid(True)
+    plt.legend()
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.show()
 
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
@@ -33,7 +97,7 @@ if RUN_FREQUENCY_RESPONSE:
     colors = plt.cm.tab10.colors  # Use a colormap for distinct colors
 
     # Plot amplitude response on the first subplot
-    for m in range(N):
+    for m in range(mdl.N):
         # Forward sweep
         ax1.plot(F_omega_hat_fw, q_steady_fw[:, m], label=f"Mode {m+1} (Forward)", color=colors[m % len(colors)], alpha=0.7)
         # Backward sweep
@@ -53,7 +117,7 @@ if RUN_FREQUENCY_RESPONSE:
     #ax1.legend()
 
     # Plot phase response on the second subplot
-    for m in range(N):
+    for m in range(mdl.N):
         # Forward sweep - convert phase to degrees for better readability
         ax2.plot(F_omega_hat_fw, np.rad2deg(phase_fw), label=f"Phase (Forward)", color="k", alpha=0.7)
         # Backward sweep

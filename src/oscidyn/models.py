@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import jax
 import jax.numpy as jnp
-from .utils.random import random_uniform
+from .utils.random_generation import random_uniform
 from .constants import Damping
     
 @dataclass(eq=False)
@@ -14,35 +14,32 @@ class NonDimensionalisedModel:
     
     N:              int
     Q:              jax.Array            # (N,)
-    kappa:          jax.Array            # (N,)
-    alpha:          jax.Array            # (N,)
-    gamma:          jax.Array            # (N,N,N)
+    kappa_1:          jax.Array            # (N,)
+    kappa_2:          jax.Array            # (N,)
+    kappa_3:          jax.Array            # (N,N,N)
     F_amp_hat:      jax.Array            # (N,)
     F_omega_hat:    jax.Array            # (1,)
     
-    omega_0_hat: jax.Array = field(init=False, repr=False)
+    omega_0_hat: jax.Array
     
     rhs_jit: callable = field(init=False, repr=False)
     
     def __post_init__(self):
-        self._calc_eigenfrequencies()
+        #self._calc_eigenfrequencies()
         self._build_rhs()
-        
-    def _calc_eigenfrequencies(self):
-        self.omega_0_hat = self.kappa
     
     def _build_rhs(self):
         def _rhs(tau, state, args):
             q, v   = jnp.split(state, 2)
             F_omega_hat_arg, F_amp_hat_arg = args
             
-            damping_term = (self.omega_0_hat) * (1 / self.Q) * v
+            damping_term = (1 / self.Q) * v
             
-            linear_stiffness_term = (self.kappa * q)
+            linear_stiffness_term = jnp.einsum("ij,j->i", self.kappa_1, q)
 
-            quadratic_stiffness_term = jnp.einsum("ijk,j,k->i",    self.alpha, q, q)
+            quadratic_stiffness_term = jnp.einsum("ijk,j,k->i", self.kappa_2, q, q)
             
-            cubic_stiffness_term = jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q)
+            cubic_stiffness_term = jnp.einsum("ijkl,j,k,l->i", self.kappa_3, q, q, q)
             
             forcing_term = F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
             
@@ -69,9 +66,9 @@ class PhysicalModel:
     N:         int
     m:         jax.Array            # (N,)
     c:         jax.Array            # (N,)
-    k:         jax.Array            # (N,)
-    a:         jax.Array            # (N,N,N)
-    g:         jax.Array            # (N,N,N,N)
+    k_1:         jax.Array            # (N,)
+    k_2:         jax.Array            # (N,N,N)
+    k_3:         jax.Array            # (N,N,N,N)
     F_amp:     jax.Array            # (N,)
     F_omega:   jax.Array            # (1,)
     
@@ -133,12 +130,11 @@ class PhysicalModel:
             
             # Stiffness matrix representing a chain-like structure with coupling (N/m)
             k = jnp.array([
-            [250.0, 200.0,   100.0,   0.0],
-            [200.0, 200.0, -60.0,   0.0],
-            [  100.0, -60.0, 180.0, -40.0],
-            [  0.0,   0.0, -40.0, 150.0]
+            [250.0, 0.0, 0.0, 0.0],
+            [0.0, 200.0, 0.0, 0.0],
+            [0.0, 0.0, 180.0, 0.0],
+            [0.0, 0.0, 0.0, 150.0]
             ])
-            
             # Quadratic nonlinearity - light coupling between modes
             alpha = jnp.zeros((N, N, N))
             alpha = alpha.at[0, 0, 0].set(2.5)
@@ -151,7 +147,7 @@ class PhysicalModel:
             gamma = gamma.at[2, 2, 2, 2].set(3.0)
             
             # External forcing - decreasing amplitude for higher modes
-            F_amp = jnp.array([20.0, 15.0, 10.0, 5.0])
+            F_amp = jnp.array([1400.0, 15.0, 100.0, 5.0])
             F_omega = jnp.array([8.0])  # Forcing frequency
         else:
             raise ValueError("Example not found for N={N}.")
@@ -168,71 +164,51 @@ class PhysicalModel:
             if self.c == Damping.NONE:
                 self.c = jnp.zeros(self.N)
             elif self.c == Damping.LIGHTLY_DAMPED:
-                self.c = 2.0 * 0.1 * jnp.sqrt(jnp.matmul(self.m, self.k))
+                self.c = 2.0 * 0.1 * jnp.sqrt(jnp.matmul(self.m, self.k_1))
             elif self.c == Damping.MODERATELY_DAMPED:
-                self.c = 2.0 * 0.2 * jnp.sqrt(jnp.matmul(self.m, self.k))
+                self.c = 2.0 * 0.2 * jnp.sqrt(jnp.matmul(self.m, self.k_1))
             else:
                 raise ValueError(f"Unknown damping type: {self.c}")
             
         self._calc_eigenfrequencies()
-        self._build_rhs()
+        #self._build_rhs()
         
     def _calc_eigenfrequencies(self):
-        M_inv_K = self.k / self.m[:, None]
+        M_inv_K = self.k_1 / self.m[:, None]
         eigvals, _ = jnp.linalg.eig(M_inv_K)
         idx       = jnp.argsort(eigvals)
         self.omega_0 = jnp.sqrt(jnp.abs(eigvals[idx]))
 
     def _build_rhs(self):
-        def _rhs(tau, state, args):
-            q, v   = jnp.split(state, 2)
-            F_omega_hat_arg, F_amp_hat_arg = args
-            
-            damping_term = -(self.non_dimensionalised_model.omega_0_hat / self.non_dimensionalised_model.Q) * v
-            
-            linear_stiffness_term = -(self.non_dimensionalised_model.kappa**2 * q)
-
-            quadratic_stiffness_term = -jnp.einsum("ijk,j,k->i",    self.non_dimensionalised_model.alpha, q, q)
-            
-            cubic_stiffness_term = -jnp.einsum("ijkl,j,k,l->i", self.non_dimensionalised_model.gamma, q, q, q)
-            
-            forcing_term = F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
-            
-            a = (
-                damping_term
-                + linear_stiffness_term
-                + quadratic_stiffness_term
-                + cubic_stiffness_term
-                + forcing_term
-            )
-            return jnp.concatenate([v, a])
-
-        self.rhs_jit = jax.jit(_rhs)
+        raise NotImplementedError("RHS is not implemented yet.")
         
     def non_dimensionalise(self) -> NonDimensionalisedModel:
         omega_0_1 = self.omega_0[0]
         omega_ref = omega_0_1
         
         Q_1 = self.m[0] * omega_0_1 / self.c[0]
-        x_ref = self.F_amp[0] * Q_1 / omega_ref**2
+        x_ref = self.F_amp[0] * Q_1 / (self.m[0] * omega_ref**2)
         
         Q = self.m * self.omega_0 / self.c
-        kappa = self.omega_0 / omega_ref
-        alpha = self.a * x_ref / (self.m * omega_ref**2)
-        gamma = self.g * x_ref**2 / (self.m * omega_ref**2)
+        kappa_1 = self.k_1 / (self.m * omega_ref**2)
+        kappa_2 = self.k_2 * x_ref / (self.m * omega_ref**2)
+        kappa_3 = self.k_3 * x_ref**2 / (self.m * omega_ref**2)
         F_amp_hat = self.F_amp / (self.m * omega_ref**2 * x_ref)
         F_omega_hat = self.F_omega / omega_ref    
+        
+        omega_0_hat = self.omega_0 / omega_ref
         
         non_dimensionalised_model = NonDimensionalisedModel(
             omega_ref=omega_ref,  
             x_ref=x_ref,
             N=self.N,
             Q=Q,
-            kappa=kappa,
-            alpha=alpha,
-            gamma=gamma,
+            kappa_1=kappa_1,
+            kappa_2=kappa_2,
+            kappa_3=kappa_3,
             F_amp_hat=F_amp_hat,
-            F_omega_hat=F_omega_hat
+            F_omega_hat=F_omega_hat,
+            omega_0_hat=omega_0_hat
         )
         return non_dimensionalised_model
     
