@@ -8,19 +8,19 @@ from .constants import Damping
     
 @dataclass(eq=False)
 class NonDimensionalisedModel: 
-    # --------------------------------------------------- non-dimensionalised parameters
-    omega_ref:      float
-    x_ref:          float
-    
-    N:              int
-    Q:              jax.Array            # (N,)
-    kappa_1:          jax.Array            # (N,)
-    kappa_2:          jax.Array            # (N,)
-    kappa_3:          jax.Array            # (N,N,N)
-    F_amp_hat:      jax.Array            # (N,)
-    F_omega_hat:    jax.Array            # (1,)
-    
-    omega_0_hat: jax.Array
+    # -----------------------non-dimensionalised parameters---------------------------- 
+    omega_ref:      float                                   # reference frequency
+    x_ref:          float                                   # reference displacement
+                    
+    N:              int                                     # number of modes   
+    Q:              jax.Array                               # quality-factor (N,)
+    kappa_1:          jax.Array                             # non-dimensionalized linear stiffness (N,)
+    kappa_2:          jax.Array                             # non-dimensionalized quadratic stiffness (N,N,N)
+    kappa_3:          jax.Array                             # non-dimensionalized cubic stiffness (N,N,N)
+    F_amp_hat:      jax.Array                               # non-dimensionalized forcing amplitude (N,)
+    F_omega_hat:    jax.Array                               # non-dimensionalized forcing frequency (1,)
+                    
+    omega_0_hat: jax.Array                                  # non-dimensionalised natural frequencies (N,) 
     
     rhs_jit: callable = field(init=False, repr=False)
     
@@ -35,7 +35,7 @@ class NonDimensionalisedModel:
             
             damping_term = (1 / self.Q) * v
             
-            linear_stiffness_term = jnp.einsum("ij,j->i", self.kappa_1, q)
+            linear_stiffness_term = self.kappa_1 * q
 
             quadratic_stiffness_term = jnp.einsum("ijk,j,k->i", self.kappa_2, q, q)
             
@@ -62,40 +62,29 @@ class NonDimensionalisedModel:
     
 @dataclass(eq=False)
 class PhysicalModel:    
-    # --------------------------------------------------- physical parameters
-    N:         int
-    m:         jax.Array            # (N,)
-    c:         jax.Array            # (N,)
-    k_1:         jax.Array            # (N,)
-    k_2:         jax.Array            # (N,N,N)
-    k_3:         jax.Array            # (N,N,N,N)
-    F_amp:     jax.Array            # (N,)
-    F_omega:   jax.Array            # (1,)
+    N:         int                                      # number of modes   
+    m:         jax.Array                                # mass (N,)
+    c:         jax.Array                                # damping (N,)
+    k_1:         jax.Array                              # linear stiffness (N,)
+    k_2:         jax.Array                              # quadratic stiffness (N,N,N)
+    k_3:         jax.Array                              # cubic stiffness (N,N,N,N)
+    F_amp:     jax.Array                                # forcing amplitude (N,)
+    F_omega:   jax.Array                                # forcing frequency (1,)
     
-    omega_0: jax.Array = field(init=False, repr=False)
+    omega_0: jax.Array = field(init=False, repr=False)  # natural frequencies (N,)
         
-    rhs_jit: callable = field(init=False, repr=False)
+    rhs_jit: callable = field(init=False, repr=False)   # right-hand side function
     
-    # --------------------------------------------------- constructors
     @classmethod
     def from_random(cls, N: int, seed: int = 0) -> "PhysicalModel":
-        key = jax.random.PRNGKey(seed)
-        m,       key = random_uniform(key, (N,),           0.1, 10.0)
-        c,       key = random_uniform(key, (N,),           80.0, 100.0)
-        k,       key = random_uniform(key, (N, N),         0.4, 1.0)
-        alpha,   key = random_uniform(key, (N, N, N),     -1.0, 1.0)
-        gamma,   key = random_uniform(key, (N, N, N, N),  -1.0, 1.0)
-        F_amp,   key = random_uniform(key, (N,),          0.5, 1.0)
-        F_omega, key = random_uniform(key, (1,),          2.0, 10.0)
-        
-        return cls(N, m, c, k, alpha, gamma, F_amp, F_omega)
+        raise NotImplementedError("Random generation is not implemented yet.")
 
     @classmethod
     def from_example(cls, N) -> "PhysicalModel":
         if N == 1:
             m     = jnp.array([1.0])
             c     = jnp.array([2.0 * 0.01 * 5.0])
-            k     = jnp.array([[10.0]])
+            k     = jnp.array([10.0])
             alpha = jnp.zeros((N, N, N))
             gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1]]))
             F_amp = jnp.array([15.0]) 
@@ -103,8 +92,7 @@ class PhysicalModel:
         elif N == 2:
             m     = jnp.array([1.0, 2.0])
             c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
-            k     = jnp.array([[10.0, 0],
-                               [0, 12.0]])
+            k     = jnp.array([10.0, 12.0])
             alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.0],
                                                             [0.0, 0.0]]))
             gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1, 0.0],
@@ -114,9 +102,7 @@ class PhysicalModel:
         elif N == 3:
             m     = jnp.array([0.204, 0.195, 0.183])
             c     = jnp.array([1.0, 1.0, 1.0])
-            k     = jnp.array([[5.78, 0.0, 0],
-                               [0.0,16.5, 0],
-                               [0,   0,   34.6]])
+            k     = jnp.array([5.78, 16.5, 34.6])
             alpha = jnp.zeros((N, N, N))
             gamma = jnp.zeros((N, N, N, N))
             F_amp = jnp.array([15.0, 10.0, 5.0]) 
@@ -129,12 +115,7 @@ class PhysicalModel:
             c = jnp.array([0.8, 1.2, 1.5, 1.8])
             
             # Stiffness matrix representing a chain-like structure with coupling (N/m)
-            k = jnp.array([
-            [250.0, 0.0, 0.0, 0.0],
-            [0.0, 200.0, 0.0, 0.0],
-            [0.0, 0.0, 180.0, 0.0],
-            [0.0, 0.0, 0.0, 150.0]
-            ])
+            k = jnp.array([250.0, 200.0, 180.0, 150.0])
             # Quadratic nonlinearity - light coupling between modes
             alpha = jnp.zeros((N, N, N))
             alpha = alpha.at[0, 0, 0].set(2.5)
@@ -147,7 +128,7 @@ class PhysicalModel:
             gamma = gamma.at[2, 2, 2, 2].set(3.0)
             
             # External forcing - decreasing amplitude for higher modes
-            F_amp = jnp.array([1400.0, 15.0, 100.0, 5.0])
+            F_amp = jnp.array([1800.0, 15.0, 100.0, 5.0])
             F_omega = jnp.array([8.0])  # Forcing frequency
         else:
             raise ValueError("Example not found for N={N}.")

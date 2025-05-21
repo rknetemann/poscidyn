@@ -121,7 +121,7 @@ class NonlinearDynamics:
             F_omega_hat_min, F_omega_hat_max, F_omega_hat_n
         )
 
-        q0_hat_n   = 30
+        q0_hat_n   = 50
         q0_hat     = jnp.linspace(0.0, 1.0, q0_hat_n)
 
         F_omega_hat_mesh, q0_hat_mesh = jnp.meshgrid(
@@ -326,6 +326,7 @@ class NonlinearDynamics:
             y0=y0_hat,
             t_end=tau_end,
             n_steps=n_steps,
+            t_steady_state_check=None,
             calculate_dimless=calculate_dimless,
         )
         

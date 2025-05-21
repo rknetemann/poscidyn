@@ -1,3 +1,4 @@
+# ───────────────────────── farbod_model.py ──────────────────────────
 import jax.numpy as jnp
 import oscidyn
 

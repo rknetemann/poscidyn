@@ -1,6 +1,8 @@
+# ───────────────────────── solver.py ──────────────────────────
 import jax
 import jax.numpy as jnp
 import diffrax
+import optimistix as optx
 
 from .models import PhysicalModel, NonDimensionalisedModel
 #from .utils.rbf_coll_solver import RBFColl
@@ -16,10 +18,16 @@ def solve_rhs(
         n_steps: int,
         calculate_dimless: bool = True,
     ) -> jax.Array:
+    
+        period = 2 * jnp.pi / F_omega.astype(float)
+           
             
-        def _steady_state_event(self, t, state, args, **kwargs) -> jax.Array:
+        def _steady_state_event(t, state, args, **kwargs) -> jax.Array:
             del kwargs
-            raise NotImplementedError("Steady state event is not implemented yet.")
+            
+            # All my steady_state check stuff
+            
+            return False
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
@@ -28,8 +36,9 @@ def solve_rhs(
             t1=t_end,
             dt0=None,
             max_steps=4096,
+            event=diffrax.Event(_steady_state_event),
             y0=y0,
-            throw=False,
+            throw=True,
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
             stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
