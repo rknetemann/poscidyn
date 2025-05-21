@@ -5,9 +5,15 @@ import diffrax
 import optimistix as optx
 
 from .models import PhysicalModel, NonDimensionalisedModel
-#from .utils.rbf_coll_solver import RBFColl
 
 jax.config.update("jax_enable_x64", False)
+jax.config.update('jax_platform_name', 'gpu')
+
+import os
+os.environ['XLA_FLAGS'] = (
+    '--xla_gpu_triton_gemm_any=True '
+    '--xla_gpu_enable_latency_hiding_scheduler=true '
+)
 
 def solve_rhs(
         model: PhysicalModel | NonDimensionalisedModel,
@@ -25,13 +31,16 @@ def solve_rhs(
         def _steady_state_event(t, state, args, **kwargs) -> jax.Array:
             del kwargs
             
+            # jax.debug.print("t: {t}", t=t)
+            # jax.debug.print("state: {state}", state=state)
+            # jax.debug.print("args: {args}", args=args)
             # All my steady_state check stuff
             
             return False
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
-            solver=diffrax.Tsit5(),
+            solver=diffrax.Dopri8(),
             t0=0.0,
             t1=t_end,
             dt0=None,
