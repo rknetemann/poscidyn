@@ -117,18 +117,18 @@ if RUN_FREQUENCY_RESPONSE:
     ax1.grid(True)
     #ax1.legend()
 
-    # Plot phase response on the second subplot
-    for m in range(mdl.N):
-        # Forward sweep - convert phase to degrees for better readability
-        ax2.plot(F_omega_hat_fw, np.rad2deg(phase_fw), label=f"Phase (Forward)", color="k", alpha=0.7)
-        # Backward sweep
-        ax2.plot(F_omega_hat_bw, np.rad2deg(phase_bw), label=f"Phase (Backward)", color="gray", alpha=0.4)
+    # # Plot phase response on the second subplot
+    # for m in range(mdl.N):
+    #     # Forward sweep - convert phase to degrees for better readability
+    #     ax2.plot(F_omega_hat_fw, np.rad2deg(phase_fw), label=f"Phase (Forward)", color="k", alpha=0.7)
+    #     # Backward sweep
+    #     ax2.plot(F_omega_hat_bw, np.rad2deg(phase_bw), label=f"Phase (Backward)", color="gray", alpha=0.4)
 
-    ax2.set_xlabel("Non-dimensionalized drive frequency")
-    ax2.set_ylabel("Phase (degrees)")
-    ax2.set_title("Frequency Response - Phase")
-    ax2.set_ylim(-180, 180)
-    ax2.grid(True)
+    # ax2.set_xlabel("Non-dimensionalized drive frequency")
+    # ax2.set_ylabel("Phase (degrees)")
+    # ax2.set_title("Frequency Response - Phase")
+    # ax2.set_ylim(-180, 180)
+    # ax2.grid(True)
     #ax2.legend()
 
     plt.tight_layout()

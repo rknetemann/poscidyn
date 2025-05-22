@@ -48,7 +48,7 @@ def solve_rhs(
                 y0=y0,
                 args=(F_omega, F_amp),
                 max_steps=None,
-                event=diffrax.Event(cond_fn=diffrax.steady_state_event(rtol=1e-1, atol=1e-1),),
+                event=diffrax.Event(cond_fn=diffrax.steady_state_event(rtol=1, atol=1e-1),),
                 adjoint = diffrax.ImplicitAdjoint(),
                 stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
                 saveat=diffrax.SaveAt(t1=True),
