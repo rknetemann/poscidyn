@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import oscidyn
 
-from farbod_model import mdl_farbod
+#from farbod_model import mdl_farbod
 
 
 # ────────────── switches ────────────────────────────────────
@@ -15,7 +15,7 @@ RUN_PHASE_SPACE = False
 
 
 # ────────────── build & scale model ─────────────────────────
-mdl = oscidyn.PhysicalModel.from_example(1).non_dimensionalise()
+mdl = oscidyn.PhysicalModel.from_example(4).non_dimensionalise()
 #mdl = oscidyn.PhysicalModel.from_random(20).non_dimensionalise()
 #mdl = mdl_farbod
 nld = oscidyn.NonlinearDynamics(mdl)
@@ -85,12 +85,12 @@ if RUN_TIME_RESPONSE:
 
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    F_omega_hat_grid = jnp.linspace(0.1, 7.0, 1000)  # Define a range of frequencies
-    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD, F_omega_hat_grid=F_omega_hat_grid)
-    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD, F_omega_hat_grid=F_omega_hat_grid)
+    # F_omega_hat_grid = jnp.linspace(0.1, 7.0, 1000)  # Define a range of frequencies
+    # F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD, F_omega_hat_grid=F_omega_hat_grid)
+    # F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD, F_omega_hat_grid=F_omega_hat_grid)
     
-    # F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD)
-    # F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD)
+    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD)
+    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD)
 
     
     # Create figure with 2 subplots - one for amplitude, one for phase
