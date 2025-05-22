@@ -24,7 +24,6 @@ class NonDimensionalisedModel:
     rhs_jit: callable = field(init=False, repr=False)
     
     def __post_init__(self):
-        #self._calc_eigenfrequencies()
         self._build_rhs()
     
     def _build_rhs(self):
@@ -57,7 +56,37 @@ class NonDimensionalisedModel:
         raise NotImplementedError("get_steady_state_t_end is not implemented yet.")
         
     def dimensionalise(self) -> PhysicalModel:
-        raise NotImplementedError("Dimensionalisation is not implemented yet.")
+        # Use unit masses as default
+        m = jnp.ones(self.N)
+        
+        # Calculate physical parameters from non-dimensional ones
+        omega_0 = self.omega_0_hat * self.omega_ref
+        c = m * omega_0 / self.Q
+        k = m * omega_0**2
+        
+        # Expand m for broadcasting with the tensor parameters
+        m_expanded_alpha = jnp.reshape(m, (self.N, 1, 1))  # Shape: (N, 1, 1)
+        m_expanded_gamma = jnp.reshape(m, (self.N, 1, 1, 1))  # Shape: (N, 1, 1, 1)
+        
+        # Calculate tensor parameters
+        alpha = self.alpha_hat * (m_expanded_alpha * self.omega_ref**2) / self.x_ref
+        gamma = self.gamma_hat * (m_expanded_gamma * self.omega_ref**2) / self.x_ref**2
+        
+        # Calculate forcing parameters
+        F_amp = self.F_amp_hat * (m * self.omega_ref**2 * self.x_ref)
+        F_omega = self.F_omega_hat * self.omega_ref
+        
+        # Create and return the physical model
+        return PhysicalModel(
+            N=self.N,
+            m=m,
+            c=c,
+            k=k,
+            alpha=alpha,
+            gamma=gamma,
+            F_amp=F_amp,
+            F_omega=F_omega
+        )
     
 @dataclass(eq=False)
 class PhysicalModel:    

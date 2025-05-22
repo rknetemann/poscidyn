@@ -16,8 +16,8 @@ class NonlinearDynamics:
             self.non_dimensionalised_model = self.physical_model.non_dimensionalise()
         elif isinstance(model, NonDimensionalisedModel):
             self.non_dimensionalised_model = model
-            #self.physical_model = self.non_dimensionalised_model.dimensionalise()
-            self.physical_model = None
+            self.physical_model = self.non_dimensionalised_model.dimensionalise()
+            #self.physical_model = None
             
     def _get_steady_state(self, q, v, discard_frac):
         n_steps = q.shape[1]
