@@ -41,7 +41,7 @@ def solve_rhs(
         if steady_state:
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(model.rhs_jit),
-                solver=diffrax.Tsit5(),
+                solver=diffrax.Dopri8(),
                 t0=0.0,
                 t1=jnp.inf,
                 dt0=None,
@@ -58,7 +58,7 @@ def solve_rhs(
         else:
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(model.rhs_jit),
-                solver=diffrax.Tsit5(),
+                solver=diffrax.Dopri8(),
                 t0=0.0,
                 t1=t_end,
                 dt0=None,
