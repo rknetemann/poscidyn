@@ -269,13 +269,14 @@ class NonlinearDynamics:
             model = self.physical_model  
                     
         def solve_rhs(F_omega_hat, F_amp_hat, y0_hat):
-            return oscidyn.solve_rhs(model, F_omega_hat, F_amp_hat, y0_hat, tau_end, n_steps)
+            return oscidyn.solve_rhs(model, F_omega_hat, F_amp_hat, y0_hat, tau_end, n_steps, steady_state=True, calculate_dimless=calculate_dimless)
 
         print("-> Solving for steady state:")
-        tau, q, v = jax.vmap(solve_rhs, in_axes=(0, None, 0))(F_omega_hat_grid, F_amp_hat_grid, y0_hat_grid)
-        q_st, v_st = self._get_steady_state(q, v, discard_frac)
+        tau, q_st, v_st = jax.vmap(solve_rhs, in_axes=(0, None, 0))(F_omega_hat_grid, F_amp_hat_grid, y0_hat_grid)
+        #q_st, v_st = self._get_steady_state(q, v, discard_frac)
         
-        phase = self._extract_phase_lag(tau, q, F_omega_hat_grid, discard_frac)
+        #phase = self._extract_phase_lag(tau, q, F_omega_hat_grid, discard_frac)
+        phase = None
         
         q_st_total = jnp.sum(q_st, axis=1)
         
