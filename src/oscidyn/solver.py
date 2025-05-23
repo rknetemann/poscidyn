@@ -58,13 +58,13 @@ def solve_rhs(
         else:
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(model.rhs_jit),
-                solver=diffrax.Dopri8(),
+                solver=diffrax.Tsit5(),
                 t0=0.0,
                 t1=t_end,
                 dt0=None,
-                max_steps=4096,
+                max_steps=400096,
                 y0=y0,
-                throw=True,
+                throw=False,
                 progress_meter=diffrax.TqdmProgressMeter(),
                 saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
                 stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),

@@ -15,7 +15,7 @@ RUN_PHASE_SPACE = False
 
 
 # ────────────── build & scale model ─────────────────────────
-mdl = oscidyn.PhysicalModel.from_example(4).non_dimensionalise()
+mdl = oscidyn.NonDimensionalisedModel.from_example(1)
 #mdl = oscidyn.PhysicalModel.from_random(20).non_dimensionalise()
 #mdl = mdl_farbod
 nld = oscidyn.NonlinearDynamics(mdl)
@@ -25,13 +25,13 @@ if RUN_TIME_RESPONSE:
     print("\nCalculating time response...")
     
     # Define parameters for time response
-    F_omega_hat_value = mdl.omega_0_hat[0] * 1.0  # Slightly below first natural frequency
+    F_omega_hat_value = mdl.omega_0_hat[0] * 1  # Slightly below first natural frequency
     F_amp_hat_value = mdl.F_amp_hat               # Use model's default amplitude
     
     # Initial displacement (small perturbation) and zero velocity
     n_modes = mdl.N
     q0_hat = jnp.ones(n_modes) * 0.1              # Small initial displacement
-    v0_hat = jnp.zeros(n_modes)                   # Zero initial velocity
+    v0_hat = jnp.ones(n_modes) * 0                 # Zero initial velocity
     y0_hat = jnp.concatenate([q0_hat, v0_hat])    # Combined initial state
     
     # Calculate time response
@@ -85,12 +85,13 @@ if RUN_TIME_RESPONSE:
 
 # =============== frequency sweep ===================
 if RUN_FREQUENCY_RESPONSE:
-    # F_omega_hat_grid = jnp.linspace(0.1, 7.0, 1000)  # Define a range of frequencies
-    # F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD, F_omega_hat_grid=F_omega_hat_grid)
-    # F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD, F_omega_hat_grid=F_omega_hat_grid)
+    F_omega_hat_grid = jnp.linspace(0.1, 10.0, 5000)  # Define a range of frequencies
+    tau_end = 300.0  # End time for the simulation
+    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD, F_omega_hat_grid=F_omega_hat_grid, tau_end=tau_end)
+    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD, F_omega_hat_grid=F_omega_hat_grid, tau_end=tau_end)
     
-    F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD)
-    F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD)
+    # F_omega_hat_fw, q_steady_fw, q_steady_total_fw, _, phase_fw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.FORWARD)
+    # F_omega_hat_bw, q_steady_bw, q_steady_total_bw, _, phase_bw, _ = nld.frequency_response(sweep_direction=oscidyn.Sweep.BACKWARD)
 
     
     # Create figure with 2 subplots - one for amplitude, one for phase

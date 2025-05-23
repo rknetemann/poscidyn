@@ -122,7 +122,7 @@ class NonlinearDynamics:
         )
 
         q0_hat_n   = 50
-        q0_hat     = jnp.linspace(0.0, 1.0, q0_hat_n)
+        q0_hat     = jnp.linspace(0.01, 1.0, q0_hat_n)
 
         F_omega_hat_mesh, q0_hat_mesh = jnp.meshgrid(
             F_omega_hat_coarse, q0_hat, indexing="ij"
@@ -400,7 +400,7 @@ class NonlinearDynamics:
         if tau_end is not None and t_end is not None:
             raise ValueError("Either t_end or tau_end must be provided, not both.")
         elif tau_end is None and t_end is None:
-            tau_end = 100.0  # Default non-dimensional time
+            tau_end = 300.0  # Default non-dimensional time
         elif t_end is not None and calculate_dimless:
             tau_end = self.non_dimensionalised_model.omega_ref * t_end
         elif tau_end is not None and not calculate_dimless:

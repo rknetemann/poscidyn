@@ -14,8 +14,10 @@ class NonDimensionalisedModel:
                     
     N:              int                                     # number of modes   
     Q:              jax.Array                               # quality-factor (N,)
-    alpha_hat:          jax.Array                           # non-dimensionalized quadratic stiffness (N,N,N)
-    gamma_hat:          jax.Array                           # non-dimensionalized cubic stiffness (N,N,N)
+    eta_hat:        jax.Array                               # non-dimensionalized damping (N,)
+    alpha_hat:      jax.Array                               # non-dimensionalized quadratic stiffness (N,N,N)
+    gamma_hat:      jax.Array                               # non-dimensionalized cubic stiffness (N,N,N)
+    delta_hat:      jax.Array                               # non-dimensionalized fith order stiffness (N,N,N,N)
     F_amp_hat:      jax.Array                               # non-dimensionalized forcing amplitude (N,)
     F_omega_hat:    jax.Array                               # non-dimensionalized forcing frequency (1,)
                     
@@ -33,24 +35,60 @@ class NonDimensionalisedModel:
             
             damping_term = (self.omega_0_hat / self.Q) * v
             
+            nonlinear_damping_term = self.eta_hat * q**2 * v
+            
             linear_stiffness_term = self.omega_0_hat**2 * q
 
             quadratic_stiffness_term = jnp.einsum("ijk,j,k->i", self.alpha_hat, q, q)
             
             cubic_stiffness_term = jnp.einsum("ijkl,j,k,l->i", self.gamma_hat, q, q, q)
             
+            fith_order_stiffness_term = jnp.einsum("ijklm,j,k,l,m->i", self.delta_hat, q, q, q, q)
+            
             forcing_term = F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
             
             a = (
                 - damping_term
+                - nonlinear_damping_term
                 - linear_stiffness_term
                 - quadratic_stiffness_term
                 - cubic_stiffness_term
+                - fith_order_stiffness_term
                 + forcing_term
             )
             return jnp.concatenate([v, a])
 
         self.rhs_jit = jax.jit(_rhs)
+        
+    @classmethod
+    def from_example(cls, N: int) -> NonDimensionalisedModel:
+        if N == 1:
+            omega_ref = 1.0
+            x_ref = 1.0
+            omega_0_hat = jnp.array([1.0])
+            Q = jnp.array([1000.0])
+            eta_hat = jnp.array([0.0])
+            alpha_hat = jnp.zeros((N, N, N)).at[0,0,0].set(0.0)
+            gamma_hat = jnp.zeros((N, N, N, N)).at[0, 0, 0, 0].set(+0.1)
+            delta_hat = jnp.zeros((N, N, N, N, N)).at[0, 0, 0, 0, 0].set(0.0)
+            F_amp_hat = jnp.array([1.0]) 
+            F_omega_hat = jnp.array([1.0])
+        else:
+            raise ValueError("Example not found for N={N}.")
+        
+        return cls(
+            omega_ref=omega_ref,
+            x_ref=x_ref,
+            N=N,
+            Q=Q,
+            eta_hat=eta_hat,
+            alpha_hat=alpha_hat,
+            gamma_hat=gamma_hat,
+            delta_hat=delta_hat,
+            F_amp_hat=F_amp_hat,
+            F_omega_hat=F_omega_hat,
+            omega_0_hat=omega_0_hat
+        )
         
     def get_steady_state_t_end(self) -> float:
         raise NotImplementedError("get_steady_state_t_end is not implemented yet.")
@@ -65,12 +103,16 @@ class NonDimensionalisedModel:
         k = m * omega_0**2
         
         # Expand m for broadcasting with the tensor parameters
+        m_expanded_eta = jnp.reshape(m, (self.N, 1))  # Shape: (N, 1)
         m_expanded_alpha = jnp.reshape(m, (self.N, 1, 1))  # Shape: (N, 1, 1)
         m_expanded_gamma = jnp.reshape(m, (self.N, 1, 1, 1))  # Shape: (N, 1, 1, 1)
+        m_expanded_delta = jnp.reshape(m, (self.N, 1, 1, 1, 1))  # Shape: (N, 1, 1, 1, 1)
         
         # Calculate tensor parameters
+        eta = self.eta_hat * (m_expanded_eta * self.omega_ref) / self.x_ref**2
         alpha = self.alpha_hat * (m_expanded_alpha * self.omega_ref**2) / self.x_ref
         gamma = self.gamma_hat * (m_expanded_gamma * self.omega_ref**2) / self.x_ref**2
+        delta = self.delta_hat * (m_expanded_delta * self.omega_ref**2) / self.x_ref**4
         
         # Calculate forcing parameters
         F_amp = self.F_amp_hat * (m * self.omega_ref**2 * self.x_ref)
@@ -81,9 +123,11 @@ class NonDimensionalisedModel:
             N=self.N,
             m=m,
             c=c,
+            eta=eta,
             k=k,
             alpha=alpha,
             gamma=gamma,
+            delta=delta,
             F_amp=F_amp,
             F_omega=F_omega
         )
@@ -93,9 +137,11 @@ class PhysicalModel:
     N:         int                                          # number of modes N
     m:         jax.Array                                    # mass (N,)
     c:         jax.Array                                    # damping (N,)
+    eta:       jax.Array                                    # damping (N,)
     k:         jax.Array                                    # linear stiffness (N,)
     alpha:     jax.Array                                    # quadratic stiffness (N,N,N)
     gamma:     jax.Array                                    # cubic stiffness (N,N,N,N)
+    delta:     jax.Array                                    # fith order stiffness (N,N,N,N,N)
     F_amp:     jax.Array                                    # forcing amplitude (N,)
     F_omega:   jax.Array                                    # forcing frequency (1,)
 
@@ -112,10 +158,12 @@ class PhysicalModel:
         if N == 1:
             m     = jnp.array([1.0])
             c     = jnp.array([2.0 * 0.01 * 5.0])
+            eta   = jnp.array([0.0])
             k     = jnp.array([10.0])
-            alpha = jnp.zeros((N, N, N))
-            gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1]]))
-            F_amp = jnp.array([15.0]) 
+            alpha = jnp.zeros((N, N, N)).at[0,0,0].set(+0.1)
+            gamma = jnp.zeros((N, N, N, N)).at[0, 0, 0, 0].set(+0.1)
+            delta = jnp.zeros((N, N, N, N, N))
+            F_amp = jnp.array([100.0]) 
             F_omega = jnp.array([1.0])
         elif N == 2:
             m     = jnp.array([1.0, 2.0])
@@ -133,6 +181,7 @@ class PhysicalModel:
             k     = jnp.array([5.78, 16.5, 34.6])
             alpha = jnp.zeros((N, N, N))
             gamma = jnp.zeros((N, N, N, N))
+            delta = jnp.zeros((N, N, N, N, N))
             F_amp = jnp.array([15.0, 10.0, 5.0]) 
             F_omega = jnp.array([1.0])
         elif N == 4:
@@ -151,9 +200,11 @@ class PhysicalModel:
             
             # Cubic nonlinearity - typical in mechanical systems with geometric nonlinearity
             gamma = jnp.zeros((N, N, N, N))
-            gamma = gamma.at[0, 0, 0, 0].set(5.0)
-            gamma = gamma.at[1, 1, 1, 1].set(4.0)
-            gamma = gamma.at[2, 2, 2, 2].set(3.0)
+            gamma = gamma.at[0, 0, 0, 0].set(-0.01)
+            gamma = gamma.at[1, 1, 1, 1].set(0.0)
+            gamma = gamma.at[2, 2, 2, 2].set(0.0)
+            
+            delta = jnp.zeros((N, N, N, N, N))
             
             # External forcing - decreasing amplitude for higher modes
             F_amp = jnp.array([180.0, 15.0, 100.0, 5.0])
@@ -161,7 +212,7 @@ class PhysicalModel:
         else:
             raise ValueError("Example not found for N={N}.")
         
-        return cls(N, m, c, k, alpha, gamma, F_amp, F_omega)
+        return cls(N=N, m=m, c=c, eta=eta, k=k, alpha=alpha, gamma=gamma, delta=delta, F_amp=F_amp, F_omega=F_omega)
     
     @classmethod
     def from_file(cls, path:str) -> "PhysicalModel":
@@ -200,8 +251,10 @@ class PhysicalModel:
         x_ref = self.F_amp[0] * Q_1 / (self.m[0] * omega_ref**2)
         
         Q = self.m * self.omega_0 / self.c
+        eta_hat = self.eta * x_ref**2 / (self.m * omega_ref)
         alpha_hat = self.alpha * x_ref / (self.m * omega_ref**2)
         gamma_hat = self.gamma * x_ref**2 / (self.m * omega_ref**2)
+        delta_hat = self.delta * x_ref**4 / (self.m * omega_ref**2)
         F_amp_hat = self.F_amp / (self.m * omega_ref**2 * x_ref)
         F_omega_hat = self.F_omega / omega_ref    
         
@@ -212,8 +265,10 @@ class PhysicalModel:
             x_ref=x_ref,
             N=self.N,
             Q=Q,
+            eta_hat=eta_hat,
             alpha_hat=alpha_hat,
             gamma_hat=gamma_hat,
+            delta_hat=delta_hat,
             F_amp_hat=F_amp_hat,
             F_omega_hat=F_omega_hat,
             omega_0_hat=omega_0_hat
