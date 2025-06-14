@@ -168,11 +168,13 @@ class PhysicalModel:
         elif N == 2:
             m     = jnp.array([1.0, 2.0])
             c     = jnp.array([2.0 * 0.01 * 5.0, 2.0 * 0.02 * 8.0])
+            eta   = jnp.array([0.0, 0.0])
             k     = jnp.array([10.0, 12.0])
             alpha = jnp.zeros((N, N, N)).at[0].set(jnp.array([[0.0, 0.0],
                                                             [0.0, 0.0]]))
             gamma = jnp.zeros((N, N, N, N)).at[0].set(jnp.array([[0.1, 0.0],
                                                             [0.0, 0.0]]))
+            delta = jnp.zeros((N, N, N, N, N))
             F_amp = jnp.array([15.0, 4.0]) 
             F_omega = jnp.array([1.0])
         elif N == 3:
