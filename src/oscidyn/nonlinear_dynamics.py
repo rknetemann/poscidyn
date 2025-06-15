@@ -6,6 +6,7 @@ import diffrax
 from typing import Tuple
 
 from oscidyn.models import PhysicalModel, NonDimensionalisedModel
+from oscidyn.results import FrequencyResponse
 import oscidyn.constants as const
 import oscidyn
 
@@ -158,6 +159,9 @@ class NonlinearDynamics:
 
         q_steady_state = q_steady.reshape(F_omega_hat_n, q0_hat_n, N)
         v_steady_state = v_steady.reshape(F_omega_hat_n, q0_hat_n, N)
+        
+        
+        
 
         norm = jnp.linalg.norm(q_steady_state, axis=-1)            # (freq , n_init)
         if sweep_direction == const.Sweep.FORWARD:
@@ -177,6 +181,8 @@ class NonlinearDynamics:
        
         q0 = jax.vmap(interp, in_axes=1, out_axes=1)(q0_coarse)  # (x,N)
         v0 = jax.vmap(interp, in_axes=1, out_axes=1)(v0_coarse)
+        
+        
             
         y0 = jnp.concatenate([q0, v0], axis=-1)            # (x,2N)
         
@@ -277,7 +283,16 @@ class NonlinearDynamics:
         
         q_st_total = jnp.sum(q_st, axis=1)
         
-        return F_omega_hat_grid, q_st, q_st_total, v_st, phase, y0_hat_grid
+        frequency_response = FrequencyResponse(
+            excitation_type="forward",
+            excitation_frequency=F_omega_hat_grid,
+            excitation_amplitude=F_amp_hat_grid,
+            total_response=q_st_total,
+            mode_response=q_st,
+            initial_guesses=y0_hat_grid
+        )
+
+        return frequency_response
 
     def phase_portrait(
         self,

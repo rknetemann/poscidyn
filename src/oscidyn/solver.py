@@ -17,43 +17,17 @@ os.environ['XLA_FLAGS'] = (
 
 def solve_rhs(
         model: PhysicalModel | NonDimensionalisedModel,
-        F_omega: jax.Array,
-        F_amp: jax.Array,
+        excitation_frequency: jax.Array,
+        excitation_amplitude: jax.Array,
         y0: jax.Array,
         t_end: float,
-        n_steps: int,
-        steady_state: bool = False,
-        calculate_dimless: bool = True,
+        n_steps: int = 4096,
+        steady_state_termination: bool = False
     ) -> jax.Array:
     
-        period = 2 * jnp.pi / F_omega.astype(float)
-           
-        def _steady_state_event(t, state, args, **kwargs) -> jax.Array:
-            del kwargs
-            
-            # jax.debug.print("t: {t}", t=t)
-            # jax.debug.print("state: {state}", state=state)
-            # jax.debug.print("args: {args}", args=args)
-            # All my steady_state check stuff
-            
-            return False
-
-        if steady_state:
-            sol = diffrax.diffeqsolve(
-                terms=diffrax.ODETerm(model.rhs_jit),
-                solver=diffrax.Dopri8(),
-                t0=0.0,
-                t1=jnp.inf,
-                dt0=None,
-                y0=y0,
-                args=(F_omega, F_amp),
-                max_steps=None,
-                event=diffrax.Event(cond_fn=diffrax.steady_state_event(rtol=1, atol=1e-1),),
-                adjoint = diffrax.ImplicitAdjoint(),
-                stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
-                saveat=diffrax.SaveAt(t1=True),
-                progress_meter=diffrax.TqdmProgressMeter(),
-                throw=True,
+        if steady_state_termination:
+            raise NotImplementedError(
+                "Steady state termination is not implemented yet."
             )
         else:
             sol = diffrax.diffeqsolve(
@@ -68,13 +42,26 @@ def solve_rhs(
                 progress_meter=diffrax.TqdmProgressMeter(),
                 saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, t_end, n_steps)),
                 stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
-                args=(F_omega, F_amp),
+                args=(excitation_frequency, excitation_amplitude),
             )
         t = sol.ts
         q = sol.ys[:, : model.N]
         v = sol.ys[:, model.N :]
-        
-        # jax.debug.print("t: {t}", t=t)
-        # jax.debug.print("q: {q}", q=q)
-        # jax.debug.print("v: {v}", v=v)
+
         return t, q, v
+
+# This function solves the RHS for each excitation frequency and amplitude in a batch manner.
+vmap_y0   = jax.vmap(
+    solve_rhs,
+    in_axes=(None, None, None, 0,    None, None, None)
+)
+vmap_amp  = jax.vmap(
+    vmap_y0,
+    in_axes=(None, None, 0,    None, None, None, None)
+)
+solve_rhs_batched = jax.vmap(
+    vmap_amp,
+    in_axes=(None, 0,    None, None, None, None, None)
+)
+
+
