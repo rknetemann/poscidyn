@@ -124,16 +124,34 @@ def _estimate_initial_conditions(
             steady_state_velocities_flat
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, N)
 
+        steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat.reshape(
+            const.N_COARSE_DRIVING_FREQUENCIES, 
+            const.N_COARSE_DRIVING_AMPLITUDES, 
+            const.N_COARSE_INITIAL_DISPLACEMENTS, 
+            model.N
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N)
+
+        steady_state_velocity_amplitudes  = steady_state_velocity_amplitudes_flat .reshape(
+            const.N_COARSE_DRIVING_FREQUENCIES, 
+            const.N_COARSE_DRIVING_AMPLITUDES, 
+            const.N_COARSE_INITIAL_DISPLACEMENTS, 
+            model.N
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N)
+
+        print(f"Shape of steady state displacement amplitudes: {steady_state_displacement_amplitudes.shape}")
+        print(f"Shape of steady state velocity amplitudes: {steady_state_velocity_amplitudes.shape}")
+
+
         # TO DO: Improve branch selection logic
-        norm = jnp.linalg.norm(steady_state_displacement_amplitudes, axis=-1)            # (freq , n_init)
+        norm = jnp.linalg.norm(steady_state_displacement_amplitudes_flat, axis=-1)            # (freq , n_init)
         if sweep_direction == const.SweepDirection.FORWARD:
-            sel = jnp.argmax(norm, axis=1)                   
+            sel = jnp.argmax(norm, axis=2)                   
         elif sweep_direction == const.SweepDirection.BACKWARD:
-            sel = jnp.argmin(norm, axis=1)              
+            sel = jnp.argmin(norm, axis=2)              
 
         rows = jnp.arange(const.N_COARSE_DRIVING_FREQUENCIES)
-        coarse_steady_state_displacement_amplitudes = steady_state_displacement_amplitudes[rows, sel, :]                   # (freq , N)
-        coarse_steady_state_velocities_amplitudes = steady_state_velocity_amplitudes[rows, sel, :]                   # (freq , N)
+        coarse_steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat[rows, sel, :]                   # (freq , N)
+        coarse_steady_state_velocities_amplitudes = steady_state_velocity_amplitudes_flat[rows, sel, :]                   # (freq , N)
 
         interp = lambda y: jnp.interp(
             driving_frequencies,      
