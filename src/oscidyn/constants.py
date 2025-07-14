@@ -1,13 +1,12 @@
+# constants.py
 from enum import Enum, auto
 
-class Sweep(Enum):
+class SweepDirection(Enum):
     FORWARD  = auto()
     BACKWARD = auto()
     
-class Damping(Enum):
-    NONE = auto()
-    LIGHTLY_DAMPED = auto()
-    MODERATELY_DAMPED = auto()
+N_COARSE_DRIVING_FREQUENCIES = 50    
+N_COARSE_DRIVING_AMPLITUDES = 10
+N_COARSE_INITIAL_DISPLACEMENTS= 50
+N_COARSE_INITIAL_VELOCITIES = 50
 
-F_OMEGA_HAT_COARSE_N = 50    
-Y0_HAT_COARSE_N = 30

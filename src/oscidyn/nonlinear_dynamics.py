@@ -1,450 +1,180 @@
-# ───────────────────────── nonlinear_dynamics.py ──────────────────────────
+# nonlinear_dynamics.py
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import diffrax
 from typing import Tuple
 
-from oscidyn.models import PhysicalModel, NonDimensionalisedModel
+from oscidyn.models import Model
+from oscidyn.solver import Solver
+from oscidyn.constants import SweepDirection
+from oscidyn.results import FrequencySweep
 import oscidyn.constants as const
-import oscidyn
 
-class NonlinearDynamics:
-    def __init__(self, model: PhysicalModel | NonDimensionalisedModel):
-        if isinstance(model, PhysicalModel):
-            self.physical_model = model
-            self.non_dimensionalised_model = self.physical_model.non_dimensionalise()
-        elif isinstance(model, NonDimensionalisedModel):
-            self.non_dimensionalised_model = model
-            self.physical_model = self.non_dimensionalised_model.dimensionalise()
-            #self.physical_model = None
-            
-    def _get_steady_state(self, q, v, discard_frac):
-        n_steps = q.shape[1]
-        
-        q_steady = q[:, int(discard_frac * n_steps):]
-        q_steady = jnp.max(jnp.abs(q_steady), axis=1)
-        v_steady = v[:, int(discard_frac * n_steps):]
-        v_steady = jnp.max(jnp.abs(v_steady), axis=1)
-        return q_steady, v_steady
+# TO DO: Implement a function to extract steady state amplitudes from the time responses of each mode
+# ASSUMPTION: The steady state is already reached in the time response
+@jax.jit
+def _get_steady_state_amplitudes(
+    driving_frequencies_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES,)
+    time_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps)
+    steady_state_displacements_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes)
+    steady_state_velocities_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes)
+):
+    """
+    Compute steady-state displacement and velocity amplitudes.
+
+    For each simulation we keep only the samples that lie in the **last three
+    periods** of its drive frequency and then take `max(|·|)` over that window.
+
+    Args
+    ----
+    driving_frequencies: Array of driving frequencies
+            (shape: [N_COARSE_DRIVING_FREQUENCIES])
+    time: Array of time values
+        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps])
+    steady_state_displacements_flat: Array of steady state displacements
+        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes])
+    steady_state_velocities_flat: Array of steady state velocities
+        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes])
+
+
+    Returns
+    -------
+    steady_state_displacement_amplitude_flat, steady_state_velocity_amplitude_flat : jnp.ndarray
+        Max absolute displacement / velocity in the last three periods for
+        every simulation.  Shape (n_sim, n_modes).
+    """
+    n_sim, n_steps, n_modes = steady_state_displacements_flat.shape
+
+    # 1.  Per-simulation dt  (works even if dt is *slightly* different between runs)
+    dt = time_flat[:, 1] - time_flat[:, 0]                     # (n_sim,)
+
+    # 2.  Samples per period  (integer, rounded)
+    samp_per_per = jnp.round((2.0 * jnp.pi / driving_frequencies_flat) / dt).astype(int)
+
+    # 3.  For every sim build a mask that is True only on the last 3 periods
+    #     time_idx shape (1, n_steps)  → broadcast to (n_sim, n_steps)
+    time_idx   = jnp.arange(n_steps)[None, :]
+    start_idx  = n_steps - 3 * samp_per_per[:, None]
+    in_window  = time_idx >= start_idx               # bool (n_sim, n_steps)
+
+    # 4.  Expand mask to (n_sim, n_steps, 1) so it broadcasts over modes
+    in_window3 = in_window[..., None]
+
+    # 5.  Apply mask, take max(|·|) over time axis
+    steady_state_displacement_amplitude_flat = jnp.max(jnp.where(in_window3, jnp.abs(steady_state_displacements_flat), 0.0), axis=1)
+    steady_state_velocity_amplitude_flat  = jnp.max(jnp.where(in_window3, jnp.abs(steady_state_velocities_flat),  0.0), axis=1)
+
+    return steady_state_displacement_amplitude_flat, steady_state_velocity_amplitude_flat
     
-    def _extract_phase_lag(self, tau, q, F_omega_hat, discard_frac=0.8):
-        """
-        Extract the phase lag between the forcing and the displacement response
-        using Fast Fourier Transform with improved noise reduction.
-        
-        Args:
-            tau: Time array (shape: [n_cases, n_steps])
-            q: Displacement array (shape: [n_cases, n_steps, N])
-            F_omega_hat: Non-dimensionalized forcing frequency (shape: [n_cases])
-            discard_frac: Fraction of the time series to discard for steady state
-            
-        Returns:
-            phase_lag: Phase lag in radians (shape: [n_cases, N])
-        """
-        n_cases, n_steps, N = q.shape
-        
-        # Extract steady state portion - use more data for better frequency resolution
-        start_idx = int(discard_frac * n_steps)
-        q_ss = q[:, start_idx:, :]
-        tau_ss = tau[:, start_idx:]
-        
-        # Function to calculate phase lag for one case
-        def _get_phase_for_case(q_case, t_case, omega):
-            # Time parameters
-            dt = t_case[1] - t_case[0]
-            n_samples = len(t_case)
-            
-            # Create Hann window for reducing spectral leakage
-            window = 0.5 - 0.5 * jnp.cos(2 * jnp.pi * jnp.arange(n_samples) / (n_samples - 1))
-            
-            # Reference forcing signal (sine wave at forcing frequency)
-            forcing = jnp.sin(omega * t_case) * window
-            
-            # Get frequency bin corresponding to forcing frequency
-            freq_res = 1.0 / (n_samples * dt)
-            target_bin = jnp.round(omega / (2 * jnp.pi * freq_res)).astype(jnp.int32)
-            
-            # Function to get phase without dynamic slicing
-            def _get_phase_for_oscillator(q_osc):
-                # Apply windowing
-                q_windowed = q_osc * window
-                
-                # Apply FFT
-                q_fft = jnp.fft.rfft(q_windowed)
-                f_fft = jnp.fft.rfft(forcing)
-                
-                # Get the complex values at the target frequency bin
-                # Using direct indexing (static) instead of dynamic slicing
-                q_complex = q_fft[target_bin]
-                f_complex = f_fft[target_bin]
-                
-                # Calculate phase using the complex product
-                phase_diff = jnp.angle(f_complex * jnp.conj(q_complex))
-                
-                # Ensure phase is in [-π, π]
-                phase_diff = (phase_diff + jnp.pi) % (2 * jnp.pi) - jnp.pi
-                
-                return phase_diff
-            
-            # Apply for each oscillator
-            return jax.vmap(_get_phase_for_oscillator)(q_case.T)
-        
-        # Apply the function for each case
-        phase_lag = jax.vmap(_get_phase_for_case)(q_ss, tau_ss, F_omega_hat)
-        
-        return phase_lag
-    
-    def _initial_guesses(
-        self,
-        F_omega_hat: jax.Array,
-        F_amp_hat:  jax.Array,
-        tau_end:    float,
-        n_steps:    int,
-        discard_frac: float,
-        sweep_direction: const.Sweep = const.Sweep.FORWARD,
-        calculate_dimless: bool = True,
+# TO DO: Include the initial velocities in the initial guesses function
+def _estimate_initial_conditions(
+        model: Model,
+        driving_frequencies: jax.Array,
+        driving_amplitudes:  jax.Array,
+        solver: Solver,
+        sweep_direction: SweepDirection,
     ) -> Tuple[jax.Array, jax.Array]:
         
-        def _pick_inphase_sample(tau, q, v, ω_F):
-            phase = (ω_F * tau) % (2 * jnp.pi)
-            k = jnp.argmin(jnp.abs(phase))
-            return q[k], v[k]
+        coarse_driving_frequencies = jnp.linspace(                
+            jnp.min(driving_frequencies), jnp.max(driving_frequencies), const.N_COARSE_DRIVING_FREQUENCIES
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES,)
 
-        N = self.non_dimensionalised_model.N
-        F_omega_hat_fine = F_omega_hat                   
+        coarse_driving_amplitudes = jnp.linspace(
+            jnp.min(driving_amplitudes), jnp.max(driving_amplitudes), const.N_COARSE_DRIVING_AMPLITUDES
+        ) # Shape: (N_COARSE_DRIVING_AMPLITUDES,)
 
-        F_omega_hat_n   = 50
-        F_omega_hat_min = jnp.min(F_omega_hat_fine)
-        F_omega_hat_max = jnp.max(F_omega_hat_fine)
-        F_omega_hat_coarse = jnp.linspace(                
-            F_omega_hat_min, F_omega_hat_max, F_omega_hat_n
+        max_displacement = 1.0 # TO DO: Determine the max amplitude based on the model or a fixed value
+        coarse_initial_displacement = jnp.linspace(
+            0.01, max_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
+        ) # Shape: (N_COARSE_INITIAL_DISPLACEMENTS,)
+
+        coarse_driving_frequency_mesh, coarse_driving_amplitude_mesh, coarse_initial_displacement_mesh = jnp.meshgrid(
+            coarse_driving_frequencies, coarse_driving_amplitudes, coarse_initial_displacement, indexing="ij"
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS)
+
+        coarse_driving_frequencies_flat = coarse_driving_frequency_mesh.ravel()
+        coarse_driving_amplitudes_flat = coarse_driving_amplitude_mesh.ravel()
+        coarse_initial_displacements_flat = coarse_initial_displacement_mesh.ravel() 
+        # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS)
+
+        def solve_case(driving_frequency, driving_amplitude, initial_displacement):
+            initial_displacement = jnp.full((model.N,), initial_displacement)
+            initial_velocity = jnp.zeros((model.N,))
+            initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
+
+            # jax.debug.print("Solving for driving frequency: {driving_frequency}, driving amplitude: {driving_amplitude}, initial displacement: {initial_displacement}", 
+            #                 driving_frequency=driving_frequency, 
+            #                 driving_amplitude=driving_amplitude, 
+            #                 initial_displacement=initial_displacement)
+
+            return solver.solve_rhs(model, driving_frequency, driving_amplitude, initial_condition)
+
+        time_flat, steady_state_displacements_flat, steady_state_velocities_flat = jax.vmap(solve_case)(
+            coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
         )
+        # Time shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps)
+        # Displacement shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N)
+        # Velocity shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N)
 
-        q0_hat_n   = 50
-        q0_hat     = jnp.linspace(0.01, 1.0, q0_hat_n)
+        steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = _get_steady_state_amplitudes(
+            coarse_driving_frequencies_flat,
+            time_flat,
+            steady_state_displacements_flat,
+            steady_state_velocities_flat
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, N)
 
-        F_omega_hat_mesh, q0_hat_mesh = jnp.meshgrid(
-            F_omega_hat_coarse, q0_hat, indexing="ij"
-        )
-        F_omega_hat_flat = F_omega_hat_mesh.ravel()
-        q0_hat_flat = q0_hat_mesh.ravel()
-        
-        if calculate_dimless:
-            model = self.non_dimensionalised_model
-        else:
-            model = self.physical_model
+        # TO DO: Improve branch selection logic
+        norm = jnp.linalg.norm(steady_state_displacement_amplitudes, axis=-1)            # (freq , n_init)
+        if sweep_direction == const.SweepDirection.FORWARD:
+            sel = jnp.argmax(norm, axis=1)                   
+        elif sweep_direction == const.SweepDirection.BACKWARD:
+            sel = jnp.argmin(norm, axis=1)              
 
-        def solve_case(f_omega_hat, q0_hat_val):
-            q0 = jnp.full((N,), q0_hat_val)
-            v0 = jnp.zeros((N,))
-            y0 = jnp.concatenate([q0, v0])
-            return oscidyn.solve_rhs(
-                model, f_omega_hat, F_amp_hat, y0, tau_end * 1, n_steps,
-                calculate_dimless=calculate_dimless,
-            )
-
-        tau_flat, q_flat, v_flat = jax.vmap(solve_case)(
-            F_omega_hat_flat, q0_hat_flat
-        )
-
-        T0 = int(discard_frac * n_steps)
-        tau_cut = tau_flat[:, T0:]        # shape (n_cases, n_keep)
-        q_cut   = q_flat[:,  T0:, :]      # (n_cases, n_keep, N)
-        v_cut   = v_flat[:,  T0:, :]
-
-        pick = lambda t,q,v,ω: _pick_inphase_sample(t, q, v, ω)
-        q_steady, v_steady = jax.vmap(pick)(tau_cut, q_cut, v_cut, F_omega_hat_flat)
-
-        q_steady_state = q_steady.reshape(F_omega_hat_n, q0_hat_n, N)
-        v_steady_state = v_steady.reshape(F_omega_hat_n, q0_hat_n, N)
-
-        norm = jnp.linalg.norm(q_steady_state, axis=-1)            # (freq , n_init)
-        if sweep_direction == const.Sweep.FORWARD:
-            sel = jnp.argmax(norm, axis=1)                         # large branch
-        elif sweep_direction == const.Sweep.BACKWARD:
-            sel = jnp.argmin(norm, axis=1)                         # small branch
-
-        rows = jnp.arange(F_omega_hat_n)
-        q0_coarse = q_steady_state[rows, sel, :]                   # (freq , N)
-        v0_coarse = v_steady_state[rows, sel, :]                   # (freq , N)
+        rows = jnp.arange(const.N_COARSE_DRIVING_FREQUENCIES)
+        coarse_steady_state_displacement_amplitudes = steady_state_displacement_amplitudes[rows, sel, :]                   # (freq , N)
+        coarse_steady_state_velocities_amplitudes = steady_state_velocity_amplitudes[rows, sel, :]                   # (freq , N)
 
         interp = lambda y: jnp.interp(
-            F_omega_hat_fine,           # x-length target
-            F_omega_hat_coarse,         # 50-length source x
-            y                           # 50-length values
+            driving_frequencies,      
+            coarse_driving_frequencies, 
+            y  
         )
        
-        q0 = jax.vmap(interp, in_axes=1, out_axes=1)(q0_coarse)  # (x,N)
-        v0 = jax.vmap(interp, in_axes=1, out_axes=1)(v0_coarse)
+        initial_displacement_amplitudes = jax.vmap(interp, in_axes=1, out_axes=1)(coarse_steady_state_displacement_amplitudes)
+        initial_velocity_amplitudes = jax.vmap(interp, in_axes=1, out_axes=1)(coarse_steady_state_velocities_amplitudes)
             
-        y0 = jnp.concatenate([q0, v0], axis=-1)            # (x,2N)
+        initial_conditions = jnp.concatenate([initial_displacement_amplitudes, initial_velocity_amplitudes], axis=-1)
         
-        return y0
+        return initial_conditions
+
+def frequency_sweep(
+    model: Model,
+    driving_frequencies: jax.Array,
+    driving_amplitudes: jax.Array,
+    solver: Solver,
+    sweep_direction: SweepDirection,
+) -> tuple:
+
+    initial_conditions = _estimate_initial_conditions(
+        model=model,
+        driving_frequencies=driving_frequencies,
+        driving_amplitudes=driving_amplitudes,
+        solver=solver,
+        sweep_direction=sweep_direction,
+    )
+
+    def solve_rhs(driving_frequency, driving_amplitude, initial_condition):
+        return solver.solve_rhs(model, driving_frequency, driving_amplitude, initial_condition)
+
+    time, displacements, velocities = jax.vmap(solve_rhs, in_axes=(0, None, 0))(driving_frequencies, driving_amplitudes, initial_conditions)
+    steady_state_displacement_amplitudes, steady_state_velocity_amplitudes = _get_steady_state_amplitudes(displacements, velocities)
+    steady_state_phase_difference = None
     
-    # --------------------------------------------------- public wrappers
-    
-    def frequency_response(
-        self,
-        F_omega_grid: jax.Array = None,
-        F_omega_hat_grid: jax.Array = None,
-        F_amp_grid : jax.Array = None,
-        F_amp_hat_grid: jax.Array = None,
-        y0: jax.Array = None,
-        y0_hat: jax.Array = None,
-        t_end: float = None,
-        tau_end: float = None,
-        n_steps: int = None,
-        discard_frac: float = None,
-        calculate_dimless: bool = True,
-        sweep_direction: const.Sweep = const.Sweep.FORWARD,
-    ) -> tuple:
-        print("\n Calculating frequency response:")
-        
-        if calculate_dimless:
-            N = self.non_dimensionalised_model.N
-        else:
-            N = self.physical_model.N
-        
-        if F_omega_grid is not None and F_omega_hat_grid is not None:
-            raise ValueError("Either F_omega or F_omega_hat must be provided, not both.")
-        elif F_omega_hat_grid is None and F_omega_grid is None:
-            F_omega_hat_min = 0.0
-            F_omega_hat_max = 3.0 * self.non_dimensionalised_model.omega_0_hat[-1]
-            F_omega_hat_grid = jnp.linspace(F_omega_hat_min, F_omega_hat_max, 400)
-        elif F_omega_grid is not None:
-            F_omega_hat_grid = F_omega_grid / self.non_dimensionalised_model.omega_ref
-        if F_amp_grid is not None and F_amp_hat_grid is not None:
-            raise ValueError("Either F_amp or F_amp_hat must be provided, not both.")
-        elif F_amp_hat_grid is None and F_amp_grid is None:
-            F_amp_hat_grid = self.non_dimensionalised_model.F_amp_hat
-        elif F_amp_grid is not None:
-            F_amp_hat_grid = F_amp_grid / (self.m * self.non_dimensionalised_model.omega_ref**2 * self.non_dimensionalised_model.x_ref)
-                
-        if tau_end is not None and t_end is not None:
-            raise ValueError("Either t_end or tau_end must be provided, not both.")  
-        elif tau_end is None and t_end is None:
-            damping_ratio = 1 / (2 * self.non_dimensionalised_model.Q)
-            tau_end = jnp.max(3.9 / (self.non_dimensionalised_model.omega_0_hat * damping_ratio))
-            tau_end = jnp.max(tau_end) * 1.3 # 10% margin
-            print(f"-> Using estimated tau_end = {tau_end:.2f} for steady state.")
-        elif t_end is not None:
-            tau_end = self.non_dimensionalised_model.omega_ref * t_end   
-            
-        if n_steps is None:
-            n_steps = 2000 
-            print(f"-> Using default n_steps = {n_steps}.")     
-            
-        if discard_frac is None:
-            discard_frac = 0.8
-            
-        if y0_hat is not None and y0 is not None:
-            raise ValueError("Either y0 or y0_hat must be provided, not both.")
-        elif y0_hat is None and y0 is None:
-            print("-> Calculating initial guesses y0:")
-            y0_hat_grid = self._initial_guesses(
-                F_omega_hat=F_omega_hat_grid,
-                F_amp_hat=F_amp_hat_grid,
-                tau_end=tau_end,
-                n_steps=n_steps,
-                discard_frac=discard_frac,
-                sweep_direction=sweep_direction or ForwardSweep(),
-                calculate_dimless=calculate_dimless,
-            )     
-        elif y0 is not None:
-            q0 = y0[:N] / self.non_dimensionalised_model.x_ref
-            v0 = y0[N:] / (
-                self.non_dimensionalised_model.x_ref
-                * self.non_dimensionalised_model.omega_ref
-            )
-            y0_hat = jnp.concatenate([q0, v0])
-            y0_hat_grid = jnp.broadcast_to(y0_hat, (F_omega_hat_grid.size, 2 * N)) 
-        
-        if calculate_dimless:
-            model = self.non_dimensionalised_model
-        else:
-            model = self.physical_model  
-                    
-        def solve_rhs(F_omega_hat, F_amp_hat, y0_hat):
-            return oscidyn.solve_rhs(model, F_omega_hat, F_amp_hat, y0_hat, tau_end, n_steps, steady_state=False, calculate_dimless=calculate_dimless)
+    # ASSUMPTION: Mode superposition validity for nonlinear systems
+    total_steady_state_displacement_amplitude = jnp.sum(steady_state_displacement_amplitudes, axis=1)
+    total_steady_state_velocity_amplitude = jnp.sum(steady_state_velocity_amplitudes, axis=1)
 
-        print("-> Solving for steady state:")
-        tau, q, v = jax.vmap(solve_rhs, in_axes=(0, None, 0))(F_omega_hat_grid, F_amp_hat_grid, y0_hat_grid)
-        q_st, v_st = self._get_steady_state(q, v, discard_frac)
-        
-        phase = self._extract_phase_lag(tau, q, F_omega_hat_grid, discard_frac)
-        #phase = None
-        
-        q_st_total = jnp.sum(q_st, axis=1)
-        
-        return F_omega_hat_grid, q_st, q_st_total, v_st, phase, y0_hat_grid
+    frequency_sweep = FrequencySweep()
 
-    def phase_portrait(
-        self,
-        F_omega_hat: jax.Array = None,
-        F_amp_hat: jax.Array = None,
-        y0_hat: jax.Array = None,
-        tau_end: float = None,
-        n_steps: int = None,
-        calculate_dimless: bool = True, # Currently, only non-dimensionalised is robustly supported for simulation
-    ) -> tuple[jax.Array, jax.Array, jax.Array]:
-        
-        if not calculate_dimless:
-            # Physical model simulation path might need review of PhysicalModel._build_rhs
-            raise NotImplementedError("Phase portrait for physical model directly is not fully verified.")
-
-        model_to_use = self.non_dimensionalised_model
-        N = model_to_use.N
-
-        if F_omega_hat is None:
-            F_omega_hat = model_to_use.F_omega_hat
-        
-        if F_amp_hat is None:
-            F_amp_hat = model_to_use.F_amp_hat
-
-        if y0_hat is None:
-            y0_hat = jnp.zeros(2 * N)
-            
-        if tau_end is None:
-            tau_end = 200.0 # Default non-dimensional time
-            
-        if n_steps is None:
-            n_steps = 4000 # Default number of steps
-        
-        if calculate_dimless:
-            model = self.non_dimensionalised_model
-        else:
-            model = self.physical_model
-            
-        # Call _solve_rhs directly, no vmap needed for a single phase portrait
-        tau, q, v = oscidyn.solve_rhs(
-            model=model,
-            F_omega=F_omega_hat, # Passed as F_omega to _solve_rhs, interpreted as F_omega_hat by model
-            F_amp=F_amp_hat,     # Passed as F_amp to _solve_rhs, interpreted as F_amp_hat by model
-            y0=y0_hat,
-            t_end=tau_end,
-            n_steps=n_steps,
-            t_steady_state_check=None,
-            calculate_dimless=calculate_dimless,
-        )
-        
-        return tau, q, v
-
-    def time_response(
-        self,
-        F_omega: jax.Array = None,
-        F_omega_hat: jax.Array = None,
-        F_amp: jax.Array = None,
-        F_amp_hat: jax.Array = None,
-        y0: jax.Array = None,
-        y0_hat: jax.Array = None,
-        t_end: float = None,
-        tau_end: float = None,
-        n_steps: int = None,
-        calculate_dimless: bool = True,
-    ) -> tuple[jax.Array, jax.Array, jax.Array]:
-        """
-        Compute the time response of the system for a given set of parameters.
-        
-        Args:
-            F_omega: Dimensional forcing frequency
-            F_omega_hat: Non-dimensional forcing frequency
-            F_amp: Dimensional forcing amplitude
-            F_amp_hat: Non-dimensional forcing amplitude
-            y0: Dimensional initial condition [q0, v0]
-            y0_hat: Non-dimensional initial condition [q0_hat, v0_hat]
-            t_end: End time (dimensional)
-            tau_end: End time (non-dimensional)
-            n_steps: Number of time steps
-            calculate_dimless: Whether to calculate in non-dimensional form
-            
-        Returns:
-            tau/t: Time array (non-dimensional/dimensional)
-            q: Displacement array (shape: [n_steps+1, N])
-            v: Velocity array (shape: [n_steps+1, N])
-        """
-        print("\n Calculating time response:")
-        
-        if calculate_dimless:
-            model = self.non_dimensionalised_model
-        else:
-            model = self.physical_model
-        
-        N = model.N
-        
-        # Handle frequency parameters
-        if F_omega is not None and F_omega_hat is not None:
-            raise ValueError("Either F_omega or F_omega_hat must be provided, not both.")
-        elif F_omega_hat is None and F_omega is None:
-            F_omega_hat = model.F_omega_hat
-        elif F_omega is not None and calculate_dimless:
-            F_omega_hat = F_omega / self.non_dimensionalised_model.omega_ref
-        elif F_omega_hat is not None and not calculate_dimless:
-            F_omega = F_omega_hat * self.non_dimensionalised_model.omega_ref
-        
-        # Handle amplitude parameters
-        if F_amp is not None and F_amp_hat is not None:
-            raise ValueError("Either F_amp or F_amp_hat must be provided, not both.")
-        elif F_amp_hat is None and F_amp is None:
-            F_amp_hat = model.F_amp_hat
-        elif F_amp is not None and calculate_dimless:
-            F_amp_hat = F_amp / (self.non_dimensionalised_model.m * 
-                               self.non_dimensionalised_model.omega_ref**2 * 
-                               self.non_dimensionalised_model.x_ref)
-        elif F_amp_hat is not None and not calculate_dimless:
-            F_amp = F_amp_hat * (self.non_dimensionalised_model.m * 
-                               self.non_dimensionalised_model.omega_ref**2 * 
-                               self.non_dimensionalised_model.x_ref)
-        
-        # Handle time parameters
-        if tau_end is not None and t_end is not None:
-            raise ValueError("Either t_end or tau_end must be provided, not both.")
-        elif tau_end is None and t_end is None:
-            tau_end = 300.0  # Default non-dimensional time
-        elif t_end is not None and calculate_dimless:
-            tau_end = self.non_dimensionalised_model.omega_ref * t_end
-        elif tau_end is not None and not calculate_dimless:
-            t_end = tau_end / self.non_dimensionalised_model.omega_ref
-        
-        if n_steps is None:
-            n_steps = 2000  # Default number of steps
-        
-        # Handle initial conditions
-        if y0_hat is not None and y0 is not None:
-            raise ValueError("Either y0 or y0_hat must be provided, not both.")
-        elif y0_hat is None and y0 is None:
-            y0_hat = jnp.zeros(2 * N)  # Default zero initial conditions
-        elif y0 is not None and calculate_dimless:
-            q0 = y0[:N] / self.non_dimensionalised_model.x_ref
-            v0 = y0[N:] / (
-                self.non_dimensionalised_model.x_ref
-                * self.non_dimensionalised_model.omega_ref
-            )
-            y0_hat = jnp.concatenate([q0, v0])
-        elif y0_hat is not None and not calculate_dimless:
-            q0 = y0_hat[:N] * self.non_dimensionalised_model.x_ref
-            v0 = y0_hat[N:] * (
-                self.non_dimensionalised_model.x_ref
-                * self.non_dimensionalised_model.omega_ref
-            )
-            y0 = jnp.concatenate([q0, v0])
-        
-        # Use appropriate parameters based on calculate_dimless
-        F_param = F_omega_hat if calculate_dimless else F_omega
-        F_amp_param = F_amp_hat if calculate_dimless else F_amp
-        y0_param = y0_hat if calculate_dimless else y0
-        t_param = tau_end if calculate_dimless else t_end
-        
-        # Solve the system
-        print(f"-> Solving time response with {n_steps} steps...")
-        tau, q, v = oscidyn.solve_rhs(
-            model=model,
-            F_omega=F_param,
-            F_amp=F_amp_param,
-            y0=y0_param,
-            t_end=t_param,
-            n_steps=n_steps,
-            calculate_dimless=calculate_dimless,
-        )
-        
-        return tau, q, v
+    return frequency_sweep
