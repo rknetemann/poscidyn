@@ -66,6 +66,52 @@ def _get_steady_state_amplitudes(
     steady_state_velocity_amplitude_flat  = jnp.max(jnp.where(in_window3, jnp.abs(steady_state_velocities_flat),  0.0), axis=1)
 
     return steady_state_displacement_amplitude_flat, steady_state_velocity_amplitude_flat
+
+def _select_branches(
+    model: Model,
+    driving_frequencies: jax.Array,
+    coarse_driving_frequencies: jax.Array,
+    steady_state_displacement_amplitudes,
+    steady_state_velocity_amplitudes,
+    sweep_direction: SweepDirection,
+):
+     
+    norm = jnp.linalg.norm(steady_state_displacement_amplitudes, axis=-1)
+
+    if sweep_direction is SweepDirection.FORWARD:     # large-amplitude branch
+        best_idx = jnp.argmax(norm, axis=2)           # (freq, amp)
+    else:                                             # small-amplitude branch
+        best_idx = jnp.argmin(norm, axis=2)
+
+    # gather helper
+    def _gather(arr):
+        # arr shape (freq, amp, init, mode)
+        idx_exp = best_idx[..., None, None]           # expand for take_along
+        out     = jnp.take_along_axis(arr, idx_exp, axis=2)
+        return out.squeeze(axis=2)                    # → (freq, amp, mode)
+
+    disp_branch = _gather(steady_state_displacement_amplitudes)                  # (freq, amp, mode)
+    vel_branch  = _gather(steady_state_velocity_amplitudes)
+
+    # ----------  6.  interpolate *only along frequency* to fine grid ----------
+    # We keep the amplitude axis intact so the caller can plot a surface.
+    def _interp_over_freq(array_coarse):
+        # array_coarse has shape (n_freq_c, n_amp_c, mode)
+        def _one_mode(a_mode):                       # (n_freq_c, n_amp_c)
+            return jnp.stack([
+                jnp.interp(driving_frequencies, coarse_driving_frequencies, a_mode[:, j])
+                for j in range(const.N_COARSE_DRIVING_AMPLITUDES)
+            ], axis=1)                               # (fine_freq, amp_c)
+        return jax.vmap(_one_mode, in_axes=2, out_axes=2)(array_coarse)
+
+    disp_fine = _interp_over_freq(disp_branch)       # (fine_freq, amp_c, mode)
+    vel_fine  = _interp_over_freq(vel_branch)
+
+    # ----------  7.  final reshape → (fine_freq * amp_c, 2*mode) ----------
+    disp_vec = disp_fine.reshape(-1, model.N)
+    vel_vec  = vel_fine .reshape(-1, model.N)
+
+    return disp_vec, vel_vec
     
 # TO DO: Include the initial velocities in the initial guesses function
 def _estimate_initial_conditions(
@@ -138,30 +184,18 @@ def _estimate_initial_conditions(
             model.N
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N)
 
-        print(f"Shape of steady state displacement amplitudes: {steady_state_displacement_amplitudes.shape}")
-        print(f"Shape of steady state velocity amplitudes: {steady_state_velocity_amplitudes.shape}")
+        initial_displacement_amplitudes, initial_velocity_amplitudes = _select_branches(
+            model=model,
+            driving_frequencies=driving_frequencies,
+            coarse_driving_frequencies=coarse_driving_frequencies,
+            steady_state_displacement_amplitudes=steady_state_displacement_amplitudes,
+            steady_state_velocity_amplitudes=steady_state_velocity_amplitudes,
+            sweep_direction=sweep_direction,
+        ) 
 
-
-        # TO DO: Improve branch selection logic
-        norm = jnp.linalg.norm(steady_state_displacement_amplitudes_flat, axis=-1)            # (freq , n_init)
-        if sweep_direction == const.SweepDirection.FORWARD:
-            sel = jnp.argmax(norm, axis=2)                   
-        elif sweep_direction == const.SweepDirection.BACKWARD:
-            sel = jnp.argmin(norm, axis=2)              
-
-        rows = jnp.arange(const.N_COARSE_DRIVING_FREQUENCIES)
-        coarse_steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat[rows, sel, :]                   # (freq , N)
-        coarse_steady_state_velocities_amplitudes = steady_state_velocity_amplitudes_flat[rows, sel, :]                   # (freq , N)
-
-        interp = lambda y: jnp.interp(
-            driving_frequencies,      
-            coarse_driving_frequencies, 
-            y  
-        )
+        print(f"Shape of initial displacement amplitudes: {initial_displacement_amplitudes.shape}")
+        print(f"Shape of initial velocity amplitudes: {initial_velocity_amplitudes.shape}")
        
-        initial_displacement_amplitudes = jax.vmap(interp, in_axes=1, out_axes=1)(coarse_steady_state_displacement_amplitudes)
-        initial_velocity_amplitudes = jax.vmap(interp, in_axes=1, out_axes=1)(coarse_steady_state_velocities_amplitudes)
-            
         initial_conditions = jnp.concatenate([initial_displacement_amplitudes, initial_velocity_amplitudes], axis=-1)
         
         return initial_conditions
@@ -182,12 +216,28 @@ def frequency_sweep(
         sweep_direction=sweep_direction,
     )
 
-    def solve_rhs(driving_frequency, driving_amplitude, initial_condition):
-        return solver.solve_rhs(model, driving_frequency, driving_amplitude, initial_condition)
+    import matplotlib.pyplot as plt, jax.numpy as jnp
 
-    time, displacements, velocities = jax.vmap(solve_rhs, in_axes=(0, None, 0))(driving_frequencies, driving_amplitudes, initial_conditions)
-    steady_state_displacement_amplitudes, steady_state_velocity_amplitudes = _get_steady_state_amplitudes(displacements, velocities)
-    steady_state_phase_difference = None
+    n_f      = driving_frequencies.size                  # fine-grid frequencies
+    n_modes  = model.N
+    n_a      = initial_conditions.shape[0] // n_f        # coarse amplitudes
+
+    disp_amp = initial_conditions[:, :n_modes]           # keep x-part only
+    disp_amp = disp_amp.reshape(n_f, n_a, n_modes)[..., 0]   # (freq, amp)
+
+    amp_vals = jnp.linspace(driving_amplitudes.min(),
+                            driving_amplitudes.max(),
+                            n_a)                         # labels
+
+    for j, A in enumerate(amp_vals):
+        plt.plot(driving_frequencies,
+                 disp_amp[:, j],
+                 label=f"A = {A:g}")
+    plt.xlabel("Drive frequency (rad s⁻¹)")
+    plt.ylabel("Chosen displacement amplitude (mode 0)")
+    plt.title("Initial conditions picked by branch selection")
+    plt.legend(title="Drive amplitude")
+    plt.tight_layout(); plt.show()
     
     # ASSUMPTION: Mode superposition validity for nonlinear systems
     total_steady_state_displacement_amplitude = jnp.sum(steady_state_displacement_amplitudes, axis=1)

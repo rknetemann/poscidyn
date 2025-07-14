@@ -20,9 +20,10 @@ class Solver:
         self.n_steps = n_steps
 
 class StandardSolver(Solver):
-    def __init__(self, t_end: float, n_steps: int = 2000):
+    def __init__(self, t_end: float, n_steps: int = 2000, max_steps: int = 4096):
         super().__init__(n_steps)
         self.t_end = t_end
+        self.max_steps = max_steps
 
     def solve_rhs(self, model: Model, driving_frequency: jax.Array, driving_amplitude: jax.Array, initial_condition: jax.Array) -> jax.Array:
         sol = diffrax.diffeqsolve(
@@ -31,7 +32,7 @@ class StandardSolver(Solver):
             t0=0.0,
             t1=self.t_end,
             dt0=None,
-            max_steps=4096,
+            max_steps=self.max_steps,
             y0=initial_condition,
             throw=True,
             progress_meter=diffrax.TqdmProgressMeter(),
