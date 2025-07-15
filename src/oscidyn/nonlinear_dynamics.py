@@ -5,11 +5,12 @@ import jax.numpy as jnp
 from typing import Tuple
 
 from oscidyn.models import AbstractModel
-from oscidyn.solver import Solver
+from oscidyn.solver import AbstractSolver
 from oscidyn.constants import SweepDirection
-from oscidyn.results import FrequencySweep
+from oscidyn.results import FrequencySweepResult
 import oscidyn.constants as const
 
+# TO DO: Improve steady state amplitude calculation
 # ASSUMPTION: The steady state is already reached in the time response
 @jax.jit
 def _get_steady_state_amplitudes(
@@ -53,7 +54,7 @@ def _get_steady_state_amplitudes(
     # 3.  For every sim build a mask that is True only on the last 3 periods
     #     time_idx shape (1, n_steps)  → broadcast to (n_sim, n_steps)
     time_idx   = jnp.arange(n_steps)[None, :]
-    start_idx  = n_steps - 3 * samp_per_per[:, None]
+    start_idx  = n_steps - const.N_PERIODS_TO_RETAIN * samp_per_per[:, None]
     in_window  = time_idx >= start_idx               # bool (n_sim, n_steps)
 
     # 4.  Expand mask to (n_sim, n_steps, 1) so it broadcasts over modes
@@ -65,6 +66,7 @@ def _get_steady_state_amplitudes(
 
     return steady_state_displacement_amplitude_flat, steady_state_velocity_amplitude_flat
 
+# TO DO: Improve branch selection logic
 def _select_branches(
     model: AbstractModel,
     driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
@@ -105,18 +107,14 @@ def _select_branches(
     disp_fine = _interp_over_freq(disp_branch)       # (fine_freq, amp_c, mode)
     vel_fine  = _interp_over_freq(vel_branch)
 
-    # ----------  7.  final reshape → (fine_freq * amp_c, 2*mode) ----------
-    disp_vec = disp_fine.reshape(-1, model.n_modes)
-    vel_vec  = vel_fine .reshape(-1, model.n_modes)
-
-    return disp_vec, vel_vec
+    return disp_fine, vel_fine
     
 # TO DO: Include the initial velocities in the initial guesses function
 def _estimate_initial_conditions(
         model: AbstractModel,
         driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
         driving_amplitudes:  jax.Array, # Shape: (n_driving_amplitudes,)
-        solver: Solver,
+        solver: AbstractSolver,
         sweep_direction: SweepDirection,
     ) -> Tuple[jax.Array, jax.Array]:
         
@@ -146,11 +144,6 @@ def _estimate_initial_conditions(
             initial_displacement = jnp.full((model.n_modes,), initial_displacement)
             initial_velocity = jnp.zeros((model.n_modes,))
             initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
-
-            # jax.debug.print("Solving for driving frequency: {driving_frequency}, driving amplitude: {driving_amplitude}, initial displacement: {initial_displacement}", 
-            #                 driving_frequency=driving_frequency, 
-            #                 driving_amplitude=driving_amplitude, 
-            #                 initial_displacement=initial_displacement)
 
             return solver.solve_rhs(model, driving_frequency, driving_amplitude, initial_condition)
 
@@ -189,21 +182,22 @@ def _estimate_initial_conditions(
             steady_state_displacement_amplitudes=steady_state_displacement_amplitudes,
             steady_state_velocity_amplitudes=steady_state_velocity_amplitudes,
             sweep_direction=sweep_direction,
-        ) 
+        ) # Shape: (n_driving_frequencies, n_driving_amplitudes, n_modes)
+      
+        batch_shape = initial_displacement_amplitudes.shape[:-1]
+        initial_conditions = jnp.concatenate([
+            initial_displacement_amplitudes.reshape(*batch_shape, model.n_modes),
+            initial_velocity_amplitudes.reshape(*batch_shape, model.n_modes)
+        ], axis=-1) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
 
-        print(f"Shape of initial displacement amplitudes: {initial_displacement_amplitudes.shape}")
-        print(f"Shape of initial velocity amplitudes: {initial_velocity_amplitudes.shape}")
-       
-        initial_conditions = jnp.concatenate([initial_displacement_amplitudes, initial_velocity_amplitudes], axis=-1)
-        
         return initial_conditions
 
 def frequency_sweep(
     model: AbstractModel,
-    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
-    driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)
-    solver: Solver,
     sweep_direction: SweepDirection,
+    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
+    driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
+    solver: AbstractSolver,
 ) -> tuple:
 
     initial_conditions = _estimate_initial_conditions(
@@ -212,35 +206,45 @@ def frequency_sweep(
         driving_amplitudes=driving_amplitudes,
         solver=solver,
         sweep_direction=sweep_direction,
-    )
+    ) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
 
-    import matplotlib.pyplot as plt, jax.numpy as jnp
+    # TO DO: Use the initial conditions to do a fine sweep:
+    steady_state_displacement_amplitudes, steady_state_velocity_amplitudes = None
 
-    n_f      = driving_frequencies.size                  # fine-grid frequencies
-    n_modes  = model.n_modes
-    n_a      = initial_conditions.shape[0] // n_f        # coarse amplitudes
-
-    disp_amp = initial_conditions[:, :n_modes]           # keep x-part only
-    disp_amp = disp_amp.reshape(n_f, n_a, n_modes)[..., 0]   # (freq, amp)
-
-    amp_vals = jnp.linspace(driving_amplitudes.min(),
-                            driving_amplitudes.max(),
-                            n_a)                         # labels
-
-    for j, A in enumerate(amp_vals):
-        plt.plot(driving_frequencies,
-                 disp_amp[:, j],
-                 label=f"A = {A:g}")
-    plt.xlabel("Drive frequency (rad s⁻¹)")
-    plt.ylabel("Chosen displacement amplitude (mode 0)")
-    plt.title("Initial conditions picked by branch selection")
-    plt.legend(title="Drive amplitude")
-    plt.tight_layout(); plt.show()
-    
     # ASSUMPTION: Mode superposition validity for nonlinear systems
     total_steady_state_displacement_amplitude = jnp.sum(steady_state_displacement_amplitudes, axis=1)
     total_steady_state_velocity_amplitude = jnp.sum(steady_state_velocity_amplitudes, axis=1)
 
-    frequency_sweep = FrequencySweep()
+    frequency_sweep = FrequencySweepResult(
+        model=model,
+        sweep_direction=sweep_direction,
+        driving_frequencies=driving_frequencies, # Shape: (n_driving_frequencies,)
+        driving_amplitudes=driving_amplitudes, # Shape: (n_driving_amplitudes,)
+        steady_state_displacement_amplitude=steady_state_displacement_amplitudes, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        steady_state_velocity_amplitude=steady_state_velocity_amplitudes, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        total_steady_state_displacement_amplitude=total_steady_state_displacement_amplitude, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
+        total_steady_state_velocity_amplitude=total_steady_state_velocity_amplitude, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
+        solver=solver,
+    )
 
     return frequency_sweep
+
+def time_response(
+    model: AbstractModel,
+    driving_frequency: jax.Array, # Shape: (1,)
+    driving_amplitude: jax.Array, # Shape: (1,)
+    initial_displacement: jax.Array, # Shape: (n_modes,)
+    initial_velocity: jax.Array, # Shape: (n_modes,)
+    solver: AbstractSolver,
+) -> tuple:
+
+    initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
+
+    time, displacements, velocities = solver.solve_rhs(
+        model=model,
+        driving_frequency=driving_frequency,
+        driving_amplitude=driving_amplitude,
+        initial_condition=initial_condition
+    )
+
+    return time, displacements, velocities

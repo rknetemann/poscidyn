@@ -15,12 +15,12 @@ jax.config.update('jax_platform_name', 'gpu')
 #     '--xla_gpu_enable_latency_hiding_scheduler=true '
 # )
 
-class Solver:
+class AbstractSolver:
     def __init__(self, n_steps: int = 2000, max_steps: int = 4096):
         self.n_steps = n_steps
         self.max_steps = max_steps
 
-class StandardSolver(Solver):
+class StandardSolver(AbstractSolver):
     def __init__(self, t_end: float, n_steps: int = 2000, max_steps: int = 4096):
         super().__init__(n_steps)
         self.t_end = t_end
@@ -37,8 +37,8 @@ class StandardSolver(Solver):
             y0=initial_condition,
             throw=True,
             progress_meter=diffrax.TqdmProgressMeter(),
-            saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, self.t_end, self.n_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
+            saveat=diffrax.SaveAt(ts=jnp.linspace(0, self.t_end, self.n_steps)),
+            stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
             args=(driving_frequency, driving_amplitude),
         )
 
@@ -48,7 +48,7 @@ class StandardSolver(Solver):
         
         return time, displacements, velocities
 
-class SteadyStateSolver(Solver):
+class SteadyStateSolver(AbstractSolver):
     def __init__(self):
         pass
 
