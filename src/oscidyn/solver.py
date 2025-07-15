@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import diffrax
 import optimistix as optx
 
-from .models import Model
+from .models import AbstractModel
 
 jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
@@ -16,8 +16,9 @@ jax.config.update('jax_platform_name', 'gpu')
 # )
 
 class Solver:
-    def __init__(self, n_steps: int = 2000):
+    def __init__(self, n_steps: int = 2000, max_steps: int = 4096):
         self.n_steps = n_steps
+        self.max_steps = max_steps
 
 class StandardSolver(Solver):
     def __init__(self, t_end: float, n_steps: int = 2000, max_steps: int = 4096):
@@ -25,7 +26,7 @@ class StandardSolver(Solver):
         self.t_end = t_end
         self.max_steps = max_steps
 
-    def solve_rhs(self, model: Model, driving_frequency: jax.Array, driving_amplitude: jax.Array, initial_condition: jax.Array) -> jax.Array:
+    def solve_rhs(self, model: AbstractModel, driving_frequency: jax.Array, driving_amplitude: jax.Array, initial_condition: jax.Array) -> jax.Array:
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
@@ -42,8 +43,8 @@ class StandardSolver(Solver):
         )
 
         time = sol.ts
-        displacements = sol.ys[:, : model.N]
-        velocities = sol.ys[:, model.N :]
+        displacements = sol.ys[:, : model.n_modes]
+        velocities = sol.ys[:, model.n_modes :]
         
         return time, displacements, velocities
 
@@ -51,5 +52,5 @@ class SteadyStateSolver(Solver):
     def __init__(self):
         pass
 
-    def solve_rhs(self, model: Model, F_omega: jax.Array, F_amp: jax.Array, y0: jax.Array, t_end: float, n_steps: int) -> jax.Array:
+    def solve_rhs(self, model: AbstractModel, F_omega: jax.Array, F_amp: jax.Array, y0: jax.Array, t_end: float, n_steps: int) -> jax.Array:
         raise NotImplementedError("SteadyStateSolver is not implemented yet.")

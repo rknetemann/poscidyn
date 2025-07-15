@@ -6,7 +6,7 @@ import jax
 oscimodel = lambda cls: dataclass(eq=False)(cls)
 
 @oscimodel
-class Model:
+class AbstractModel:
     rhs_jit: callable = field(init=False, repr=False)
 
     def __post_init__(self):

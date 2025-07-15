@@ -4,23 +4,23 @@ from dataclasses import dataclass, field
 import jax
 import jax.numpy as jnp
 
-from ..models import Model, oscimodel
+from ..models import AbstractModel, oscimodel
 
 @oscimodel
-class NonlinearOscillator(Model): 
+class NonlinearOscillator(AbstractModel): 
     omega_ref:      float                                   # reference frequency
     x_ref:          float                                   # reference displacement
                     
-    N:              int                                     # number of modes   
-    Q:              jax.Array                               # quality-factor (N,)
-    eta_hat:        jax.Array                               # non-dimensionalized damping (N,)
-    alpha_hat:      jax.Array                               # non-dimensionalized quadratic stiffness (N,N,N)
-    gamma_hat:      jax.Array                               # non-dimensionalized cubic stiffness (N,N,N)
-    delta_hat:      jax.Array                               # non-dimensionalized fith order stiffness (N,N,N,N)
-    F_amp_hat:      jax.Array                               # non-dimensionalized forcing amplitude (N,)
+    n_modes:              int                                     # number of modes   
+    Q:              jax.Array                               # quality-factor (n_modes,)
+    eta_hat:        jax.Array                               # non-dimensionalized damping (n_modes,)
+    alpha_hat:      jax.Array                               # non-dimensionalized quadratic stiffness (n_modes,n_modes,n_modes)
+    gamma_hat:      jax.Array                               # non-dimensionalized cubic stiffness (n_modes,n_modes,n_modes)
+    delta_hat:      jax.Array                               # non-dimensionalized fith order stiffness (n_modes,n_modes,n_modes,n_modes)
+    F_amp_hat:      jax.Array                               # non-dimensionalized forcing amplitude (n_modes,)
     F_omega_hat:    jax.Array                               # non-dimensionalized forcing frequency (1,)
                     
-    omega_0_hat: jax.Array                                  # non-dimensionalised natural frequencies (N,) 
+    omega_0_hat: jax.Array                                  # non-dimensionalised natural frequencies (n_modes,) 
     
     def rhs(self, tau, state, args):
         q, v   = jnp.split(state, 2)
@@ -52,25 +52,25 @@ class NonlinearOscillator(Model):
         return jnp.concatenate([v, a])
     
     @classmethod
-    def from_example(cls, N: int) -> NonlinearOscillator:
-        if N == 1:
+    def from_example(cls, n_modes: int) -> NonlinearOscillator:
+        if n_modes == 1:
             omega_ref = 1.0
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
             Q = jnp.array([1000.0])
             eta_hat = jnp.array([0.0])
-            alpha_hat = jnp.zeros((N, N, N)).at[0,0,0].set(0.0)
-            gamma_hat = jnp.zeros((N, N, N, N)).at[0, 0, 0, 0].set(+0.1)
-            delta_hat = jnp.zeros((N, N, N, N, N)).at[0, 0, 0, 0, 0].set(0.0)
+            alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.0)
+            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(+0.1)
+            delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(0.0)
             F_amp_hat = jnp.array([1.0]) 
             F_omega_hat = jnp.array([1.0])
         else:
-            raise ValueError("Example not found for N={N}.")
+            raise ValueError("Example not found for n_modes={n_modes}.")
         
         return cls(
             omega_ref=omega_ref,
             x_ref=x_ref,
-            N=N,
+            n_modes=n_modes,
             Q=Q,
             eta_hat=eta_hat,
             alpha_hat=alpha_hat,

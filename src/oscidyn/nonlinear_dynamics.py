@@ -2,23 +2,21 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-import diffrax
 from typing import Tuple
 
-from oscidyn.models import Model
+from oscidyn.models import AbstractModel
 from oscidyn.solver import Solver
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweep
 import oscidyn.constants as const
 
-# TO DO: Implement a function to extract steady state amplitudes from the time responses of each mode
 # ASSUMPTION: The steady state is already reached in the time response
 @jax.jit
 def _get_steady_state_amplitudes(
     driving_frequencies_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES,)
     time_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps)
-    steady_state_displacements_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes)
-    steady_state_velocities_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes)
+    steady_state_displacements_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, n_modes)
+    steady_state_velocities_flat: jnp.ndarray, # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, n_modes)
 ):
     """
     Compute steady-state displacement and velocity amplitudes.
@@ -29,13 +27,13 @@ def _get_steady_state_amplitudes(
     Args
     ----
     driving_frequencies: Array of driving frequencies
-            (shape: [N_COARSE_DRIVING_FREQUENCIES])
+        (shape: [N_COARSE_DRIVING_FREQUENCIES])
     time: Array of time values
         (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps])
     steady_state_displacements_flat: Array of steady state displacements
-        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes])
+        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, n_modes])
     steady_state_velocities_flat: Array of steady state velocities
-        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N_modes])
+        (shape: [N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, n_modes])
 
 
     Returns
@@ -68,11 +66,11 @@ def _get_steady_state_amplitudes(
     return steady_state_displacement_amplitude_flat, steady_state_velocity_amplitude_flat
 
 def _select_branches(
-    model: Model,
-    driving_frequencies: jax.Array,
-    coarse_driving_frequencies: jax.Array,
-    steady_state_displacement_amplitudes,
-    steady_state_velocity_amplitudes,
+    model: AbstractModel,
+    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
+    coarse_driving_frequencies: jax.Array, # Shape: (N_COARSE_DRIVING_FREQUENCIES,)
+    steady_state_displacement_amplitudes, # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
+    steady_state_velocity_amplitudes, # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
     sweep_direction: SweepDirection,
 ):
      
@@ -108,16 +106,16 @@ def _select_branches(
     vel_fine  = _interp_over_freq(vel_branch)
 
     # ----------  7.  final reshape → (fine_freq * amp_c, 2*mode) ----------
-    disp_vec = disp_fine.reshape(-1, model.N)
-    vel_vec  = vel_fine .reshape(-1, model.N)
+    disp_vec = disp_fine.reshape(-1, model.n_modes)
+    vel_vec  = vel_fine .reshape(-1, model.n_modes)
 
     return disp_vec, vel_vec
     
 # TO DO: Include the initial velocities in the initial guesses function
 def _estimate_initial_conditions(
-        model: Model,
-        driving_frequencies: jax.Array,
-        driving_amplitudes:  jax.Array,
+        model: AbstractModel,
+        driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
+        driving_amplitudes:  jax.Array, # Shape: (n_driving_amplitudes,)
         solver: Solver,
         sweep_direction: SweepDirection,
     ) -> Tuple[jax.Array, jax.Array]:
@@ -145,8 +143,8 @@ def _estimate_initial_conditions(
         # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS)
 
         def solve_case(driving_frequency, driving_amplitude, initial_displacement):
-            initial_displacement = jnp.full((model.N,), initial_displacement)
-            initial_velocity = jnp.zeros((model.N,))
+            initial_displacement = jnp.full((model.n_modes,), initial_displacement)
+            initial_velocity = jnp.zeros((model.n_modes,))
             initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
             # jax.debug.print("Solving for driving frequency: {driving_frequency}, driving amplitude: {driving_amplitude}, initial displacement: {initial_displacement}", 
@@ -159,30 +157,30 @@ def _estimate_initial_conditions(
         time_flat, steady_state_displacements_flat, steady_state_velocities_flat = jax.vmap(solve_case)(
             coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
         )
-        # Time shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps)
-        # Displacement shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N)
-        # Velocity shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, N)
+        # time_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps)
+        # steady_state_displacements_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, n_modes)
+        # steady_state_velocities_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_steps, n_modes)
 
         steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = _get_steady_state_amplitudes(
             coarse_driving_frequencies_flat,
             time_flat,
             steady_state_displacements_flat,
             steady_state_velocities_flat
-        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, N)
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
         steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
-            model.N
-        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N)
+            model.n_modes
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
         steady_state_velocity_amplitudes  = steady_state_velocity_amplitudes_flat .reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
-            model.N
-        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N)
+            model.n_modes
+        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
         initial_displacement_amplitudes, initial_velocity_amplitudes = _select_branches(
             model=model,
@@ -201,9 +199,9 @@ def _estimate_initial_conditions(
         return initial_conditions
 
 def frequency_sweep(
-    model: Model,
-    driving_frequencies: jax.Array,
-    driving_amplitudes: jax.Array,
+    model: AbstractModel,
+    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
+    driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)
     solver: Solver,
     sweep_direction: SweepDirection,
 ) -> tuple:
@@ -219,7 +217,7 @@ def frequency_sweep(
     import matplotlib.pyplot as plt, jax.numpy as jnp
 
     n_f      = driving_frequencies.size                  # fine-grid frequencies
-    n_modes  = model.N
+    n_modes  = model.n_modes
     n_a      = initial_conditions.shape[0] // n_f        # coarse amplitudes
 
     disp_amp = initial_conditions[:, :n_modes]           # keep x-part only
