@@ -109,7 +109,7 @@ def random_parameter_vectors( key, batchsize , ranges ):
 
 def duffing_produce_training_batch( key, batchsize, ranges , num_frequency_bins,
                                   force=1.0, omega_start=-4.0, omega_end=+4.0,
-                                  t_end=200.0, n_steps=400):
+                                  t_end=200.0, n_time_steps=400):
     """
     Produce a Duffing model training batch.
     Random values for omega0, gamma, and epsilon are generated uniformly
@@ -125,7 +125,7 @@ def duffing_produce_training_batch( key, batchsize, ranges , num_frequency_bins,
     """
     omega0s, gammas, epsilons = random_parameter_vectors( key, batchsize, ranges )
     zs,_,_ = solve_duffing_parameter_batch( 0.0+0.0j, omega0s, gammas, epsilons, 
-                                 force, omega_start, omega_end, t_end, n_steps )
+                                 force, omega_start, omega_end, t_end, n_time_steps )
     x = jax.image.resize( jnp.abs(zs), [ batchsize, num_frequency_bins ] , "linear")
     return x, jnp.stack([omega0s,gammas,epsilons],1)
     

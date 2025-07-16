@@ -18,21 +18,21 @@ drive_frequency -= 0.0  # Adjust to avoid resonance
 
 dt = 0.01     # Time step (s)
 T = 10.0      # Total simulation time (s)
-n_steps = int(T / dt)
+n_time_steps = int(T / dt)
 
 # Initialize positions and velocities (vertical displacements)
 y = np.zeros(n_masses)  # Vertical positions (initially 0)
 v = np.zeros(n_masses)  # Vertical velocities (initially 0)
 
 # Pre-allocate arrays to store simulation results for animation
-y_history = np.zeros((n_steps, n_masses))
-middle_history = np.zeros(n_steps)
+y_history = np.zeros((n_time_steps, n_masses))
+middle_history = np.zeros(n_time_steps)
 
 # Determine the index of the middle mass
 middle_index = n_masses // 2
 
 # Simulation loop using Euler integration
-for step in range(n_steps):
+for step in range(n_time_steps):
     # Save current state for animation
     y_history[step] = y.copy()
     middle_history[step] = y[middle_index]
@@ -75,7 +75,7 @@ ax1.set_xlabel('Mass index')
 ax1.set_ylabel('Vertical displacement')
 
 # Plot the time series for the middle mass displacement
-time_array = np.linspace(0, T, n_steps)
+time_array = np.linspace(0, T, n_time_steps)
 ax2.plot(time_array, middle_history, 'r-', lw=1)
 # A red dot to mark the current time point; note we wrap the scalars in lists
 dot, = ax2.plot([0], [middle_history[0]], 'ro')
@@ -93,6 +93,6 @@ def update(frame):
     dot.set_data([current_time], [middle_history[frame]])
     return line1, dot
 
-ani = FuncAnimation(fig, update, frames=n_steps, interval=20, blit=True)
+ani = FuncAnimation(fig, update, frames=n_time_steps, interval=20, blit=True)
 plt.tight_layout()
 plt.show()

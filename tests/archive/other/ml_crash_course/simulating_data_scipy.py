@@ -13,8 +13,8 @@ def duffing_rhs_real(Y, t, omega_start, domega_dt, gamma, epsilon, force, omega0
     return [dz.real, dz.imag]
 
 def solve_duffing_scipy(z0, omega0, gamma, epsilon, force,
-                        omega_start, omega_stop, t_end, n_steps):
-    ts = np.linspace(0.0, t_end, n_steps)
+                        omega_start, omega_stop, t_end, n_time_steps):
+    ts = np.linspace(0.0, t_end, n_time_steps)
     domega_dt = (omega_stop - omega_start) / t_end
     omegas = omega_start + domega_dt * ts
     Y0 = [z0.real, z0.imag]
@@ -27,7 +27,7 @@ def duffing_produce_training_batch_scipy(key, batchsize, ranges,
                                          num_frequency_bins,
                                          force=1.0, omega_start=-4.0,
                                          omega_stop=4.0,
-                                         t_end=1000.0, n_steps=400):
+                                         t_end=1000.0, n_time_steps=400):
     # draw random parameters
     rng = np.random.RandomState(key)
     params = [rng.uniform(low, high, size=batchsize)
@@ -39,7 +39,7 @@ def duffing_produce_training_batch_scipy(key, batchsize, ranges,
         z_ts, omegas = solve_duffing_scipy(
             0.0+0.0j,
             omega0s[i], gammas[i], epsilons[i], force,
-            omega_start, omega_stop, t_end, n_steps
+            omega_start, omega_stop, t_end, n_time_steps
         )
         amp = np.abs(z_ts)
         # resample onto desired frequency bins

@@ -45,7 +45,7 @@ if RUN_TIME_RESPONSE:
         F_omega_hat=jnp.array([F_omega_hat_value]),
         F_amp_hat=F_amp_hat_value,
         y0_hat=y0_hat,
-        n_steps=4000,                             # More steps for smoother curves
+        n_time_steps=4000,                             # More steps for smoother curves
         calculate_dimless=True                    # Use non-dimensional equations
     )
     
@@ -238,7 +238,7 @@ if RUN_PHASE_SPACE:
         # F_amp_hat=mdl.F_amp_hat 
         y0_hat=jnp.zeros(2 * N), # Start from rest
         tau_end=500.0,           # Simulate for a longer time to see attractor
-        n_steps=8000
+        n_time_steps=8000
     )
     
     # Plot phase portraits for each mode

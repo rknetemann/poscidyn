@@ -26,7 +26,7 @@ tau, q, v = nld.time_response(
     F_omega_hat=jnp.array([F_omega_hat_value]),
     F_amp_hat=F_amp_hat_value,
     y0_hat=y0_hat,
-    n_steps=4000,                             # More steps for smoother curves
+    n_time_steps=4000,                             # More steps for smoother curves
     calculate_dimless=True                    # Use non-dimensional equations
 )
 

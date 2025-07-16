@@ -33,7 +33,7 @@ def rk4_step_coupled(state, t, dt, f, omega, params):
     return state + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
 
 # Simulate the time series for the coupled system.
-def simulate_time_series_coupled(f, omega, params, dt=0.01, n_steps=8000):
+def simulate_time_series_coupled(f, omega, params, dt=0.01, n_time_steps=8000):
     # initial state: both modes start at rest
     state = jnp.array([0.0, 0.0, 0.0, 0.0])
     t0 = 0.0
@@ -45,13 +45,13 @@ def simulate_time_series_coupled(f, omega, params, dt=0.01, n_steps=8000):
         # record only the displacement of the primary mode x1
         return (new_state, new_t), new_state[0]
     
-    (final_state, final_t), x1_series = test_jax.lax.scan(step_fn, (state, t0), None, length=n_steps)
+    (final_state, final_t), x1_series = test_jax.lax.scan(step_fn, (state, t0), None, length=n_time_steps)
     return x1_series
 
 # Compute the steady-state amplitude by discarding a fraction of the time series as transient.
-def compute_amplitude_coupled(f, omega, params, dt=0.01, n_steps=8000, transient_fraction=0.5):
-    x1_series = simulate_time_series_coupled(f, omega, params, dt=dt, n_steps=n_steps)
-    transient_cut = int(n_steps * transient_fraction)
+def compute_amplitude_coupled(f, omega, params, dt=0.01, n_time_steps=8000, transient_fraction=0.5):
+    x1_series = simulate_time_series_coupled(f, omega, params, dt=dt, n_time_steps=n_time_steps)
+    transient_cut = int(n_time_steps * transient_fraction)
     steady_state = x1_series[transient_cut:]
     # Return the maximum absolute displacement in the steady state
     amp = jnp.max(jnp.abs(steady_state))
@@ -83,7 +83,7 @@ drive_amplitudes = [0.1, 0.3, 0.5, 0.7]
 
 # Settings for the time integration
 dt = 0.01           # time step (dimensionless)
-n_steps = 8000      # total number of time steps per frequency
+n_time_steps = 8000      # total number of time steps per frequency
 transient_fraction = 0.5  # discard the first half as transient
 
 # For each drive amplitude, compute the steady-state amplitude vs drive frequency.
@@ -91,7 +91,7 @@ results = {}
 for f in drive_amplitudes:
     # Vectorize the computation over frequency.
     compute_for_freq = test_jax.jit(test_jax.vmap(
-        lambda omega: compute_amplitude_coupled(f, omega, coupled_params, dt, n_steps, transient_fraction)
+        lambda omega: compute_amplitude_coupled(f, omega, coupled_params, dt, n_time_steps, transient_fraction)
     ))
     amps = compute_for_freq(frequencies)
     results[f] = amps

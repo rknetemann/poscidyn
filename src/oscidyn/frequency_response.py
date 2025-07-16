@@ -32,7 +32,7 @@ def frequency_response(
     n_freqs = 64
     n_amps = 5
     n_init_guesses = 50
-    n_steps = 4096  
+    n_time_steps = 4096  
     
     # shape excitation_frequency_coarse: (n_freqs,)
     excitation_frequency_coarse = jnp.linspace(excitation_frequency[0], 
@@ -55,14 +55,14 @@ def frequency_response(
     print("initial_velocity_coarse shape:", initial_velocity_coarse.shape)
     print("initial_guesses_coarse shape:", initial_guesses_coarse.shape)
 
-    # shape x, v: (n_modes, n_freq, n_amp, n_init_guesses, n_steps):
+    # shape x, v: (n_modes, n_freq, n_amp, n_init_guesses, n_time_steps):
     time_coarse, displacement_coarse, velocity_coarse = solve_rhs_batched(
         model,                         
         excitation_frequency_coarse,   
         excitation_amplitude_coarse,   
         initial_guesses_coarse,        
         1.0,                           
-        n_steps,
+        n_time_steps,
         False,
     )
 

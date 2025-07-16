@@ -17,8 +17,6 @@ class NonlinearOscillator(AbstractModel):
     alpha_hat:      jax.Array                               # non-dimensionalized quadratic stiffness (n_modes,n_modes,n_modes)
     gamma_hat:      jax.Array                               # non-dimensionalized cubic stiffness (n_modes,n_modes,n_modes)
     delta_hat:      jax.Array                               # non-dimensionalized fith order stiffness (n_modes,n_modes,n_modes,n_modes)
-    F_amp_hat:      jax.Array                               # non-dimensionalized forcing amplitude (n_modes,)
-    F_omega_hat:    jax.Array                               # non-dimensionalized forcing frequency (1,)
                     
     omega_0_hat: jax.Array                                  # non-dimensionalised natural frequencies (n_modes,) 
     
@@ -56,14 +54,12 @@ class NonlinearOscillator(AbstractModel):
         if n_modes == 1:
             omega_ref = 1.0
             x_ref = 1.0
-            omega_0_hat = jnp.array([1.0])
-            Q = jnp.array([1000.0])
-            eta_hat = jnp.array([0.01])
+            omega_0_hat = jnp.array([2.5])
+            Q = jnp.array([50.0])
+            eta_hat = jnp.array([0.00])
             alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.0)
-            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(+0.2)
+            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(+0.1)
             delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(0.0)
-            F_amp_hat = jnp.array([1.0]) 
-            F_omega_hat = jnp.array([1.0])
         else:
             raise ValueError("Example not found for n_modes={n_modes}.")
         
@@ -76,8 +72,6 @@ class NonlinearOscillator(AbstractModel):
             alpha_hat=alpha_hat,
             gamma_hat=gamma_hat,
             delta_hat=delta_hat,
-            F_amp_hat=F_amp_hat,
-            F_omega_hat=F_omega_hat,
             omega_0_hat=omega_0_hat
         )
         
