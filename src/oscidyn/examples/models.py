@@ -54,7 +54,7 @@ class NonlinearOscillator(AbstractModel):
         if n_modes == 1:
             omega_ref = 1.0
             x_ref = 1.0
-            omega_0_hat = jnp.array([2.5])
+            omega_0_hat = jnp.array([1.0])
             Q = jnp.array([50.0])
             eta_hat = jnp.array([0.00])
             alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.0)

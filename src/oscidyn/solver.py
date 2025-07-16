@@ -6,7 +6,7 @@ import optimistix as optx
 
 from .models import AbstractModel
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
 
 # import os
@@ -29,7 +29,7 @@ class StandardSolver(AbstractSolver):
     def solve_rhs(self, model: AbstractModel, driving_frequency: jax.Array, driving_amplitude: jax.Array, initial_condition: jax.Array) -> jax.Array:
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
-            solver=diffrax.Kvaerno5(),
+            solver=diffrax.Tsit5(),
             t0=0.0,
             t1=self.t_end,
             dt0=None,
@@ -38,7 +38,7 @@ class StandardSolver(AbstractSolver):
             throw=True,
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(0, self.t_end, self.n_time_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-6, atol=1e-9),
+            stepsize_controller=diffrax.PIDController(rtol=1e-4, atol=1e-6),
             args=(driving_frequency, driving_amplitude),
         )
 
