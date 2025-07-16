@@ -8,6 +8,7 @@ from oscidyn.models import AbstractModel
 from oscidyn.solver import AbstractSolver
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
+import numpy as np
 import oscidyn.constants as const
 
 # TO DO: Improve steady state amplitude calculation
@@ -192,6 +193,80 @@ def _estimate_initial_conditions(
 
         return initial_conditions
 
+def _fine_sweep(
+    model: AbstractModel,
+    initial_conditions: jax.Array,           # (n_f, n_A_coarse, 2*n_modes)
+    driving_frequencies: jax.Array,          # (n_f,)
+    driving_amplitudes:  jax.Array,          # (n_A_fine,)
+    solver: AbstractSolver,
+) -> tuple[jax.Array, jax.Array]:
+    """
+    Run the fine‑grid sweep and return steady‑state displacement / velocity
+    amplitudes flattened to (n_f * n_A_fine, n_modes).
+    """
+    n_f           = driving_frequencies.size
+    n_A_fine      = driving_amplitudes.size
+    n_A_coarse    = initial_conditions.shape[1]
+    n_params      = initial_conditions.shape[2]        # 2 * n_modes
+    n_modes       = model.n_modes
+
+    # ------------------------------------------------------------------
+    # 1.  If necessary, interpolate ICs from the coarse → fine amplitude grid
+    # ------------------------------------------------------------------
+    if n_A_coarse != n_A_fine:
+        coarse_amps = jnp.linspace(
+            driving_amplitudes[0], driving_amplitudes[-1], n_A_coarse
+        )                                             # (n_A_coarse,)
+
+        # ----  vmap over frequency and over the 2*n_modes parameters ----
+        def _interp_row(ic_row):                      # ic_row (n_A_coarse, n_params)
+            ic_T        = ic_row.T                   # (n_params, n_A_coarse)
+            interp_T    = jax.vmap(
+                lambda param_vals:
+                    jnp.interp(driving_amplitudes, coarse_amps, param_vals)
+            )(ic_T)                                  # (n_params, n_A_fine)
+            return interp_T.T                        # → (n_A_fine, n_params)
+
+        initial_conditions = jax.vmap(_interp_row)(initial_conditions)
+        # shape now (n_f, n_A_fine, 2*n_modes)
+
+    # ------------------------------------------------------------------
+    # 2.  Flatten sweep grid
+    # ------------------------------------------------------------------
+    freq_mesh, amp_mesh = jnp.meshgrid(
+        driving_frequencies, driving_amplitudes, indexing="ij"
+    )                                                 # both (n_f, n_A_fine)
+
+    freq_flat = freq_mesh.ravel()                    # (n_f * n_A_fine,)
+    amp_flat  = amp_mesh .ravel()
+    ic_flat   = initial_conditions.reshape(
+        -1, n_params
+    )                                                # (n_f * n_A_fine, 2*n_modes)
+
+    # ------------------------------------------------------------------
+    # 3.  Solve every case in parallel
+    # ------------------------------------------------------------------
+    @jax.jit
+    def _solve(freq, amp, ic):
+        return solver.solve_rhs(model, freq, amp, ic)
+
+    time_flat, disp_flat, vel_flat = jax.vmap(_solve, in_axes=(0, 0, 0))(
+        freq_flat, amp_flat, ic_flat
+    )
+    #  → time_flat (n_sim, n_steps)
+    #    disp_flat (n_sim, n_steps, n_modes)
+    #    vel_flat  (n_sim, n_steps, n_modes)
+
+    # ------------------------------------------------------------------
+    # 4.  Extract steady‑state amplitudes
+    # ------------------------------------------------------------------
+    disp_amp_flat, vel_amp_flat = _get_steady_state_amplitudes(
+        freq_flat, time_flat, disp_flat, vel_flat
+    )                                                 # (n_sim, n_modes)
+
+    return disp_amp_flat, vel_amp_flat
+
+
 def frequency_sweep(
     model: AbstractModel,
     sweep_direction: SweepDirection,
@@ -208,13 +283,42 @@ def frequency_sweep(
         sweep_direction=sweep_direction,
     ) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
 
-    # TO DO: Use the initial conditions to do a fine sweep:
-    steady_state_displacement_amplitudes, steady_state_velocity_amplitudes = None
+    steady_state_displacement_amplitudes, steady_state_velocity_amplitudes = _fine_sweep(
+        model=model,
+        initial_conditions=initial_conditions,
+        driving_frequencies=driving_frequencies,
+        driving_amplitudes=driving_amplitudes,
+        solver=solver,
+    )
 
     # ASSUMPTION: Mode superposition validity for nonlinear systems
     total_steady_state_displacement_amplitude = jnp.sum(steady_state_displacement_amplitudes, axis=1)
     total_steady_state_velocity_amplitude = jnp.sum(steady_state_velocity_amplitudes, axis=1)
+    
+    # define grid sizes for plotting
+    n_f = driving_frequencies.size
+    n_A = driving_amplitudes.size
 
+    import matplotlib.pyplot as plt
+
+    # reshape into (n_frequencies, n_amplitudes)
+    disp_matrix = np.array(total_steady_state_displacement_amplitude).reshape(n_f, n_A)
+
+    plt.figure()
+    for idx, amp in enumerate(np.array(driving_amplitudes)):
+        plt.plot(
+            np.array(driving_frequencies),
+            disp_matrix[:, idx],
+            label=f"A = {amp:.3f}"
+        )
+    plt.xlabel("Driving Frequency")
+    plt.ylabel("Total Steady‐State Displacement Amplitude")
+    plt.title("Steady‐State Amplitude vs Frequency")
+    plt.legend(title="Driving Amplitude")
+    plt.grid(True)
+    plt.show()
+
+    
     frequency_sweep = FrequencySweepResult(
         model=model,
         sweep_direction=sweep_direction,

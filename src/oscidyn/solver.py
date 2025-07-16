@@ -49,8 +49,32 @@ class StandardSolver(AbstractSolver):
         return time, displacements, velocities
 
 class SteadyStateSolver(AbstractSolver):
-    def __init__(self):
-        pass
+    def __init__(self, n_steps: int = 2000, max_steps: int = 4096):
+        super().__init__(n_steps)
+        self.max_steps = max_steps
+    
+    def steady_state_event(self, t, y, args, **kwargs):
+        
+        return False
+    
+    def solve_rhs(self, model: AbstractModel, driving_frequency: jax.Array, driving_amplitude: jax.Array, initial_condition: jax.Array) -> jax.Array:
+        sol = diffrax.diffeqsolve(
+            terms=diffrax.ODETerm(model.rhs_jit),
+            solver=diffrax.Tsit5(),
+            t0=0.0,
+            t1=1.0, # Use jnp.inf for steady state analysis
+            dt0=None,
+            event=diffrax.Event(self.steady_state_event),
+            max_steps=self.max_steps,
+            y0=initial_condition,
+            throw=True,
+            progress_meter=diffrax.TqdmProgressMeter(),
+            stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
+            args=(driving_frequency, driving_amplitude),
+        )
 
-    def solve_rhs(self, model: AbstractModel, F_omega: jax.Array, F_amp: jax.Array, y0: jax.Array, t_end: float, n_steps: int) -> jax.Array:
-        raise NotImplementedError("SteadyStateSolver is not implemented yet.")
+        time = sol.ts
+        displacements = sol.ys[:, : model.n_modes]
+        velocities = sol.ys[:, model.n_modes :]
+        
+        return time, displacements, velocities

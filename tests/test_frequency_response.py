@@ -22,11 +22,19 @@ import numpy as np
 # plt.grid(True)
 # plt.show()
 
+# frequency_sweep = oscidyn.frequency_sweep(
+#     model = oscidyn.NonlinearOscillator.from_example(n_modes=1),
+#     sweep_direction = oscidyn.SweepDirection.FORWARD,
+#     driving_frequencies = np.linspace(0.1, 4, 300),
+#     driving_amplitudes = np.linspace(0.1, 1.5, 100),
+#     solver = oscidyn.StandardSolver(t_end=1000.0, n_steps=5000, max_steps=200192),
+# )
+
 frequency_sweep = oscidyn.frequency_sweep(
     model = oscidyn.NonlinearOscillator.from_example(n_modes=1),
-    sweep_direction = oscidyn.SweepDirection.BACKWARD,
+    sweep_direction = oscidyn.SweepDirection.FORWARD,
     driving_frequencies = np.linspace(0.1, 4, 300),
     driving_amplitudes = np.linspace(0.1, 1.5, 100),
-    solver = oscidyn.StandardSolver(t_end=600.0, n_steps=5000, max_steps=20192),
+    solver = oscidyn.SteadyStateSolver()
 )
 
