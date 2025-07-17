@@ -9,6 +9,8 @@ oscimodel = lambda cls: dataclass(eq=False)(cls)
 class AbstractModel:
     rhs_jit: callable = field(init=False, repr=False)
 
+    n_modes: int = field(init=True, repr=False)
+
     def __post_init__(self):
         self._build_rhs()
 

@@ -9,12 +9,6 @@ from . import constants as const
 jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
 
-# import os
-# os.environ['XLA_FLAGS'] = (
-#     '--xla_gpu_triton_gemm_any=True '
-#     '--xla_gpu_enable_latency_hiding_scheduler=true '
-# )
-
 class AbstractSolver:
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096):
         self.n_time_steps = n_time_steps
@@ -26,7 +20,12 @@ class StandardSolver(AbstractSolver):
         self.t_end = t_end
         self.max_steps = max_steps
 
-    def solve_rhs(self, model: AbstractModel, driving_frequency: jax.Array, driving_amplitude: jax.Array, initial_condition: jax.Array) -> jax.Array:
+    def solve(self, model: AbstractModel, 
+              driving_frequency: jax.Array, 
+              driving_amplitude: jax.Array, 
+              initial_condition: jax.Array
+              ) -> tuple[jax.Array, jax.Array, jax.Array]:
+        
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
@@ -42,9 +41,9 @@ class StandardSolver(AbstractSolver):
             args=(driving_frequency, driving_amplitude),
         )
 
-        time = sol.ts
-        displacements = sol.ys[:, : model.n_modes]
-        velocities = sol.ys[:, model.n_modes :]
+        time = sol.ts # Shape: (n_steps,)
+        displacements = sol.ys[:, : model.n_modes] # Shape: (n_steps, n_modes)
+        velocities = sol.ys[:, model.n_modes :] # Shape: (n_steps, n_modes)
         
         return time, displacements, velocities
 
@@ -56,13 +55,12 @@ class SteadyStateSolver(AbstractSolver):
         self.rtol = rtol
         self.atol = atol
     
-    def solve_rhs(
-        self,
-        model: AbstractModel,
-        driving_frequency: jax.Array, 
-        driving_amplitude:  jax.Array, 
-        initial_condition:  jax.Array, 
-    ):
+    def solve(self,
+              model: AbstractModel, 
+              driving_frequency: jax.Array, # Shape: (1,)
+              driving_amplitude:  jax.Array, # Shape: (n_modes,)
+              initial_condition:  jax.Array, # Shape: (2 * n_modes,)
+              ) -> tuple[jax.Array, jax.Array, jax.Array]:
         """
         Integrate one drive window at a time until the RMS displacement
         between successive periods changes by less than `self.rtol` (relative)
@@ -84,10 +82,10 @@ class SteadyStateSolver(AbstractSolver):
         carry0 = (
             jnp.array(0.0, dtype=initial_condition.dtype),  # t0
             initial_condition,                              # y0
-            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # prev_rms
-            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # delta_rms
-            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # prev_amp
-            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # delta_amp
+            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # prev_rms
+            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # delta_rms
+            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # prev_amp
+            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # delta_amp
             jnp.array(0, dtype=jnp.int32),                     # window
             all_t,
             all_y,
@@ -97,9 +95,6 @@ class SteadyStateSolver(AbstractSolver):
         def solve_periods(carry):
             t0, y0, prev_rms, _delta_rms, prev_amp, _delta_amp, window, all_t, all_y = carry
             ts = t0 + delta_ts
-
-            # ASSUMPTION: A good first time step
-            dt0 = drive_period / (n_steps_period * const.MAXIMUM_ORDER_SUPERHARMONICS)
 
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(model.rhs_jit),
@@ -115,13 +110,13 @@ class SteadyStateSolver(AbstractSolver):
                 throw=False,                      
             )
 
-            time = sol.ts
+            time = sol.ts # Shape: (n_steps_period,)
             displacement = sol.ys[:, :n_modes] # Shape: (n_steps_period, n_modes)
             velocity = sol.ys[:, n_modes:]  # Shape: (n_steps_period, n_modes)
 
             # compute RMS displacement and maximum amplitude over this window
-            rms = jnp.sqrt(jnp.mean(displacement**2))
-            amp = jnp.max(jnp.abs(displacement))
+            rms = jnp.sqrt(jnp.mean(displacement**2, axis=0))  
+            amp = jnp.max(jnp.abs(displacement), axis=0)
 
             delta_rms = jnp.abs(rms - prev_rms)
             delta_amp = jnp.abs(amp - prev_amp)
@@ -155,13 +150,14 @@ class SteadyStateSolver(AbstractSolver):
             rms_ok = (rel_rms < self.rtol) | (delta_rms < self.atol)
             amp_ok = (rel_amp < self.rtol) | (delta_amp < self.atol)
 
+            all_modes_converged = jnp.all(rms_ok & amp_ok)
+
             MIN_PERIODS = 3
-            converged = rms_ok & amp_ok & (window >= MIN_PERIODS) & (window > 0)
+            converged = all_modes_converged & (window >= MIN_PERIODS) & (window > 0)
 
             keep_going = jnp.logical_and(~converged, window < self.max_periods)
             return keep_going
         
-
         (t0_f, y0_f,
         rms_f,  delta_rms_f,
         amp_f,  delta_amp_f,

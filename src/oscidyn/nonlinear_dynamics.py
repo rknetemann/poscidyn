@@ -146,7 +146,7 @@ def _estimate_initial_conditions(
             initial_velocity = jnp.zeros((model.n_modes,))
             initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-            return solver.solve_rhs(model, driving_frequency, driving_amplitude, initial_condition)
+            return solver.solve(model, driving_frequency, driving_amplitude, initial_condition)
 
         time_flat, steady_state_displacements_flat, steady_state_velocities_flat = jax.vmap(solve_case)(
             coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
@@ -248,7 +248,7 @@ def _fine_sweep(
     # ------------------------------------------------------------------
     @jax.jit
     def _solve(freq, amp, ic):
-        return solver.solve_rhs(model, freq, amp, ic)
+        return solver.solve(model, freq, amp, ic)
 
     time_flat, disp_flat, vel_flat = jax.vmap(_solve, in_axes=(0, 0, 0))(
         freq_flat, amp_flat, ic_flat
@@ -336,15 +336,21 @@ def frequency_sweep(
 def time_response(
     model: AbstractModel,
     driving_frequency: jax.Array, # Shape: (1,)
-    driving_amplitude: jax.Array, # Shape: (1,)
+    driving_amplitude: jax.Array, # Shape: (n_modes,)
     initial_displacement: jax.Array, # Shape: (n_modes,)
     initial_velocity: jax.Array, # Shape: (n_modes,)
     solver: AbstractSolver,
 ) -> tuple:
-
+    
+    if model.n_modes != initial_displacement.size:
+        raise ValueError(f"Model has {model.n_modes} modes, but initial displacement has shape {initial_displacement.shape}. It should have shape ({model.n_modes},).")
+    if model.n_modes != initial_velocity.size:
+        raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
+    
+    
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-    time, displacements, velocities = solver.solve_rhs(
+    time, displacements, velocities = solver.solve(
         model=model,
         driving_frequency=driving_frequency,
         driving_amplitude=driving_amplitude,
