@@ -347,7 +347,6 @@ def time_response(
     if model.n_modes != initial_velocity.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
     
-    
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
     time, displacements, velocities = solver.solve(
