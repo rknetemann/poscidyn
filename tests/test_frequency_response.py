@@ -4,20 +4,20 @@ import matplotlib.pyplot as plt
 
 time_response_steady_state = oscidyn.time_response(
     model = oscidyn.NonlinearOscillator.from_example(n_modes=1),
-    driving_frequency = 10.0,
+    driving_frequency = 2.0,
     driving_amplitude = 0.5,
     initial_displacement= np.zeros(1),
     initial_velocity = np.zeros(1),
-    solver = oscidyn.SteadyStateSolver(rtol=1e-3, atol=1e-7, n_time_steps=5_000, max_periods=1_000, max_steps=1_000_000),
+    solver = oscidyn.SteadyStateSolver(rtol=1e-4, atol=1e-7, n_time_steps=5_000, max_periods=1_000, max_steps=1_000_000),
 )
 
 time_response_standard = oscidyn.time_response(
     model = oscidyn.NonlinearOscillator.from_example(n_modes=1),
-    driving_frequency = 10.0,
+    driving_frequency = 2.0,
     driving_amplitude = 0.5,
     initial_displacement= np.zeros(1),
     initial_velocity = np.zeros(1),
-    solver = oscidyn.StandardSolver(t_end=500, n_time_steps=10_000, max_steps=100_000),
+    solver = oscidyn.StandardSolver(t_end=500, n_time_steps=5_000, max_steps=100_000),
 )
 
 time,displacements, velocities = time_response_steady_state
@@ -43,8 +43,8 @@ plt.show()
 # frequency_sweep = oscidyn.frequency_sweep(
 #     model = oscidyn.NonlinearOscillator.from_example(n_modes=1),
 #     sweep_direction = oscidyn.SweepDirection.FORWARD,
-#     driving_frequencies = np.linspace(0, 3.0, 150),
-#     driving_amplitudes = np.linspace(0.1, 1.5, 100),
-#     solver = oscidyn.SteadyStateSolver(tol=1e-1, max_steps=100_000),
+#     driving_frequencies = np.linspace(0, 3.0, 10),
+#     driving_amplitudes = np.linspace(0.1, 1.5, 10),
+#     solver = oscidyn.SteadyStateSolver(rtol=1e-3, atol=1e-7, n_time_steps=50, max_steps=100_000),
 # )
 

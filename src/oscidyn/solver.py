@@ -2,10 +2,9 @@
 import jax
 import jax.numpy as jnp
 import diffrax
-import optimistix as optx
 
 from .models import AbstractModel
-from . import constants as const            # needs N_PERIODS_TO_RETAIN
+from . import constants as const 
 
 jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
@@ -83,17 +82,20 @@ class SteadyStateSolver(AbstractSolver):
 
         # carry = (t0, y0, prev_rms, delta_rms, window, all_t, all_y)
         carry0 = (
-            jnp.array(0.0, dtype=initial_condition.dtype),       # t0
-            initial_condition,                                   # y0
-            jnp.array(jnp.inf, dtype=initial_condition.dtype),   # prev_rms, inifinity to start
-            jnp.array(jnp.inf, dtype=initial_condition.dtype),   # delta_rms, infinity to start
-            jnp.array(0, dtype=jnp.int32),                       # window
+            jnp.array(0.0, dtype=initial_condition.dtype),  # t0
+            initial_condition,                              # y0
+            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # prev_rms
+            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # delta_rms
+            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # prev_amp
+            jnp.array(jnp.inf, dtype=initial_condition.dtype),  # delta_amp
+            jnp.array(0, dtype=jnp.int32),                     # window
             all_t,
             all_y,
         )
 
+
         def solve_periods(carry):
-            t0, y0, prev_rms, _delta_rms, window, all_t, all_y = carry
+            t0, y0, prev_rms, _delta_rms, prev_amp, _delta_amp, window, all_t, all_y = carry
             ts = t0 + delta_ts
 
             # ASSUMPTION: A good first time step
@@ -104,7 +106,7 @@ class SteadyStateSolver(AbstractSolver):
                 solver=diffrax.Tsit5(),
                 t0=t0,
                 t1=t0 + solve_window,
-                dt0=dt0,
+                dt0=None,
                 y0=y0,
                 max_steps=self.max_steps,
                 saveat=diffrax.SaveAt(ts=ts),
@@ -117,59 +119,56 @@ class SteadyStateSolver(AbstractSolver):
             displacement = sol.ys[:, :n_modes] # Shape: (n_steps_period, n_modes)
             velocity = sol.ys[:, n_modes:]  # Shape: (n_steps_period, n_modes)
 
-            # compute RMS displacement over this window
-            rms = jnp.sqrt(jnp.mean(displacement**2)) 
+            # compute RMS displacement and maximum amplitude over this window
+            rms = jnp.sqrt(jnp.mean(displacement**2))
+            amp = jnp.max(jnp.abs(displacement))
+
             delta_rms = jnp.abs(rms - prev_rms)
+            delta_amp = jnp.abs(amp - prev_amp)
 
             # store this window's results
             all_t = all_t.at[window].set(sol.ts)
             all_y = all_y.at[window].set(sol.ys)
 
             jax.debug.print("SteadyStateSolver: window {window} done, "
-                            "rms={rms:.3e}, delta_rms={delta_rms:.3e}",
-                            window=window, rms=rms, delta_rms=delta_rms)
+                            "rms={rms:.3e}, amp={amp:.3e}, delta_rms={delta_rms:.3e}, delta_amp={delta_amp:.3e}",
+                            window=window, rms=rms, amp=amp, delta_rms=delta_rms, delta_amp=delta_amp)
 
             # update carry for next window
-            return (
-                t0 + solve_window,
+            return (t0 + solve_window,
                 sol.ys[-1],
-                rms, 
-                delta_rms,
+                rms,  delta_rms,
+                amp,  delta_amp,
                 window + 1,
-                all_t,
-                all_y,
-            )
+                all_t, all_y)
 
         def steady_state_cond(carry):
-            _t0, _y0, prev_rms, delta_rms, window, *_ = carry
+            (_t0, _y0,
+            prev_rms, delta_rms,
+            prev_amp, delta_amp,
+            window, *_ ) = carry
 
-            # --- 1. Skip the very first window (no reference yet) -------------
-            enough_samples = window > 0
+            eps = 1e-12
+            rel_rms = delta_rms / jnp.maximum(prev_rms, eps)
+            rel_amp = delta_amp / jnp.maximum(prev_amp, eps)
 
-            # --- 2. Robust relative change ------------------------------------
-            eps = 1e-12   
-            safe_prev = jnp.where(prev_rms == 0, eps, prev_rms)
-            rel_change = delta_rms / safe_prev
+            rms_ok = (rel_rms < self.rtol) | (delta_rms < self.atol)
+            amp_ok = (rel_amp < self.rtol) | (delta_amp < self.atol)
 
-            rel_ok  = rel_change < self.rtol
-            abs_ok  = delta_rms  < self.atol
+            MIN_PERIODS = 3
+            converged = rms_ok & amp_ok & (window >= MIN_PERIODS) & (window > 0)
 
-            # --- 3. Either tolerance is sufficient ----------------------------
-            converged = jnp.logical_or(rel_ok, abs_ok)
-
-            # --- 4. Require at least N periods before we allow exit -----------
-            MIN_PERIODS = 3                       # <- tune if needed
-            min_reached = window >= MIN_PERIODS
-
-            keep_going  = jnp.logical_and(
-                ~(converged & min_reached & enough_samples),
-                window < self.max_periods,
-            )
+            keep_going = jnp.logical_and(~converged, window < self.max_periods)
             return keep_going
+        
 
-
-        t0_f, y0_f, rms_f, delta_f, periods_f, all_t_f, all_y_f = \
-            jax.lax.while_loop(steady_state_cond, solve_periods, carry0)
+        (t0_f, y0_f,
+        rms_f,  delta_rms_f,
+        amp_f,  delta_amp_f,
+        periods_f,
+        all_t_f, all_y_f) = jax.lax.while_loop(
+            steady_state_cond, solve_periods, carry0
+        )
 
         # sanity: raise if we never converged
         if self.max_periods and isinstance(periods_f, jax.Array):
@@ -178,7 +177,9 @@ class SteadyStateSolver(AbstractSolver):
                 if periods_val == self.max_periods:
                     raise RuntimeError(
                         f"Steady‑state not reached after {self.max_periods} periods "
-                        f"(rtol={self.rtol}, atol={self.atol}, last delta_rms={delta_f}).")
+                        f"(rtol={self.rtol}, atol={self.atol}, "
+                        f"last Δrms={delta_rms_f}, Δamp={delta_amp_f})."
+                    )
                 return ()
             jax.debug.callback(_host_assert, periods_f, ordered=True)
 
