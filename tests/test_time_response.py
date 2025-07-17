@@ -67,12 +67,3 @@ axes[1].legend()
 
 plt.tight_layout()
 plt.show()
-
-# frequency_sweep = oscidyn.frequency_sweep(
-#     model = oscidyn.NonlinearOscillator.from_example(n_modes=1),
-#     sweep_direction = oscidyn.SweepDirection.FORWARD,
-#     driving_frequencies = np.linspace(0, 3.0, 2),
-#     driving_amplitudes = np.linspace(0.1, 1.5, 2),
-#     solver = oscidyn.SteadyStateSolver(rtol=5e-2, atol=1e-8, n_time_steps=5000, max_periods=2048, max_steps=100_000),
-# )
-
