@@ -112,7 +112,7 @@ class SteadyStateSolver(AbstractSolver):
                 saveat=diffrax.SaveAt(ts=ts),
                 stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
                 args=(driving_frequency, driving_amplitude),
-                throw=True,                      
+                throw=False,                      
             )
 
             time = sol.ts
@@ -130,9 +130,9 @@ class SteadyStateSolver(AbstractSolver):
             all_t = all_t.at[window].set(sol.ts)
             all_y = all_y.at[window].set(sol.ys)
 
-            jax.debug.print("SteadyStateSolver: window {window} done, "
-                            "rms={rms:.3e}, amp={amp:.3e}, delta_rms={delta_rms:.3e}, delta_amp={delta_amp:.3e}",
-                            window=window, rms=rms, amp=amp, delta_rms=delta_rms, delta_amp=delta_amp)
+            # jax.debug.print("SteadyStateSolver: window {window} done, "
+            #                 "rms={rms:.3e}, amp={amp:.3e}, delta_rms={delta_rms:.3e}, delta_amp={delta_amp:.3e}",
+            #                 window=window, rms=rms, amp=amp, delta_rms=delta_rms, delta_amp=delta_amp)
 
             # update carry for next window
             return (t0 + solve_window,
