@@ -3,12 +3,12 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from typing import Tuple
+import numpy as np
 
 from oscidyn.models import AbstractModel
-from oscidyn.solver import AbstractSolver
+from oscidyn.solver import AbstractSolver,SteadyStateSolver
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
-import numpy as np
 import oscidyn.constants as const
 
 # TO DO: Improve steady state amplitude calculation
@@ -274,6 +274,9 @@ def frequency_sweep(
     driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
     solver: AbstractSolver,
 ) -> tuple:
+            
+    if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
+        raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
 
     initial_conditions = _estimate_initial_conditions(
         model=model,
