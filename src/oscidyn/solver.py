@@ -66,6 +66,11 @@ class SteadyStateSolver(AbstractSolver):
         between successive periods changes by less than `self.rtol` (relative)
         and `self.atol` (absolute).  Works with `vmap`/`jit`.
         """
+        
+        # ensure driving frequency is non-zero
+        if jnp.any(driving_frequency == 0):
+            raise ValueError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
+
         drive_period = 2.0 * jnp.pi / driving_frequency
         solve_window =  drive_period * const.MAXIMUM_ORDER_SUBHARMONICS # ASSUMPTION: MAXIMUM_ORDER_SUBHARMONICS means that we can check for subharmonics of order MAXIMUM_ORDER_SUBHARMONICS maximum
         n_steps_period = self.n_time_steps
