@@ -61,6 +61,7 @@ class SteadyStateSolver(AbstractSolver):
               driving_frequency: jax.Array, # Shape: (1,)
               driving_amplitude:  jax.Array, # Shape: (n_modes,)
               initial_condition:  jax.Array, # Shape: (2 * n_modes,) # TO DO: Initial conditions not yet used
+              only_amplitude: bool = False # TO DO: If True only save the amplitude of the steady state, not the full state
               ) -> tuple[jax.Array, jax.Array, jax.Array]:
         """
         Integrate one drive window at a time until the RMS displacement
