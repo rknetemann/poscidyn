@@ -11,6 +11,22 @@ from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
 import oscidyn.constants as const
 
+# Goal: Simulator classes:
+class FrequencySweepSimulator:
+    pass
+
+class TimeResponseSimulator:
+    pass
+
+# Goal: Simulation classes
+class FrequencySweepSimulation:
+    pass
+
+class TimeResponseSimulation:
+    pass
+
+
+
 # TO DO: Improve steady state amplitude calculation
 # ASSUMPTION: The steady state is already reached in the time response
 @jax.jit
@@ -140,27 +156,33 @@ def _estimate_initial_conditions(
         coarse_driving_amplitudes_flat = coarse_driving_amplitude_mesh.ravel()
         coarse_initial_displacements_flat = coarse_initial_displacement_mesh.ravel() 
         # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS)
-
+        
         def solve_case(driving_frequency, driving_amplitude, initial_displacement):
             initial_displacement = jnp.full((model.n_modes,), initial_displacement)
             initial_velocity = jnp.zeros((model.n_modes,))
             initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
             return solver.solve(model, driving_frequency, driving_amplitude, initial_condition)
+        
+        if isinstance(solver, SteadyStateSolver):
+            if solver.only_amplitude:
+                steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = jax.vmap(solve_case)(
+                    coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
+                )
+            else:
+                time_flat, steady_state_displacements_flat, steady_state_velocities_flat = jax.vmap(solve_case)(
+                    coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
+                )
+                # time_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps)
+                # steady_state_displacements_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps, n_modes)
+                # steady_state_velocities_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps, n_modes)
 
-        time_flat, steady_state_displacements_flat, steady_state_velocities_flat = jax.vmap(solve_case)(
-            coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
-        )
-        # time_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps)
-        # steady_state_displacements_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps, n_modes)
-        # steady_state_velocities_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps, n_modes)
-
-        steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = _get_steady_state_amplitudes(
-            coarse_driving_frequencies_flat,
-            time_flat,
-            steady_state_displacements_flat,
-            steady_state_velocities_flat
-        ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
+                steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = _get_steady_state_amplitudes(
+                    coarse_driving_frequencies_flat,
+                    time_flat,
+                    steady_state_displacements_flat,
+                    steady_state_velocities_flat
+                ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
         steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
@@ -230,9 +252,6 @@ def _fine_sweep(
         initial_conditions = jax.vmap(_interp_row)(initial_conditions)
         # shape now (n_f, n_A_fine, 2*n_modes)
 
-    # ------------------------------------------------------------------
-    # 2.  Flatten sweep grid
-    # ------------------------------------------------------------------
     freq_mesh, amp_mesh = jnp.meshgrid(
         driving_frequencies, driving_amplitudes, indexing="ij"
     )                                                 # both (n_f, n_A_fine)
@@ -243,29 +262,29 @@ def _fine_sweep(
         -1, n_params
     )                                                # (n_f * n_A_fine, 2*n_modes)
 
-    # ------------------------------------------------------------------
-    # 3.  Solve every case in parallel
-    # ------------------------------------------------------------------
     @jax.jit
     def _solve(freq, amp, ic):
         return solver.solve(model, freq, amp, ic)
+    
+    if isinstance(solver, SteadyStateSolver):
+        if solver.only_amplitude:
+            # If only_amplitude is True, we only need the steady state amplitudes
+            disp_amp_flat, vel_amp_flat = _get_steady_state_amplitudes(
+                freq_flat, jnp.zeros((freq_flat.size,)), ic_flat[:, :n_modes], ic_flat[:, n_modes:]
+            )
+        else:
+            time_flat, disp_flat, vel_flat = jax.vmap(_solve, in_axes=(0, 0, 0))(
+                freq_flat, amp_flat, ic_flat
+            )
+            #  → time_flat (n_sim, n_time_steps)
+            #    disp_flat (n_sim, n_time_steps, n_modes)
+            #    vel_flat  (n_sim, n_time_steps, n_modes)
 
-    time_flat, disp_flat, vel_flat = jax.vmap(_solve, in_axes=(0, 0, 0))(
-        freq_flat, amp_flat, ic_flat
-    )
-    #  → time_flat (n_sim, n_time_steps)
-    #    disp_flat (n_sim, n_time_steps, n_modes)
-    #    vel_flat  (n_sim, n_time_steps, n_modes)
-
-    # ------------------------------------------------------------------
-    # 4.  Extract steady‑state amplitudes
-    # ------------------------------------------------------------------
-    disp_amp_flat, vel_amp_flat = _get_steady_state_amplitudes(
-        freq_flat, time_flat, disp_flat, vel_flat
-    )                                                 # (n_sim, n_modes)
+            disp_amp_flat, vel_amp_flat = _get_steady_state_amplitudes(
+                freq_flat, time_flat, disp_flat, vel_flat
+            )                                                   # (n_sim, n_modes)
 
     return disp_amp_flat, vel_amp_flat
-
 
 def frequency_sweep(
     model: AbstractModel,
@@ -277,6 +296,7 @@ def frequency_sweep(
             
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
         raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
+               
 
     initial_conditions = _estimate_initial_conditions(
         model=model,
@@ -301,26 +321,6 @@ def frequency_sweep(
     # define grid sizes for plotting
     n_f = driving_frequencies.size
     n_A = driving_amplitudes.size
-
-    import matplotlib.pyplot as plt
-
-    # reshape into (n_frequencies, n_amplitudes)
-    disp_matrix = np.array(total_steady_state_displacement_amplitude).reshape(n_f, n_A)
-
-    plt.figure()
-    for idx, amp in enumerate(np.array(driving_amplitudes)):
-        plt.plot(
-            np.array(driving_frequencies),
-            disp_matrix[:, idx],
-            label=f"A = {amp:.3f}"
-        )
-    plt.xlabel("Driving Frequency")
-    plt.ylabel("Total Steady‐State Displacement Amplitude")
-    plt.title("Steady‐State Amplitude vs Frequency")
-    plt.legend(title="Driving Amplitude")
-    plt.grid(True)
-    plt.show()
-
     
     frequency_sweep = FrequencySweepResult(
         model=model,
@@ -349,10 +349,13 @@ def time_response(
         raise ValueError(f"Model has {model.n_modes} modes, but initial displacement has shape {initial_displacement.shape}. It should have shape ({model.n_modes},).")
     if model.n_modes != initial_velocity.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
+    if isinstance(solver, SteadyStateSolver):
+        if solver.only_amplitude:
+            raise ValueError("SteadyStateSolver with only_amplitude=True is not compatible with time_response.")
     
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-    time, displacements, velocities = solver.solve(
+    time, displacements, velocities = solver(
         model=model,
         driving_frequency=driving_frequency,
         driving_amplitude=driving_amplitude,

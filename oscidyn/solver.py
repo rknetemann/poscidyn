@@ -10,36 +10,52 @@ jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
 
 class AbstractSolver:
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096):
+    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, 
+                 rtol: float = 1e-4, atol: float = 1e-6):
         self.n_time_steps = n_time_steps
         self.max_steps = max_steps
-
-class StandardSolver(AbstractSolver):
-    def __init__(self, t_end: float, n_time_steps: int = 2000, max_steps: int = 4096):
-        super().__init__(n_time_steps)
-        self.t_end = t_end
-        self.max_steps = max_steps
-
-    def solve(self, model: AbstractModel, 
-              driving_frequency: jax.Array, 
-              driving_amplitude: jax.Array, 
-              initial_condition: jax.Array
-              ) -> tuple[jax.Array, jax.Array, jax.Array]:
+        self.rtol = rtol
+        self.atol = atol
+    
+    def solve(self, 
+              model: AbstractModel,
+              t0: float, 
+              t1: float, 
+              y0: jax.Array,
+              driving_frequency: float, 
+              driving_amplitude: float, 
+              ) -> diffrax.Solution:
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
-            t0=0.0,
-            t1=self.t_end,
+            t0=t0,
+            t1=t1,
             dt0=None,
             max_steps=self.max_steps,
-            y0=initial_condition,
+            y0=y0,
             throw=True,
             progress_meter=diffrax.TqdmProgressMeter(),
-            saveat=diffrax.SaveAt(ts=jnp.linspace(0, self.t_end, self.n_time_steps)),
-            stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
+            saveat=diffrax.SaveAt(ts=jnp.linspace(0, t1, self.n_time_steps)),
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_frequency, driving_amplitude),
         )
+        return sol
+
+class FixedTimeSolver(AbstractSolver):
+    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = 2000, max_steps: int = 4096, 
+                 rtol: float = 1e-4, atol: float = 1e-6):
+        super().__init__(n_time_steps, max_steps, rtol, atol)
+        self.t0 = t0
+        self.t1 = t1
+
+    def __call__(self, model: AbstractModel, 
+              driving_frequency: jax.Array, 
+              driving_amplitude: jax.Array, 
+              initial_condition: jax.Array
+              ) -> tuple[jax.Array, jax.Array, jax.Array]:
+
+        sol = self.solve(model=model, t0=self.t0, t1=self.t1, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
         time = sol.ts # Shape: (n_steps,)
         displacements = sol.ys[:, : model.n_modes] # Shape: (n_steps, n_modes)
@@ -48,20 +64,18 @@ class StandardSolver(AbstractSolver):
         return time, displacements, velocities
 
 class SteadyStateSolver(AbstractSolver):
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, max_windows: int = 512, rtol: float = 1e-6, atol: float = 1e-6):
-        super().__init__(n_time_steps)
-        self.max_steps = max_steps
+    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, rtol: float = 1e-6, atol: float = 1e-6, 
+                 max_windows: int = 512, only_amplitude=True):
+        super().__init__(n_time_steps, max_steps, rtol, atol)
         self.max_windows = max_windows
-        self.rtol = rtol
-        self.atol = atol
+        self.only_amplitude = only_amplitude
 
     # jit-incompatible, vmap-compatible
-    def solve(self,
+    def __call__(self,
               model: AbstractModel, 
               driving_frequency: jax.Array, # Shape: (1,)
               driving_amplitude:  jax.Array, # Shape: (n_modes,)
               initial_condition:  jax.Array, # Shape: (2 * n_modes,) # TO DO: Initial conditions not yet used
-              only_amplitude: bool = False # TO DO: If True only save the amplitude of the steady state, not the full state
               ) -> tuple[jax.Array, jax.Array, jax.Array]:
         """
         Integrate one drive window at a time until the RMS displacement
@@ -75,11 +89,17 @@ class SteadyStateSolver(AbstractSolver):
         n_modes = model.n_modes
         state_dim = 2 * n_modes # (displacement + velocity) for each mode
 
-        # Create arrays to store all periods (up to max_windows)
-        ts = jnp.zeros((self.max_windows, n_steps_window))
-        ys = jnp.zeros((self.max_windows, n_steps_window, state_dim))
-        win_idx = 0 
+        if self.only_amplitude:
+            # If only_amplitude is True, we do not need to store previous windows except for the last two
+            ts = jnp.zeros((2, n_steps_window))
+            ys = jnp.zeros((self.max_windows, n_steps_window, state_dim))
 
+        else:
+            # Create arrays to store all periods (up to max_windows)
+            ts = jnp.zeros((self.max_windows, n_steps_window))
+            ys = jnp.zeros((self.max_windows, n_steps_window, state_dim))
+        
+        win_idx = 0 
         init_window = (ts, ys, win_idx)
 
         # vmap-compatible
@@ -167,8 +187,16 @@ class SteadyStateSolver(AbstractSolver):
             return keep_going
         
         # Keep solving solve_windows() until we reach steady state or hit max_windows
-        (ts, ys, n_windows) = jax.lax.while_loop(steady_state_cond, solve_windows, init_window)
-
+        (ts, ys, n_windows) = jax.lax.while_loop(steady_state_cond, solve_windows, init_window)       
         
+        time = ts.flatten()
+        displacements = ys[:, :, :n_modes]
+        velocities = ys[:, :, n_modes:]
 
         return time, displacements, velocities
+    
+    def solve_amplitudes():
+        pass
+    
+    def solve_states():
+        pass
