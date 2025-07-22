@@ -1,6 +1,10 @@
-import oscidyn
 import numpy as np
 import matplotlib.pyplot as plt
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import oscidyn
 
 N_MODES = 2
 DRIVING_FREQUENCY = 2.0
@@ -14,11 +18,14 @@ time_response_steady_state = oscidyn.time_response(
     driving_amplitude = DRIVING_AMPLITUDE,
     initial_displacement= INITIAL_DISPLACEMENT,
     initial_velocity = INITIAL_VELOCITY,
-    solver = oscidyn.SteadyStateSolver(rtol=1e-3, atol=1e-8, n_time_steps=300, max_periods=1_000, max_steps=1_000_000),
+    solver = oscidyn.SteadyStateSolver(rtol=1e-3, atol=1e-8, n_time_steps=300, max_windows=1_000, max_steps=1_000_000),
 )
 time_steady_state,displacements_steady_state, velocities_steady_state = time_response_steady_state
 total_displacement_steady_state = displacements_steady_state.sum(axis=1)  # Sum across modes
 t_end_steady_state = time_steady_state[-1]
+
+print(t_end_steady_state)
+print(time_steady_state)
 
 time_response_standard = oscidyn.time_response(
     model = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES),

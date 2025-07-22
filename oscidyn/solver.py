@@ -48,18 +48,19 @@ class StandardSolver(AbstractSolver):
         return time, displacements, velocities
 
 class SteadyStateSolver(AbstractSolver):
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, max_periods: int = 512, rtol: float = 1e-6, atol: float = 1e-6):
+    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, max_windows: int = 512, rtol: float = 1e-6, atol: float = 1e-6):
         super().__init__(n_time_steps)
         self.max_steps = max_steps
-        self.max_periods = max_periods
+        self.max_windows = max_windows
         self.rtol = rtol
         self.atol = atol
-    
+
+    # jit-incompatible, vmap-compatible
     def solve(self,
               model: AbstractModel, 
               driving_frequency: jax.Array, # Shape: (1,)
               driving_amplitude:  jax.Array, # Shape: (n_modes,)
-              initial_condition:  jax.Array, # Shape: (2 * n_modes,)
+              initial_condition:  jax.Array, # Shape: (2 * n_modes,) # TO DO: Initial conditions not yet used
               ) -> tuple[jax.Array, jax.Array, jax.Array]:
         """
         Integrate one drive window at a time until the RMS displacement
@@ -69,126 +70,104 @@ class SteadyStateSolver(AbstractSolver):
         
         drive_period = 2.0 * jnp.pi / driving_frequency
         solve_window =  drive_period * const.MAXIMUM_ORDER_SUBHARMONICS # ASSUMPTION: MAXIMUM_ORDER_SUBHARMONICS means that we can check for subharmonics of order MAXIMUM_ORDER_SUBHARMONICS maximum
-        n_steps_period = self.n_time_steps
+        n_steps_window = self.n_time_steps
         n_modes = model.n_modes
         state_dim = 2 * n_modes # (displacement + velocity) for each mode
 
-        delta_ts = jnp.linspace(0.0, solve_window, n_steps_period) # Shape: (n_steps_period,)
+        # Create arrays to store all periods (up to max_windows)
+        ts = jnp.zeros((self.max_windows, n_steps_window))
+        ys = jnp.zeros((self.max_windows, n_steps_window, state_dim))
+        win_idx = 0 
 
-        # Create arrays to store all periods (up to max_periods)
-        all_t = jnp.zeros((self.max_periods, n_steps_period))
-        all_y = jnp.zeros((self.max_periods, n_steps_period, state_dim))
+        init_window = (ts, ys, win_idx)
 
-        # carry = (t0, y0, prev_rms, delta_rms, window, all_t, all_y)
-        carry0 = (
-            jnp.array(0.0, dtype=initial_condition.dtype),  # t0
-            initial_condition,                              # y0
-            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # prev_rms
-            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # delta_rms
-            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # prev_amp
-            jnp.ones(n_modes, dtype=initial_condition.dtype) * jnp.inf,  # delta_amp
-            jnp.array(0, dtype=jnp.int32),                     # window
-            all_t,
-            all_y,
-        )
+        # vmap-compatible
+        def solve_windows(window):
+            ts, ys, win_idx = window
 
+            t0 = ts[win_idx - 1, -1]
+            t1 = t0 + solve_window
+            ts_window = jnp.linspace(t0, t1, n_steps_window) # Shape: (n_steps_window,), ts of current window
+            y0 = ys[win_idx - 1, -1]  # Initial condition for the current window
 
-        def solve_periods(carry):
-            t0, y0, prev_rms, _delta_rms, prev_amp, _delta_amp, window, all_t, all_y = carry
-            ts = t0 + delta_ts
+            # jax.debug.print("Solving window {win_idx}: t0={t0}, t1={t1}, y0={y0}",
+            #                 win_idx=win_idx, t0=t0, t1=t1, y0=y0)
 
+            # vmap-compatible
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(model.rhs_jit),
                 solver=diffrax.Tsit5(),
                 t0=t0,
-                t1=t0 + solve_window,
+                t1=t1,
                 dt0=None,
                 y0=y0,
                 max_steps=self.max_steps,
-                saveat=diffrax.SaveAt(ts=ts),
+                saveat=diffrax.SaveAt(ts=ts_window),
                 stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-7),
                 args=(driving_frequency, driving_amplitude),
                 throw=False,                      
             )
 
-            time = sol.ts # Shape: (n_steps_period,)
-            displacement = sol.ys[:, :n_modes] # Shape: (n_steps_period, n_modes)
-            velocity = sol.ys[:, n_modes:]  # Shape: (n_steps_period, n_modes)
+            ts_window = sol.ts # Shape: (n_steps_window,)
+            ys_window = sol.ys # Shape: (n_steps_window, state_dim)
 
-            # compute RMS displacement and maximum amplitude over this window
-            rms = jnp.sqrt(jnp.mean(displacement**2, axis=0))  
-            amp = jnp.max(jnp.abs(displacement), axis=0)
+            ts = ts.at[win_idx].set(ts_window)  # Store the time steps for this window
+            ys = ys.at[win_idx].set(ys_window)  # Store the state for this window
+            win_idx += 1  # Increment the window index
 
-            delta_rms = jnp.abs(rms - prev_rms)
-            delta_amp = jnp.abs(amp - prev_amp)
+            return ts, ys, win_idx
 
-            # store this window's results
-            all_t = all_t.at[window].set(sol.ts)
-            all_y = all_y.at[window].set(sol.ys)
+        @jax.jit
+        def steady_state_cond(window):
+            (ts, ys, win_idx) = window
 
-            # jax.debug.print("SteadyStateSolver: window {window} done, "
-            #                 "rms={rms:.3e}, amp={amp:.3e}, delta_rms={delta_rms:.3e}, delta_amp={delta_amp:.3e}",
-            #                 window=window, rms=rms, amp=amp, delta_rms=delta_rms, delta_amp=delta_amp)
+            # Initialize prev_rms and prev_max to +inf when win_idx == 0, else compute from the last window
+            prev_rms, prev_max = jax.lax.cond(
+                win_idx > 1,
+                lambda idx: (
+                    jnp.sqrt(jnp.mean(ys[idx - 2][:, :n_modes]**2, axis=0)),
+                    jnp.max(jnp.abs(ys[idx - 2][:, :n_modes]), axis=0),
+                ),
+                lambda _: (
+                    jnp.full((n_modes,), jnp.inf),
+                    jnp.full((n_modes,), jnp.inf),
+                ),
+                operand=win_idx
+            )
 
-            # update carry for next window
-            return (t0 + solve_window,
-                sol.ys[-1],
-                rms,  delta_rms,
-                amp,  delta_amp,
-                window + 1,
-                all_t, all_y)
+            rms = jnp.sqrt(jnp.mean(ys[win_idx - 1][:, :n_modes]**2, axis=0))
+            max = jnp.max(jnp.abs(ys[win_idx - 1][:, :n_modes]), axis=0)
 
-        def steady_state_cond(carry):
-            (_t0, _y0,
-            prev_rms, delta_rms,
-            prev_amp, delta_amp,
-            window, *_ ) = carry
+            delta_rms = jnp.abs(prev_rms - rms)
+            delta_max = jnp.abs(prev_max - max)
 
             eps = 1e-12
             rel_rms = delta_rms / jnp.maximum(prev_rms, eps)
-            rel_amp = delta_amp / jnp.maximum(prev_amp, eps)
+            rel_max = delta_max / jnp.maximum(prev_max, eps)
+
+            # jax.debug.print(
+            #     "win_idx: {win_idx}, "
+            #     "prev_rms: {prev_rms}, rms: {rms}, rel_rms: {rel_rms}, "
+            #     "prev_max: {prev_max}, max: {max}, rel_max: {rel_max}", 
+            #     win_idx=win_idx,
+            #     prev_rms=prev_rms, rms=rms, rel_rms=rel_rms,
+            #     prev_max=prev_max, max=max, rel_max=rel_max
+            # )
 
             rms_ok = (rel_rms < self.rtol) | (delta_rms < self.atol)
-            amp_ok = (rel_amp < self.rtol) | (delta_amp < self.atol)
+            max_ok = (rel_max < self.rtol) | (delta_max < self.atol)
 
-            all_modes_converged = jnp.all(rms_ok & amp_ok)
+            all_modes_converged = jnp.all(rms_ok & max_ok)
 
             MIN_PERIODS = 3
-            converged = all_modes_converged & (window >= MIN_PERIODS) & (window > 0)
+            converged = all_modes_converged & (win_idx >= MIN_PERIODS) & (win_idx > 0)
 
-            keep_going = jnp.logical_and(~converged, window < self.max_periods)
+            keep_going = jnp.logical_and(~converged, win_idx < self.max_windows)
             return keep_going
         
-        (t0_f, y0_f,
-        rms_f,  delta_rms_f,
-        amp_f,  delta_amp_f,
-        periods_f,
-        all_t_f, all_y_f) = jax.lax.while_loop(
-            steady_state_cond, solve_periods, carry0
-        )
+        # Keep solving solve_windows() until we reach steady state or hit max_windows
+        (ts, ys, n_windows) = jax.lax.while_loop(steady_state_cond, solve_windows, init_window)
 
-        # sanity: raise if we never converged
-        if self.max_periods and isinstance(periods_f, jax.Array):
-            # (inside JIT this becomes a host callback)
-            def _host_assert(periods_val):
-                if periods_val == self.max_periods:
-                    raise RuntimeError(
-                        f"Steady‑state not reached after {self.max_periods} periods "
-                        f"(rtol={self.rtol}, atol={self.atol}, "
-                        f"last Δrms={delta_rms_f}, Δamp={delta_amp_f})."
-                    )
-                return ()
-            jax.debug.callback(_host_assert, periods_f, ordered=True)
-
-        # Get only the valid periods (the ones we actually computed)
-        valid_t = all_t_f[:periods_f]
-        valid_y = all_y_f[:periods_f]
         
-        # Reshape to flatten all periods into a single timeline
-        time = valid_t.reshape(-1)
-        y_all = valid_y.reshape(-1, state_dim)
-
-        displacements = y_all[:, :n_modes]
-        velocities = y_all[:, n_modes:]
 
         return time, displacements, velocities
