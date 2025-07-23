@@ -23,19 +23,20 @@ class NonlinearOscillator(AbstractModel):
         q, v   = jnp.split(state, 2)
         F_omega_hat_arg, F_amp_hat_arg = args
         
-        damping_term = (self.omega_0_hat / self.Q) * v
+        damping_term = (self.omega_0_hat / self.Q) * v # Shape: (n_modes,)
         
-        nonlinear_damping_term = self.eta_hat * q**2 * v
+        nonlinear_damping_term = self.eta_hat * q**2 * v # Shape: (n_modes,)
         
-        linear_stiffness_term = self.omega_0_hat**2 * q
+        linear_stiffness_term = self.omega_0_hat**2 * q # Shape: (n_modes,)
 
-        quadratic_stiffness_term = jnp.einsum("ijk,j,k->i", self.alpha_hat, q, q)
+        quadratic_stiffness_term = jnp.einsum("ijk,j,k->i", self.alpha_hat, q, q) # Shape: (n_modes,)
         
-        cubic_stiffness_term = jnp.einsum("ijkl,j,k,l->i", self.gamma_hat, q, q, q)
+        cubic_stiffness_term = jnp.einsum("ijkl,j,k,l->i", self.gamma_hat, q, q, q) # Shape: (n_modes,)
         
-        fith_order_stiffness_term = jnp.einsum("ijklm,j,k,l,m->i", self.delta_hat, q, q, q, q)
+        fith_order_stiffness_term = jnp.einsum("ijklm,j,k,l,m->i", self.delta_hat, q, q, q, q) # Shape: (n_modes,)
         
-        forcing_term = F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
+        forcing_term = jnp.zeros(self.n_modes) # Shape: (n_modes,)
+        forcing_term = forcing_term.at[0].set(F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)) # Shape: (n_modes,)
         
         a = (
             - damping_term
@@ -45,8 +46,8 @@ class NonlinearOscillator(AbstractModel):
             - cubic_stiffness_term
             - fith_order_stiffness_term
             + forcing_term
-        )
-        return jnp.concatenate([v, a])
+        ) # Shape: (n_modes,)
+        return jnp.concatenate([v, a]) # Shape: (2 * n_modes,)
     
     @classmethod
     def from_example(cls, n_modes: int) -> NonlinearOscillator:
@@ -54,11 +55,11 @@ class NonlinearOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
-            Q = jnp.array([50.0])
+            Q = jnp.array([100.0])
             eta_hat = jnp.array([0.00])
-            alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(-0.1)
-            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(0.5)
-            delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(-0.1)
+            alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(-0.0)
+            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(0.1)
+            delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(-0.0)
         elif n_modes == 2:
             omega_ref = 1.0
             x_ref = 1.0

@@ -162,27 +162,15 @@ def _estimate_initial_conditions(
             initial_velocity = jnp.zeros((model.n_modes,))
             initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-            return solver.solve(model, driving_frequency, driving_amplitude, initial_condition)
+            return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
         
         if isinstance(solver, SteadyStateSolver):
-            if solver.only_amplitude:
-                steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = jax.vmap(solve_case)(
-                    coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
-                )
-            else:
-                time_flat, steady_state_displacements_flat, steady_state_velocities_flat = jax.vmap(solve_case)(
-                    coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
-                )
-                # time_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps)
-                # steady_state_displacements_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps, n_modes)
-                # steady_state_velocities_flat shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_time_steps, n_modes)
+            steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = jax.vmap(solve_case)(
+                coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
+            )
 
-                steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = _get_steady_state_amplitudes(
-                    coarse_driving_frequencies_flat,
-                    time_flat,
-                    steady_state_displacements_flat,
-                    steady_state_velocities_flat
-                ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
+        print("steady_state_displacement_amplitudes_flat shape:", steady_state_displacement_amplitudes_flat.shape)
+        print("steady_state_velocity_amplitudes_flat shape:", steady_state_velocity_amplitudes_flat.shape)
 
         steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
@@ -191,10 +179,10 @@ def _estimate_initial_conditions(
             model.n_modes
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        steady_state_velocity_amplitudes  = steady_state_velocity_amplitudes_flat .reshape(
+        steady_state_velocity_amplitudes  = steady_state_velocity_amplitudes_flat.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
-            const.N_COARSE_INITIAL_DISPLACEMENTS, 
+            const.N_COARSE_INITIAL_DISPLACEMENTS,
             model.n_modes
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
@@ -212,6 +200,27 @@ def _estimate_initial_conditions(
             initial_displacement_amplitudes.reshape(*batch_shape, model.n_modes),
             initial_velocity_amplitudes.reshape(*batch_shape, model.n_modes)
         ], axis=-1) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
+
+        import matplotlib.pyplot as plt
+
+        # extract only the displacement part of the ICs (shape: n_freq × n_amp × n_modes)
+        init_disp = initial_conditions[..., :model.n_modes]
+
+        # select the first mode (if you have more modes you can loop over modes)
+        disp_mode0 = init_disp[..., 0]  # shape: (n_freq, n_amp)
+
+        # plot a separate curve for each driving amplitude
+        for j in range(disp_mode0.shape[1]):
+            plt.plot(driving_frequencies,
+                     disp_mode0[:, j],
+                     label=f"Amp={driving_amplitudes[j]:.3f}")
+
+        plt.xlabel("Driving frequency")
+        plt.ylabel("Initial displacement (mode 0)")
+        plt.title("Initial displacement vs. frequency for each amplitude")
+        plt.legend(title="Driving amplitude")
+        plt.grid(True)
+        plt.show()
 
         return initial_conditions
 
@@ -349,17 +358,15 @@ def time_response(
         raise ValueError(f"Model has {model.n_modes} modes, but initial displacement has shape {initial_displacement.shape}. It should have shape ({model.n_modes},).")
     if model.n_modes != initial_velocity.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
-    if isinstance(solver, SteadyStateSolver):
-        if solver.only_amplitude:
-            raise ValueError("SteadyStateSolver with only_amplitude=True is not compatible with time_response.")
-    
+
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
     time, displacements, velocities = solver(
         model=model,
         driving_frequency=driving_frequency,
         driving_amplitude=driving_amplitude,
-        initial_condition=initial_condition
+        initial_condition=initial_condition,
+        response=const.ResponseType.TimeResponse
     )
 
     return time, displacements, velocities
