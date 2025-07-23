@@ -165,21 +165,49 @@ def _estimate_initial_conditions(
             return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
         
         if isinstance(solver, SteadyStateSolver):
-            steady_state_displacement_amplitudes_flat, steady_state_velocity_amplitudes_flat = jax.vmap(solve_case)(
+            ts, ys = jax.vmap(solve_case)(
                 coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
-            )
+            ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes, n_time_steps, 2 * n_modes)
 
-        print("steady_state_displacement_amplitudes_flat shape:", steady_state_displacement_amplitudes_flat.shape)
-        print("steady_state_velocity_amplitudes_flat shape:", steady_state_velocity_amplitudes_flat.shape)
+            # ------------------------------------------------------------------
+            # 1.  Split displacements / velocities  … ys has shape
+            #     (n_sim , n_windows , n_steps , 2*n_modes)
+            # ------------------------------------------------------------------
+            n_sim, n_windows, n_steps, _ = ys.shape
+            n_modes = model.n_modes
 
-        steady_state_displacement_amplitudes = steady_state_displacement_amplitudes_flat.reshape(
+            disp = ys[..., :n_modes]         # (n_sim, n_windows, n_steps, n_modes)
+            vel  = ys[..., n_modes:]         # (n_sim, n_windows, n_steps, n_modes)
+
+            # ------------------------------------------------------------------
+            # 2.  Build a mask that is True on samples that actually contain data
+            #     (all‑zero windows produced by SteadyStateSolver are ignored)
+            # ------------------------------------------------------------------
+            sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1)      # (n_sim, n_windows, n_steps)
+            sample_mask = sample_mask[..., None]                 # broadcast over modes
+
+            # ------------------------------------------------------------------
+            # 3.  Peak amplitudes = max |·| over (windows, time) of *valid* samples
+            # ------------------------------------------------------------------
+            disp_peak = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0),
+                                axis=(1, 2))                     # (n_sim, n_modes)
+            vel_peak  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0),
+                                axis=(1, 2))                     # (n_sim, n_modes)
+
+            # ------------------------------------------------------------------
+            # 4.  Use the names expected further below
+            # ------------------------------------------------------------------
+            displacements = disp_peak
+            velocities    = vel_peak
+
+        steady_state_displacement_amplitudes = displacements.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             model.n_modes
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        steady_state_velocity_amplitudes  = steady_state_velocity_amplitudes_flat.reshape(
+        steady_state_velocity_amplitudes  = velocities.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS,
@@ -212,8 +240,8 @@ def _estimate_initial_conditions(
         # plot a separate curve for each driving amplitude
         for j in range(disp_mode0.shape[1]):
             plt.plot(driving_frequencies,
-                     disp_mode0[:, j],
-                     label=f"Amp={driving_amplitudes[j]:.3f}")
+             disp_mode0[:, j],
+             label=f"Amp={coarse_driving_amplitudes[j]:.3f}")
 
         plt.xlabel("Driving frequency")
         plt.ylabel("Initial displacement (mode 0)")
@@ -361,12 +389,29 @@ def time_response(
 
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-    time, displacements, velocities = solver(
+    ts, ys = solver(
         model=model,
         driving_frequency=driving_frequency,
         driving_amplitude=driving_amplitude,
         initial_condition=initial_condition,
         response=const.ResponseType.TimeResponse
     )
+
+    if isinstance(solver, SteadyStateSolver):
+        time = ts.flatten()
+
+        # Remove windows that contain only zeros, artifacts of the parallel solver
+        nonzero_mask = jnp.any(jnp.abs(ys) > 0, axis=(1, 2)) # (n_windows,)
+        ts_nonzero = ts[nonzero_mask] # (n_windows_nonzero, n_steps)
+        ys_nonzero = ys[nonzero_mask] # (n_windows_nonzero, n_steps, 2*n_modes)
+
+        time = ts_nonzero.flatten() # (n_windows_nonzero * n_steps,)
+        displacements = ys_nonzero[:, :, :model.n_modes].reshape(-1, model.n_modes)
+        velocities    = ys_nonzero[:, :, model.n_modes:].reshape(-1, model.n_modes)
+    else:
+        # For FixedTimeSolver, ts and ys are already in the correct shape
+        time = ts
+        displacements = ys[:, :model.n_modes]  # Shape: (n_steps, n_modes)
+        velocities = ys[:, model.n_modes:]  # Shape: (n_steps, n_modes)
 
     return time, displacements, velocities

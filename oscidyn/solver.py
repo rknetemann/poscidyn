@@ -35,7 +35,7 @@ class AbstractSolver:
             dt0=None,
             max_steps=self.max_steps,
             y0=y0,
-            throw=False,
+            throw=True,
             #progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(t0, t1, self.n_time_steps)),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
@@ -55,15 +55,14 @@ class FixedTimeSolver(AbstractSolver):
               driving_amplitude: jax.Array, 
               initial_condition: jax.Array,
               response: const.ResponseType
-              ) -> tuple[jax.Array, jax.Array, jax.Array]:
+              ):
 
         sol = self.solve(model=model, t0=self.t0, t1=self.t1, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
-        time = sol.ts # Shape: (n_steps,)
-        displacements = sol.ys[:, : model.n_modes] # Shape: (n_steps, n_modes)
-        velocities = sol.ys[:, model.n_modes :] # Shape: (n_steps, n_modes)
-        
-        return time, displacements, velocities
+        ts = sol.ts  # Shape: (n_steps,)
+        ys = sol.ys  # Shape: (n_steps, state_dim)
+
+        return ts, ys
 
 class SteadyStateSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, rtol: float = 1e-6, atol: float = 1e-6, 
@@ -107,11 +106,10 @@ class SteadyStateSolver(AbstractSolver):
         def solve_windows(window):
             ts, ys, rms, max, _prev_rms, _prev_max, win_idx = window
 
-            last_saved_window_idx = jax.lax.cond(windows_to_save == 1, lambda: 0, lambda: win_idx - 1)
-
-            t0 = ts[last_saved_window_idx, -1]
+            previous_window_idx = jax.lax.cond(windows_to_save == 1, lambda: 0, lambda:  win_idx)
+            t0 = ts[previous_window_idx, -1]
             t1 = t0 + solve_window
-            y0 = ys[last_saved_window_idx, -1]
+            y0 = ys[previous_window_idx, -1]
 
             sol = self.solve(model=model, t0=t0, t1=t1, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
@@ -123,17 +121,17 @@ class SteadyStateSolver(AbstractSolver):
             rms = jnp.sqrt(jnp.mean(ys_window[:, :n_modes]**2, axis=0))
             max = jnp.max(jnp.abs(ys_window[:, :n_modes]), axis=0)
 
-            ts = ts.at[last_saved_window_idx + 1].set(ts_window)
-            ys = ys.at[last_saved_window_idx + 1].set(ys_window)
-
             win_idx += 1 
+            current_window_idx = jax.lax.cond(windows_to_save == 1, lambda: 0, lambda: win_idx)
+            ts = ts.at[current_window_idx].set(ts_window)
+            ys = ys.at[current_window_idx].set(ys_window)           
 
             return ts, ys, rms, max, prev_rms, prev_max, win_idx
         
         # Keep solving solve_windows() until we reach steady state or hit max_windows
         (ts, ys, _rms, max, _prev_rms, _prev_max, _n_windows) = jax.lax.while_loop(self._steady_state_cond, solve_windows, init_window)       
-
         return ts, ys
+        
         
     @partial(jax.jit, static_argnames=['self'])
     def _steady_state_cond(self, window):
