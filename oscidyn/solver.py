@@ -108,7 +108,7 @@ class SteadyStateSolver(AbstractSolver):
             ts, ys, rms, max, _prev_rms, _prev_max, win_idx = window
 
             last_saved_window_idx = jax.lax.cond(windows_to_save == 1, lambda: 0, lambda: win_idx - 1)
-            
+
             t0 = ts[last_saved_window_idx, -1]
             t1 = t0 + solve_window
             y0 = ys[last_saved_window_idx, -1]
@@ -133,11 +133,7 @@ class SteadyStateSolver(AbstractSolver):
         # Keep solving solve_windows() until we reach steady state or hit max_windows
         (ts, ys, _rms, max, _prev_rms, _prev_max, _n_windows) = jax.lax.while_loop(self._steady_state_cond, solve_windows, init_window)       
 
-        time = ts.flatten()
-        displacements = ys[:, :, :n_modes].reshape(-1, n_modes)  # Shape: (max_windows * n_steps_window, n_modes)
-        velocities = ys[:, :, n_modes:].reshape(-1, n_modes)  # Shape: (max_windows * n_steps_window, n_modes)
-
-        return time, displacements, velocities
+        return ts, ys
         
     @partial(jax.jit, static_argnames=['self'])
     def _steady_state_cond(self, window):
@@ -159,108 +155,3 @@ class SteadyStateSolver(AbstractSolver):
 
         keep_going = jnp.logical_and(~converged, win_idx < self.max_windows)
         return keep_going
-
-    def solve_time_response(self, model: AbstractModel, driving_frequency: float, driving_amplitude: float):
-        drive_period = 2.0 * jnp.pi / driving_frequency
-        solve_window =  drive_period * const.MAXIMUM_ORDER_SUBHARMONICS # ASSUMPTION: MAXIMUM_ORDER_SUBHARMONICS means that we can check for subharmonics of order MAXIMUM_ORDER_SUBHARMONICS maximum
-        n_steps_window = self.n_time_steps
-        n_modes = model.n_modes
-        state_dim = 2 * n_modes
-
-        # Create arrays to store all periods (up to max_windows)
-        ts = jnp.zeros((self.max_windows, n_steps_window))
-        ys = jnp.zeros((self.max_windows, n_steps_window, state_dim))
-        rms = jnp.full((n_modes,), jnp.inf)  # RMS of displacements for each mode
-        max = jnp.full((n_modes,), jnp.inf)  # Max of displacements for each mode
-        prev_rms = jnp.full((n_modes,), jnp.inf)  # Previous RMS of displacements for each mode
-        prev_max = jnp.full((n_modes,), jnp.inf)  # Previous Max of displacements for each mode
-        win_idx = 0
-        
-        init_window = (ts, ys, rms, max, prev_rms, prev_max, win_idx)
-
-        # vmap-compatible
-        def solve_windows(window):
-            ts, ys, rms, max, _prev_rms, _prev_max, win_idx = window
-
-            t0 = ts[win_idx - 1, -1]
-            t1 = t0 + solve_window
-            y0 = ys[win_idx - 1, -1]
-
-            sol = self.solve(model=model, t0=t0, t1=t1, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
-
-            ts_window = sol.ts # Shape: (n_steps_window,)
-            ys_window = sol.ys # Shape: (n_steps_window, state_dim)
-
-            prev_rms = rms
-            prev_max = max
-            rms = jnp.sqrt(jnp.mean(ys_window[:, :n_modes]**2, axis=0))
-            max = jnp.max(jnp.abs(ys_window[:, :n_modes]), axis=0)
-
-            ts = ts.at[win_idx].set(ts_window)
-            ys = ys.at[win_idx].set(ys_window)
-
-            win_idx += 1 
-
-            return ts, ys, rms, max, prev_rms, prev_max, win_idx
-
-        # Keep solving solve_windows() until we reach steady state or hit max_windows
-        (ts, ys, _rms, _max, _prev_rms, _prev_max, n_windows) = jax.lax.while_loop(self._steady_state_cond, solve_windows, init_window)       
-
-        time = ts.flatten() # Shape: (max_windows * n_steps_window,)
-        displacements = ys[:, :, :n_modes].reshape(-1, n_modes)  # Shape: (max_windows * n_steps_window, n_modes)
-        velocities = ys[:, :, n_modes:].reshape(-1, n_modes)  # Shape: (max_windows * n_steps_window, n_modes)
-
-        return time, displacements, velocities
-
-    def solve_frequency_response(self, model: AbstractModel, driving_frequency: float, driving_amplitude: float, single_window: bool = False):
-        drive_period = 2.0 * jnp.pi / driving_frequency
-        solve_window =  drive_period * const.MAXIMUM_ORDER_SUBHARMONICS # ASSUMPTION: MAXIMUM_ORDER_SUBHARMONICS means that we can check for subharmonics of order MAXIMUM_ORDER_SUBHARMONICS maximum
-        n_steps_window = self.n_time_steps
-        n_modes = model.n_modes
-        state_dim = 2 * n_modes
-
-        # We only save one window 
-        ts = jnp.zeros((1, n_steps_window))
-        ys = jnp.zeros((1, n_steps_window, state_dim))
-        rms = jnp.full((n_modes,), jnp.inf)
-        max = jnp.full((n_modes,), jnp.inf)
-        prev_rms = jnp.full((n_modes,), jnp.inf)
-        prev_max = jnp.full((n_modes,), jnp.inf)
-        win_idx = 0
-
-        init_window = (ts, ys, rms, max, prev_rms, prev_max, win_idx)
-
-        # vmap-compatible
-        def solve_windows(window):
-            ts, ys, rms, max, _prev_rms, _prev_max, win_idx = window
-
-            last_saved_window_idx = jax.lax.cond(single_window, lambda: 0, lambda: win_idx - 1)
-            t0 = ts[last_saved_window_idx, -1]
-            t1 = t0 + solve_window
-            y0 = ys[last_saved_window_idx, -1]
-
-            sol = self.solve(model=model, t0=t0, t1=t1, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
-
-            ts_window = sol.ts # Shape: (n_steps_window,)
-            ys_window = sol.ys # Shape: (n_steps_window, state_dim)
-
-            prev_rms = rms
-            prev_max = max
-            rms = jnp.sqrt(jnp.mean(ys_window[:, :n_modes]**2, axis=0))
-            max = jnp.max(jnp.abs(ys_window[:, :n_modes]), axis=0)
-
-            win_idx += 1
-
-            ts = ts.at[last_saved_window_idx + 1].set(ts_window)
-            ys = ys.at[last_saved_window_idx + 1].set(ys_window)
-
-            return ts, ys, rms, max, prev_rms, prev_max, win_idx
-        
-        # Keep solving solve_windows() until we reach steady state or hit max_windows
-        (ts, ys, _rms, max, _prev_rms, _prev_max, _n_windows) = jax.lax.while_loop(self._steady_state_cond, solve_windows, init_window)       
-
-        time = ts.flatten()
-        displacements = ys[:, :, :n_modes].reshape(-1, n_modes)  # Shape: (max_windows * n_steps_window, n_modes)
-        velocities = ys[:, :, n_modes:].reshape(-1, n_modes)  # Shape: (max_windows * n_steps_window, n_modes)
-
-        return time, displacements, velocities
