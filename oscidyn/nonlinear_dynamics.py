@@ -9,6 +9,7 @@ from oscidyn.models import AbstractModel
 from oscidyn.solver import AbstractSolver,SteadyStateSolver
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
+import time
 import oscidyn.constants as const
 
 # Goal: Simulator classes:
@@ -135,7 +136,14 @@ def _estimate_initial_conditions(
         sweep_direction: SweepDirection,
     ) -> Tuple[jax.Array, jax.Array]:
         
-        coarse_driving_frequencies = jnp.linspace(                
+        n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
+        * const.N_COARSE_INITIAL_DISPLACEMENTS * const.N_COARSE_INITIAL_VELOCITIES \
+        * driving_frequencies.size * driving_amplitudes.size
+
+        n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
+        print(f"Basin exploration: running {n_simulations_formatted} simulations in parallel...")
+
+        coarse_driving_frequencies = jnp.linspace(
             jnp.min(driving_frequencies), jnp.max(driving_frequencies), const.N_COARSE_DRIVING_FREQUENCIES
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES,)
 
@@ -165,9 +173,22 @@ def _estimate_initial_conditions(
             return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
         
         if isinstance(solver, SteadyStateSolver):
+            start_time = time.time()
             ts, ys = jax.vmap(solve_case)(
-                coarse_driving_frequencies_flat, coarse_driving_amplitudes_flat, coarse_initial_displacements_flat
-            ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes, n_time_steps, 2 * n_modes)
+                coarse_driving_frequencies_flat,
+                coarse_driving_amplitudes_flat,
+                coarse_initial_displacements_flat
+            )
+            # ensure computation completes before timing ends
+            ts.block_until_ready()
+            ys.block_until_ready()
+            elapsed = time.time() - start_time
+            sims_per_sec = n_simulations / elapsed
+            sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+            print(
+                f"Basin exploration: completed in {elapsed:.3f} seconds "
+                f"({sims_per_sec_formatted} simulations/sec)"
+            )
 
             # ------------------------------------------------------------------
             # 1.  Split displacements / velocities  … ys has shape
@@ -199,6 +220,34 @@ def _estimate_initial_conditions(
             # ------------------------------------------------------------------
             displacements = disp_peak
             velocities    = vel_peak
+        else:
+            start_time = time.time()
+            ts, ys = jax.vmap(solve_case)(
+                coarse_driving_frequencies_flat,
+                coarse_driving_amplitudes_flat,
+                coarse_initial_displacements_flat
+            )
+            # ensure computation completes before timing ends
+            ts.block_until_ready()
+            ys.block_until_ready()
+            elapsed = time.time() - start_time
+            sims_per_sec = n_simulations / elapsed
+            sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+            print(
+                f"Basin exploration: completed in {elapsed:.3f} seconds "
+                f"({sims_per_sec_formatted} simulations/sec)"
+            )
+
+            time_flat = ts
+            steady_state_displacements_flat = ys[..., :model.n_modes]  # (n_sim, n_windows, n_steps, n_modes)
+            steady_state_velocities_flat = ys[..., model.n_modes:]     # (n_sim, n_windows, n_steps, n_modes)
+
+            displacements, velocities = _get_steady_state_amplitudes(
+                coarse_driving_frequencies_flat,
+                time_flat,
+                steady_state_displacements_flat,
+                steady_state_velocities_flat
+            ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
         steady_state_displacement_amplitudes = displacements.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 

@@ -35,7 +35,7 @@ class AbstractSolver:
             dt0=None,
             max_steps=self.max_steps,
             y0=y0,
-            throw=True,
+            throw=False,
             #progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=jnp.linspace(t0, t1, self.n_time_steps)),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
