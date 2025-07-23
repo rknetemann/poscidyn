@@ -8,7 +8,7 @@ import oscidyn
 
 N_MODES = 1
 DRIVING_FREQUENCY = 1.0
-DRIVING_AMPLITUDE = 0.1  # Shape: (N_MODES,)
+DRIVING_AMPLITUDE = 0.0001  # Shape: (N_MODES,)
 INITIAL_DISPLACEMENT = np.zeros(N_MODES) # Shape: (N_MODES,)
 INITIAL_VELOCITY = np.zeros(N_MODES) # Shape: (N_MODES,)
 MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
