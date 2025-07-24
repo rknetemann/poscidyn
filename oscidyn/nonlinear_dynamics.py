@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 
 from oscidyn.models import AbstractModel
-from oscidyn.solver import AbstractSolver,SteadyStateSolver
+from oscidyn.solver import AbstractSolver, FixedTimeSolver, SteadyStateSolver
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
 import time
@@ -139,9 +139,9 @@ def _estimate_initial_conditions(
         n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
         * const.N_COARSE_INITIAL_DISPLACEMENTS * const.N_COARSE_INITIAL_VELOCITIES \
         * driving_frequencies.size * driving_amplitudes.size
-
         n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
         print(f"Basin exploration: running {n_simulations_formatted} simulations in parallel...")
+        start_time = time.time()
 
         coarse_driving_frequencies = jnp.linspace(
             jnp.min(driving_frequencies), jnp.max(driving_frequencies), const.N_COARSE_DRIVING_FREQUENCIES
@@ -172,91 +172,51 @@ def _estimate_initial_conditions(
 
             return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
         
-        if isinstance(solver, SteadyStateSolver):
-            start_time = time.time()
-            ts, ys = jax.vmap(solve_case)(
-                coarse_driving_frequencies_flat,
-                coarse_driving_amplitudes_flat,
-                coarse_initial_displacements_flat
-            )
-            # ensure computation completes before timing ends
-            ts.block_until_ready()
-            ys.block_until_ready()
-            elapsed = time.time() - start_time
-            sims_per_sec = n_simulations / elapsed
-            sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-            print(
-                f"Basin exploration: completed in {elapsed:.3f} seconds "
-                f"({sims_per_sec_formatted} simulations/sec)"
-            )
+        sol = jax.vmap(solve_case)(
+            coarse_driving_frequencies_flat,
+            coarse_driving_amplitudes_flat,
+            coarse_initial_displacements_flat
+        )
 
-            # ------------------------------------------------------------------
-            # 1.  Split displacements / velocities  … ys has shape
-            #     (n_sim , n_windows , n_steps , 2*n_modes)
-            # ------------------------------------------------------------------
-            n_sim, n_windows, n_steps, _ = ys.shape
+        if isinstance(solver, SteadyStateSolver):
             n_modes = model.n_modes
 
-            disp = ys[..., :n_modes]         # (n_sim, n_windows, n_steps, n_modes)
-            vel  = ys[..., n_modes:]         # (n_sim, n_windows, n_steps, n_modes)
+            ts, ys = sol
 
-            # ------------------------------------------------------------------
-            # 2.  Build a mask that is True on samples that actually contain data
-            #     (all‑zero windows produced by SteadyStateSolver are ignored)
-            # ------------------------------------------------------------------
-            sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1)      # (n_sim, n_windows, n_steps)
-            sample_mask = sample_mask[..., None]                 # broadcast over modes
+            disp = ys[..., :n_modes] # (n_sim, n_windows, n_steps, n_modes)
+            vel  = ys[..., n_modes:] # (n_sim, n_windows, n_steps, n_modes)
 
-            # ------------------------------------------------------------------
-            # 3.  Peak amplitudes = max |·| over (windows, time) of *valid* samples
-            # ------------------------------------------------------------------
+            sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1) # (n_sim, n_windows, n_steps)
+            sample_mask = sample_mask[..., None] # broadcast over modes
+
             disp_peak = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0),
                                 axis=(1, 2))                     # (n_sim, n_modes)
             vel_peak  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0),
                                 axis=(1, 2))                     # (n_sim, n_modes)
 
-            # ------------------------------------------------------------------
-            # 4.  Use the names expected further below
-            # ------------------------------------------------------------------
-            displacements = disp_peak
-            velocities    = vel_peak
+            # TO DO: Implement RMS alternative
+            disp_amp = disp_peak
+            vel_amp    = vel_peak
         else:
-            start_time = time.time()
-            ts, ys = jax.vmap(solve_case)(
-                coarse_driving_frequencies_flat,
-                coarse_driving_amplitudes_flat,
-                coarse_initial_displacements_flat
-            )
-            # ensure computation completes before timing ends
-            ts.block_until_ready()
-            ys.block_until_ready()
-            elapsed = time.time() - start_time
-            sims_per_sec = n_simulations / elapsed
-            sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-            print(
-                f"Basin exploration: completed in {elapsed:.3f} seconds "
-                f"({sims_per_sec_formatted} simulations/sec)"
-            )
+            ts, ys = sol
+            disp = ys[..., :model.n_modes] # (n_sim, n_windows, n_steps, n_modes)
+            vel = ys[..., model.n_modes:] # (n_sim, n_windows, n_steps, n_modes)
 
-            time_flat = ts
-            steady_state_displacements_flat = ys[..., :model.n_modes]  # (n_sim, n_windows, n_steps, n_modes)
-            steady_state_velocities_flat = ys[..., model.n_modes:]     # (n_sim, n_windows, n_steps, n_modes)
-
-            displacements, velocities = _get_steady_state_amplitudes(
+            disp_amp, vel_amp = _get_steady_state_amplitudes(
                 coarse_driving_frequencies_flat,
-                time_flat,
-                steady_state_displacements_flat,
-                steady_state_velocities_flat
+                ts,
+                disp,
+                vel
             ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        steady_state_displacement_amplitudes = displacements.reshape(
+        steady_state_displacement_amplitudes = disp_amp.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             model.n_modes
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        steady_state_velocity_amplitudes  = velocities.reshape(
+        steady_state_velocity_amplitudes  = vel_amp.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS,
@@ -278,20 +238,25 @@ def _estimate_initial_conditions(
             initial_velocity_amplitudes.reshape(*batch_shape, model.n_modes)
         ], axis=-1) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
 
+        # ensure computation completes before timing ends
+        ts.block_until_ready()
+        ys.block_until_ready()
+        elapsed = time.time() - start_time
+        sims_per_sec = n_simulations / elapsed
+        sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+        print(
+            f"Basin exploration: completed in {elapsed:.3f} seconds "
+            f"({sims_per_sec_formatted} simulations/sec)"
+        )
+
         import matplotlib.pyplot as plt
-
-        # extract only the displacement part of the ICs (shape: n_freq × n_amp × n_modes)
         init_disp = initial_conditions[..., :model.n_modes]
-
-        # select the first mode (if you have more modes you can loop over modes)
         disp_mode0 = init_disp[..., 0]  # shape: (n_freq, n_amp)
-
         # plot a separate curve for each driving amplitude
         for j in range(disp_mode0.shape[1]):
             plt.plot(driving_frequencies,
              disp_mode0[:, j],
              label=f"Amp={coarse_driving_amplitudes[j]:.3f}")
-
         plt.xlabel("Driving frequency")
         plt.ylabel("Initial displacement (mode 0)")
         plt.title("Initial displacement vs. frequency for each amplitude")
