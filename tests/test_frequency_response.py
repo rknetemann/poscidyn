@@ -10,7 +10,7 @@ import oscidyn
 N_MODES = 1
 MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
 DRIVING_FREQUENCY = jnp.linspace(0.1, 2.2, 1000) # Shape: (n_driving_frequencies,)
-DRIVING_AMPLITUDE = jnp.linspace(0.1, 1.0, 100)  # Shape: (n_driving_amplitudes,)
+DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 100)  # Shape: (n_driving_amplitudes,)
 
 # frequency_sweep = oscidyn.frequency_sweep(
 #     model = MODEL,
@@ -25,15 +25,7 @@ frequency_sweep = oscidyn.frequency_sweep(
     sweep_direction = oscidyn.SweepDirection.FORWARD,
     driving_frequencies = DRIVING_FREQUENCY,
     driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.FixedTimeSteadyStateSolver(n_time_steps=200, max_steps=4096),
-)
-
-frequency_sweep = oscidyn.frequency_sweep(
-    model = MODEL,
-    sweep_direction = oscidyn.SweepDirection.FORWARD,
-    driving_frequencies = DRIVING_FREQUENCY,
-    driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.FixedTimeSteadyStateSolver(n_time_steps=200, max_steps=4096),
+    solver = oscidyn.FixedTimeSteadyStateSolver(n_time_steps=300, max_steps=4096),
 )
 
 n_f = DRIVING_FREQUENCY.shape[0]
