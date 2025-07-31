@@ -335,36 +335,36 @@ def _fine_sweep(
     def solve_case(driving_frequency, driving_amplitude, initial_condition):
         return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
     
+    start_time = time.time()
     if isinstance(solver, SteadyStateSolver):
-        start_time = time.time()
         ts, ys = jax.vmap(solve_case, in_axes=(0, 0, 0))(freq_flat, amp_flat, ic_flat)
         
-        # ensure computation completes before timing ends
-        ts.block_until_ready()
-        ys.block_until_ready()
-        elapsed = time.time() - start_time
-        sims_per_sec = n_simulations / elapsed
-        sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-        print(
-            f"-> completed in {elapsed:.3f} seconds "
-            f"({sims_per_sec_formatted} simulations/sec)"
-        )
-
         disp = ys[..., :n_modes]         # (n_sim, n_windows, n_steps, n_modes)
         vel  = ys[..., n_modes:]         # (n_sim, n_windows, n_steps, n_modes)
 
-        # Build a mask that is True on samples that actually contain data
-        # (all‑zero windows produced by SteadyStateSolver are ignored)
+        # Build a mask that is True on samples that actually contain data (all‑zero windows produced by SteadyStateSolver are ignored)
         sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1) # (n_sim, n_windows, n_steps)
-        sample_mask = sample_mask[..., None] # broadcast over modes
+        sample_mask = sample_mask[..., None]
 
         # Peak amplitudes = max over (windows, time) of *valid* samples
-        disp_peak = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0), axis=(1, 2)) # (n_sim, n_modes)
-        vel_peak  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0), axis=(1, 2)) # (n_sim, n_modes)
+        ss_disp_peak = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0), axis=(1, 2)) # (n_sim, n_modes)
+        ss_vel_peak  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0), axis=(1, 2)) # (n_sim, n_modes)
     else:
-        raise NotImplementedError("Fine sweep is not implemented for non-SteadyStateSolver cases.")
+        ts, ys = jax.vmap(solve_case, in_axes=(0, 0, 0))(freq_flat, amp_flat, ic_flat)
+        
+        ss_disp = ys[..., :n_modes]  # (n_sim, n_windows, n_steps, n_modes)
+        ss_vel = ys[..., n_modes:]     # (n_sim, n_windows, n_steps, n_modes)
 
-    return disp_peak, vel_peak
+        ss_disp_peak, ss_vel_peak = _get_steady_state_amplitudes(freq_flat, ts, ss_disp, ss_vel)
+    
+    print(ss_disp_peak.shape, ss_vel_peak.shape) # (n_sim, n_modes)
+
+    elapsed = time.time() - start_time
+    sims_per_sec = n_simulations / elapsed
+    sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+    print(f"-> completed in {elapsed:.3f} seconds "f"({sims_per_sec_formatted} simulations/sec)")       
+
+    return ss_disp_peak, ss_vel_peak
 
 def frequency_sweep(
     model: AbstractModel,
@@ -376,6 +376,17 @@ def frequency_sweep(
             
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
         raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
+    
+    if solver.n_time_steps is None:
+        '''
+        The Nyquist theorem, also known as the Nyquist-Shannon sampling theorem, states that to accurately digitize an analog signal, 
+        it must be sampled at a rate at least twice the highest frequency component present in that signal.
+        '''
+        highest_frequency = const.MAXIMUM_ORDER_SUPERHARMONICS * driving_frequency * 2
+        n_steps = jnp.floor((t1 - t0) * highest_frequency * 1.1).astype(jnp.int32)
+        
+        jax.debug.print("shape n_steps: {}", n_steps.shape)
+        return n_steps
                
     initial_conditions = _estimate_initial_conditions(
         model=model,

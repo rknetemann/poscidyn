@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 import diffrax
 from functools import partial
+import numpy as np
 
 from .models import AbstractModel
 from . import constants as const 
@@ -11,12 +12,13 @@ jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
 
 class AbstractSolver:
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, 
-                 rtol: float = 1e-4, atol: float = 1e-6):
-        self.n_time_steps = n_time_steps
-        self.max_steps = max_steps
+    def __init__(self, ts:jax.Array, 
+                 rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+        
+        self.ts = ts
         self.rtol = rtol
         self.atol = atol
+        self.max_steps = max_steps
     
     def solve(self, 
               model: AbstractModel,
@@ -37,18 +39,20 @@ class AbstractSolver:
             y0=y0,
             throw=False,
             #progress_meter=diffrax.TqdmProgressMeter(),
-            saveat=diffrax.SaveAt(ts=jnp.linspace(t0, t1, self.n_time_steps)),
+            saveat=diffrax.SaveAt(ts=self.ts),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_frequency, driving_amplitude),
         )
         return sol
 
 class FixedTimeSolver(AbstractSolver):
-    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = 2000, max_steps: int = 4096, 
-                 rtol: float = 1e-4, atol: float = 1e-6):
-        super().__init__(n_time_steps, max_steps, rtol, atol)
+    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = 2000,
+                 rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+        
+        super().__init__(max_steps, rtol, atol)
         self.t0 = t0
         self.t1 = t1
+        self.ts = jnp.linspace(t0, t1, n_time_steps)
 
     def __call__(self, model: AbstractModel, 
               driving_frequency: jax.Array, 
@@ -58,6 +62,52 @@ class FixedTimeSolver(AbstractSolver):
               ):
 
         sol = self.solve(model=model, t0=self.t0, t1=self.t1, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+
+        ts = sol.ts  # Shape: (n_steps,)
+        ys = sol.ys  # Shape: (n_steps, state_dim)
+
+        return ts, ys
+    
+class FixedTimeSteadyStateSolver(AbstractSolver):
+    def __init__(self, t0: float = 0, n_time_steps: int = 2000, max_steps: int = 4096, 
+                 ss_tol:float = 1e-3, rtol: float = 1e-4, atol: float = 1e-6):
+        super().__init__(n_time_steps, max_steps, rtol, atol)
+        self.t0 = t0
+        self.ss_tol = ss_tol
+        
+    def _calculate_t1(self, model: AbstractModel, driving_frequency: float) -> float:
+        '''
+        Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
+        '''
+        tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - (1/model.Q)**2) / driving_frequency) * 1.4
+        
+        three_periods = 3 * (2 * jnp.pi / driving_frequency)
+        t1 = (tau_d + three_periods).astype(jnp.float64)  # Ensure t1 is a float64 for precision
+        
+        return t1
+    
+    def _calculate_n_steps(self, driving_frequency: float, t0:float, t1: float) -> int:
+        '''
+        The Nyquist theorem, also known as the Nyquist-Shannon sampling theorem, states that to accurately digitize an analog signal, 
+        it must be sampled at a rate at least twice the highest frequency component present in that signal.
+        '''
+        highest_frequency = const.MAXIMUM_ORDER_SUPERHARMONICS * driving_frequency * 2
+        n_steps = jnp.floor((t1 - t0) * highest_frequency * 1.1).astype(jnp.int32)
+        
+        jax.debug.print("shape n_steps: {}", n_steps.shape)
+        return n_steps
+
+    def __call__(self, model: AbstractModel, 
+              driving_frequency: jax.Array, 
+              driving_amplitude: jax.Array, 
+              initial_condition: jax.Array,
+              response: const.ResponseType
+              ):
+
+        t1 = self._calculate_t1(model, driving_frequency)
+        n_steps = self._calculate_n_steps(driving_frequency, self.t0, t1)
+
+        sol = self.solve(model=model, t0=self.t0, t1=t1, n_steps=n_steps, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)
