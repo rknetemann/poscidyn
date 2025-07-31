@@ -22,6 +22,8 @@ class NonlinearOscillator(AbstractModel):
     def rhs(self, tau, state, args):
         q, v   = jnp.split(state, 2)
         F_omega_hat_arg, F_amp_hat_arg = args
+        F_omega_hat_arg = jnp.asarray(F_omega_hat_arg).reshape(())
+        F_amp_hat_arg   = jnp.asarray(F_amp_hat_arg).reshape(())
         
         damping_term = (self.omega_0_hat / self.Q) * v # Shape: (n_modes,)
         
@@ -35,8 +37,12 @@ class NonlinearOscillator(AbstractModel):
         
         fith_order_stiffness_term = jnp.einsum("ijklm,j,k,l,m->i", self.delta_hat, q, q, q, q) # Shape: (n_modes,)
         
-        forcing_term = jnp.zeros(self.n_modes) # Shape: (n_modes,)
-        forcing_term = forcing_term.at[0].set(F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)) # Shape: (n_modes,)
+        forcing_term = jnp.zeros((self.n_modes,))
+
+        forcing_term = forcing_term.at[:1].set(
+            F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
+        )
+
         
         a = (
             - damping_term
