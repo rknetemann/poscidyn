@@ -30,7 +30,7 @@ class AbstractSolver:
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
-            solver=diffrax.Tsit5(),
+            solver=diffrax.Kvaerno5(),
             t0=t0,
             t1=t1,
             dt0=None,

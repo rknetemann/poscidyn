@@ -7,8 +7,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import oscidyn
 
 N_MODES = 1
-DRIVING_FREQUENCY = 1.5
-DRIVING_AMPLITUDE = 0.1  # Shape: (N_MODES,)
+DRIVING_FREQUENCY = 1.6
+DRIVING_AMPLITUDE = 1.0  # Shape: (N_MODES,)
 INITIAL_DISPLACEMENT = np.array([0.0]) # Shape: (N_MODES,)
 INITIAL_VELOCITY = np.array([0.0]) # Shape: (N_MODES,)
 MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
@@ -20,21 +20,27 @@ t_end = np.max(tau_d)
 print("Calculated t_end:", t_end)
 
 
+# time_response_standard = oscidyn.time_response(
+#     model = MODEL,
+#     driving_frequency = DRIVING_FREQUENCY,
+#     driving_amplitude = DRIVING_AMPLITUDE,
+#     initial_displacement= INITIAL_DISPLACEMENT,
+#     initial_velocity = INITIAL_VELOCITY,
+#     solver = oscidyn.FixedTimeSolver(t1=250, n_time_steps=10_000, max_steps=1_000_000),
+# )
+
 time_response_standard = oscidyn.time_response(
     model = MODEL,
     driving_frequency = DRIVING_FREQUENCY,
     driving_amplitude = DRIVING_AMPLITUDE,
     initial_displacement= INITIAL_DISPLACEMENT,
     initial_velocity = INITIAL_VELOCITY,
-    solver = oscidyn.FixedTimeSolver(t1=250, n_time_steps=10_000, max_steps=1_000_000),
+    solver = oscidyn.FixedTimeSteadyStateSolver(n_time_steps=500, max_steps=4_096*100),
 )
+
 time_standard, displacements_standard, velocities_standard = time_response_standard
 total_displacement_standard = displacements_standard.sum(axis=1)  # Sum across modes
 total_velocity_standard = velocities_standard.sum(axis=1)  # Sum across modes
-
-print(time_standard[4000])
-print(total_displacement_standard[4000])
-print(total_velocity_standard[4000])
 
 plt.figure()
 plt.plot(time_standard, total_displacement_standard, label='Total Displacement')
