@@ -1,12 +1,9 @@
 from jax import numpy as jnp
 import matplotlib.pyplot as plt
-import numpy as np
-import jax
-import jax.profiler
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
 N_MODES = 1
@@ -19,7 +16,9 @@ frequency_sweep = oscidyn.frequency_sweep(
     sweep_direction = oscidyn.SweepDirection.FORWARD,
     driving_frequencies = DRIVING_FREQUENCY,
     driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096),
+    #solver = oscidyn.FixedTimeSolver(t1=200, max_steps=4_096),
+    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096),
+    #solver = oscidyn.SteadyStateSolver(rtol=1e-4, atol=1e-6, max_steps=4_096),
 )
 
 n_f = DRIVING_FREQUENCY.shape[0]

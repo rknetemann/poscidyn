@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
 N_MODES = 1
@@ -20,6 +20,8 @@ time_response_steady_state = oscidyn.time_response(
     initial_displacement= INITIAL_DISPLACEMENT,
     initial_velocity = INITIAL_VELOCITY,
     solver = oscidyn.FixedTimeSolver(t1=200, max_steps=4_096),
+    #solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096),
+    #solver = oscidyn.SteadyStateSolver(max_steps=4096, rtol=1e-4, atol=1e-6)
 )
 time_steady_state,displacements_steady_state, velocities_steady_state = time_response_steady_state
 total_displacement_steady_state = displacements_steady_state.sum(axis=1)

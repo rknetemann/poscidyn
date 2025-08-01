@@ -174,7 +174,10 @@ class SteadyStateSolver(AbstractSolver):
             t1 = t0 + solve_window
             y0 = ys[previous_window_idx, -1]
 
-            sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+            # Generate a 1D array of time points for this window
+            ts_window = jnp.linspace(t0, t1, n_steps_window)
+
+            sol = self.solve(model=model, t0=t0, t1=t1, ts=ts_window, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
             ts_window = sol.ts # Shape: (n_steps_window,)
             ys_window = sol.ys # Shape: (n_steps_window, state_dim)
