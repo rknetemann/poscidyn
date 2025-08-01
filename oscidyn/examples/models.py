@@ -61,7 +61,7 @@ class NonlinearOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
-            Q = jnp.array([500.0])
+            Q = jnp.array([10.0])
             eta_hat = jnp.array([0.1])
             alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.00)
             gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(0.60)

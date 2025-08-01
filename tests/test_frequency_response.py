@@ -22,13 +22,14 @@ DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 30)  # Shape: (n_driving_amplitudes,
 #     solver = oscidyn.SteadyStateSolver(ss_rtol=1e-2, ss_atol=1e-6, n_time_steps=500, max_windows=100, max_steps=4096),
 # )
 
-frequency_sweep = oscidyn.frequency_sweep(
-    model = MODEL,
-    sweep_direction = oscidyn.SweepDirection.FORWARD,
-    driving_frequencies = DRIVING_FREQUENCY,
-    driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096*20),
-)
+with jax.profiler.trace("/tmp/profile-data"):
+    frequency_sweep = oscidyn.frequency_sweep(
+        model = MODEL,
+        sweep_direction = oscidyn.SweepDirection.FORWARD,
+        driving_frequencies = DRIVING_FREQUENCY,
+        driving_amplitudes = DRIVING_AMPLITUDE,
+        solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096*20),
+    )
 
 jax.profiler.save_device_memory_profile("memory.prof")
 

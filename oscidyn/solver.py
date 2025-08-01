@@ -18,7 +18,7 @@ os.environ['XLA_FLAGS'] = (
     '--xla_gpu_enable_latency_hiding_scheduler=true '
 )
 
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.9' 
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.85' 
 
 
 class AbstractSolver:

@@ -399,12 +399,12 @@ def frequency_sweep(
         max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * max_driving_frequency
         
         one_period = 2.0 * jnp.pi / max_frequency_component
-        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.01 # ASSUMPTION: 1.01 is a safety factor to ensure the sampling frequency is above the Nyquist rate
+        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
         
         n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
         solver.n_time_steps = n_time_steps
 
-        print("\n Automatically determined number of time steps for steady state solver:", n_time_steps)
+        print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
 
     initial_conditions = _estimate_initial_conditions(
         model=model,
