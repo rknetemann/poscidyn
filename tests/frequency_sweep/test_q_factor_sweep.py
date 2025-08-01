@@ -29,19 +29,3 @@ for Q in Q_FACTORS:
         solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096),
         #solver = oscidyn.SteadyStateSolver(rtol=1e-4, atol=1e-6, max_steps=4_096),
     )
-
-    if Q == Q_FACTORS[0]:
-        fig, axes = plt.subplots(len(Q_FACTORS), 1, sharex=True, figsize=(8, 3 * len(Q_FACTORS)))
-
-    idx = Q_FACTORS.index(Q)
-    ax = axes[idx]
-    for i, A in enumerate(DRIVING_AMPLITUDE):
-        ax.plot(frequency_sweep.frequencies, frequency_sweep.response[i], label=f"A = {A}")
-    ax.set_title(f"Q = {Q}")
-    ax.set_xlabel("Frequency")
-    ax.set_ylabel("Displacement")
-    ax.legend()
-
-    if Q == Q_FACTORS[-1]:
-        plt.tight_layout()
-        plt.show()
