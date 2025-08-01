@@ -1,6 +1,8 @@
 from jax import numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
+import jax
+import jax.profiler
 
 import sys
 import os
@@ -9,27 +11,38 @@ import oscidyn
 
 N_MODES = 1
 MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
-SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = jnp.linspace(0.1, 2.2, 100) # Shape: (n_driving_frequencies,)
-DRIVING_AMPLITUDE = jnp.linspace(0.1, 1.0, 100)  # Shape: (n_driving_amplitudes,)
-
-frequency_sweep = oscidyn.frequency_sweep(
-    model = MODEL,
-    sweep_direction = SWEEP_DIRECTION,
-    driving_frequencies = DRIVING_FREQUENCY,
-    driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.SteadyStateSolver(ss_rtol=1e-2, ss_atol=1e-6, n_time_steps=500, max_windows=100, max_steps=4096),
-)
-
-# d = 0.01
-# tau_d = - 2 * MODEL.Q * np.log(d * np.sqrt(1 - (1/MODEL.Q)**2) / DRIVING_FREQUENCY) 
-# t_end = np.max(tau_d)
-# print("Calculated t_end:", t_end)
+DRIVING_FREQUENCY = jnp.linspace(0.1, 2.2, 300) # Shape: (n_driving_frequencies,)
+DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 30)  # Shape: (n_driving_amplitudes,)
 
 # frequency_sweep = oscidyn.frequency_sweep(
 #     model = MODEL,
-#     sweep_direction = SWEEP_DIRECTION,
+#     sweep_direction = oscidyn.SweepDirection.FORWARD,
 #     driving_frequencies = DRIVING_FREQUENCY,
 #     driving_amplitudes = DRIVING_AMPLITUDE,
-#     solver = oscidyn.FixedTimeSolver(t1=tau_d, n_time_steps=1000, max_steps=4096),
+#     solver = oscidyn.SteadyStateSolver(ss_rtol=1e-2, ss_atol=1e-6, n_time_steps=500, max_windows=100, max_steps=4096),
 # )
+
+with jax.profiler.trace("/tmp/profile-data"):
+    frequency_sweep = oscidyn.frequency_sweep(
+        model = MODEL,
+        sweep_direction = oscidyn.SweepDirection.FORWARD,
+        driving_frequencies = DRIVING_FREQUENCY,
+        driving_amplitudes = DRIVING_AMPLITUDE,
+        solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096*20),
+    )
+
+jax.profiler.save_device_memory_profile("memory.prof")
+
+n_f = DRIVING_FREQUENCY.shape[0]
+n_a = DRIVING_AMPLITUDE.shape[0]
+amps = frequency_sweep.total_steady_state_displacement_amplitude.reshape(n_f, n_a)
+
+# 2D Line plots
+plt.figure()
+for j in range(n_a):
+    plt.plot(DRIVING_FREQUENCY, amps[:, j], label=f"A={DRIVING_AMPLITUDE[j]:.2g}")
+plt.xlabel("Driving frequency")
+plt.ylabel("Total steady-state displacement amplitude")
+plt.legend(title="Drive amplitude")
+plt.show()
+

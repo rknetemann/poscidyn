@@ -22,6 +22,8 @@ class NonlinearOscillator(AbstractModel):
     def rhs(self, tau, state, args):
         q, v   = jnp.split(state, 2)
         F_omega_hat_arg, F_amp_hat_arg = args
+        F_omega_hat_arg = jnp.asarray(F_omega_hat_arg).reshape(())
+        F_amp_hat_arg   = jnp.asarray(F_amp_hat_arg).reshape(())
         
         damping_term = (self.omega_0_hat / self.Q) * v # Shape: (n_modes,)
         
@@ -35,8 +37,12 @@ class NonlinearOscillator(AbstractModel):
         
         fith_order_stiffness_term = jnp.einsum("ijklm,j,k,l,m->i", self.delta_hat, q, q, q, q) # Shape: (n_modes,)
         
-        forcing_term = jnp.zeros(self.n_modes) # Shape: (n_modes,)
-        forcing_term = forcing_term.at[0].set(F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)) # Shape: (n_modes,)
+        forcing_term = jnp.zeros((self.n_modes,))
+
+        forcing_term = forcing_term.at[:1].set(
+            F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
+        )
+
         
         a = (
             - damping_term
@@ -55,11 +61,11 @@ class NonlinearOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
-            Q = jnp.array([30.0])
-            eta_hat = jnp.array([0.01])
-            alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.1)
-            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(0.2)
-            delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(-0.0)
+            Q = jnp.array([10.0])
+            eta_hat = jnp.array([0.1])
+            alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.00)
+            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(0.60)
+            delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(0.00)
         elif n_modes == 2:
             omega_ref = 1.0
             x_ref = 1.0

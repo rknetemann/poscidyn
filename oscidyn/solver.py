@@ -3,25 +3,36 @@ import jax
 import jax.numpy as jnp
 import diffrax
 from functools import partial
+import numpy as np
+import os
 
 from .models import AbstractModel
 from . import constants as const 
 
 jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
+jax.config.update('jax_compiler_enable_remat_pass', True)
+
+os.environ['XLA_FLAGS'] = (
+    '--xla_gpu_triton_gemm_any=True '
+    '--xla_gpu_enable_latency_hiding_scheduler=true '
+)
+
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.85' 
+
 
 class AbstractSolver:
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, 
-                 rtol: float = 1e-4, atol: float = 1e-6):
-        self.n_time_steps = n_time_steps
-        self.max_steps = max_steps
+    def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+
         self.rtol = rtol
         self.atol = atol
+        self.max_steps = max_steps
     
     def solve(self, 
               model: AbstractModel,
               t0: float, 
               t1: float, 
+              ts: jax.Array,
               y0: jax.Array,
               driving_frequency: float, 
               driving_amplitude: float, 
@@ -37,18 +48,21 @@ class AbstractSolver:
             y0=y0,
             throw=False,
             #progress_meter=diffrax.TqdmProgressMeter(),
-            saveat=diffrax.SaveAt(ts=jnp.linspace(t0, t1, self.n_time_steps)),
+            saveat=diffrax.SaveAt(ts=ts),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_frequency, driving_amplitude),
         )
         return sol
 
 class FixedTimeSolver(AbstractSolver):
-    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = 2000, max_steps: int = 4096, 
-                 rtol: float = 1e-4, atol: float = 1e-6):
-        super().__init__(n_time_steps, max_steps, rtol, atol)
+    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = None,
+                 rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+
+        super().__init__(rtol, atol, max_steps)
         self.t0 = t0
         self.t1 = t1
+        self.n_time_steps = n_time_steps
+        self.ts = jnp.linspace(t0, t1, n_time_steps)
 
     def __call__(self, model: AbstractModel, 
               driving_frequency: jax.Array, 
@@ -57,7 +71,53 @@ class FixedTimeSolver(AbstractSolver):
               response: const.ResponseType
               ):
 
-        sol = self.solve(model=model, t0=self.t0, t1=self.t1, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        sol = self.solve(model=model, t0=self.t0, t1=self.t1, ts=self.ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+
+        ts = sol.ts  # Shape: (n_steps,)
+        ys = sol.ys  # Shape: (n_steps, state_dim)
+
+        return ts, ys
+    
+class FixedTimeSteadyStateSolver(AbstractSolver):
+    def __init__(self, t0: float = 0, n_time_steps: int = None, ss_tol:float = 1e-3,
+                 rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+        
+        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
+        self.t0 = t0
+        self.n_time_steps = n_time_steps # Can be None, in which case it will be calculated based on the driving frequency 
+        
+        self.ss_tol = ss_tol
+        
+    def _calculate_t_steady_state(self, model: AbstractModel, driving_frequency) -> float:
+        '''
+        Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
+        '''
+        driving_frequency = jnp.asarray(driving_frequency).reshape(())
+        tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - (1/model.Q)**2) / jnp.max(driving_frequency)) * 1.4
+
+        three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
+        t_steady_state = (tau_d + three_periods).astype(jnp.float32) 
+        
+        return t_steady_state
+
+    def _calculate_t_window(self, model: AbstractModel, driving_frequency, t_steady_state) -> jax.Array:
+        t_window = const.MAXIMUM_ORDER_SUBHARMONICS * (2 * jnp.pi / jnp.max(driving_frequency))
+        
+        return t_window
+
+    def __call__(self, model: AbstractModel, 
+              driving_frequency: jax.Array, 
+              driving_amplitude: jax.Array, 
+              initial_condition: jax.Array,
+              response: const.ResponseType
+              ):
+
+        t_steady_state = self._calculate_t_steady_state(model, driving_frequency).reshape(())
+        t_window = self._calculate_t_window(model, driving_frequency, t_steady_state)
+        t1 = t_steady_state + t_window
+        ts = jnp.linspace(t_steady_state, t1, self.n_time_steps)
+
+        sol = self.solve(model=model, t0=self.t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)
@@ -67,7 +127,9 @@ class FixedTimeSolver(AbstractSolver):
 class SteadyStateSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, rtol: float = 1e-6, atol: float = 1e-6, 
                  ss_rtol: float = 1e-3, ss_atol: float = 1e-6, max_windows: int = 512):
-        super().__init__(n_time_steps, max_steps, rtol, atol)
+
+        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
+        self.n_time_steps = n_time_steps 
         self.max_windows = max_windows
         self.ss_rtol = ss_rtol
         self.ss_atol = ss_atol

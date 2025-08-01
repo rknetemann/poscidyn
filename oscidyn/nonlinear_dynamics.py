@@ -137,11 +137,10 @@ def _estimate_initial_conditions(
     ) -> Tuple[jax.Array, jax.Array]:
         
         n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
-        * const.N_COARSE_INITIAL_DISPLACEMENTS * const.N_COARSE_INITIAL_VELOCITIES \
-        * driving_frequencies.size * driving_amplitudes.size
+        * const.N_COARSE_INITIAL_DISPLACEMENTS 
         n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
-        print(f"Basin exploration: running {n_simulations_formatted} simulations in parallel...")
-        start_time = time.time()
+        print("\nBasin exploration:")
+        print(f"-> running {n_simulations_formatted} simulations in parallel...")
 
         coarse_driving_frequencies = jnp.linspace(
             jnp.min(driving_frequencies), jnp.max(driving_frequencies), const.N_COARSE_DRIVING_FREQUENCIES
@@ -165,6 +164,7 @@ def _estimate_initial_conditions(
         coarse_initial_displacements_flat = coarse_initial_displacement_mesh.ravel() 
         # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS)
         
+        @jax.jit
         def solve_case(driving_frequency, driving_amplitude, initial_displacement):
             initial_displacement = jnp.full((model.n_modes,), initial_displacement)
             initial_velocity = jnp.zeros((model.n_modes,))
@@ -172,13 +172,29 @@ def _estimate_initial_conditions(
 
             return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
         
-        sol = jax.vmap(solve_case)(
-            coarse_driving_frequencies_flat,
-            coarse_driving_amplitudes_flat,
-            coarse_initial_displacements_flat
-        )
-
         if isinstance(solver, SteadyStateSolver):
+            start_time = time.time()
+            ts, ys = jax.vmap(solve_case)(
+                coarse_driving_frequencies_flat,
+                coarse_driving_amplitudes_flat,
+                coarse_initial_displacements_flat
+            )
+            # ensure computation completes before timing ends
+            ts.block_until_ready()
+            ys.block_until_ready()
+            elapsed = time.time() - start_time
+            sims_per_sec = n_simulations / elapsed
+            sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+            print(
+                f"-> completed in {elapsed:.3f} seconds "
+                f"({sims_per_sec_formatted} simulations/sec)"
+            )
+
+            # ------------------------------------------------------------------
+            # 1.  Split displacements / velocities  … ys has shape
+            #     (n_sim , n_windows , n_steps , 2*n_modes)
+            # ------------------------------------------------------------------
+            n_sim, n_windows, n_steps, _ = ys.shape
             n_modes = model.n_modes
 
             ts, ys = sol
@@ -198,11 +214,28 @@ def _estimate_initial_conditions(
             disp_amp = disp_peak
             vel_amp    = vel_peak
         else:
-            ts, ys = sol
-            disp = ys[..., :model.n_modes] # (n_sim, n_windows, n_steps, n_modes)
-            vel = ys[..., model.n_modes:] # (n_sim, n_windows, n_steps, n_modes)
+            start_time = time.time()
+            ts, ys = jax.vmap(solve_case)(
+                coarse_driving_frequencies_flat,
+                coarse_driving_amplitudes_flat,
+                coarse_initial_displacements_flat
+            )
+            # ensure computation completes before timing ends
+            ts.block_until_ready()
+            ys.block_until_ready()
+            elapsed = time.time() - start_time
+            sims_per_sec = n_simulations / elapsed
+            sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+            print(
+                f"-> completed in {elapsed:.3f} seconds "
+                f"({sims_per_sec_formatted} simulations/sec)"
+            )
 
-            disp_amp, vel_amp = _get_steady_state_amplitudes(
+            time_flat = ts
+            steady_state_displacements_flat = ys[..., :model.n_modes]  # (n_sim, n_windows, n_steps, n_modes)
+            steady_state_velocities_flat = ys[..., model.n_modes:]     # (n_sim, n_windows, n_steps, n_modes)
+
+            displacements, velocities = _get_steady_state_amplitudes(
                 coarse_driving_frequencies_flat,
                 ts,
                 disp,
@@ -223,7 +256,7 @@ def _estimate_initial_conditions(
             model.n_modes
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        initial_displacement_amplitudes, initial_velocity_amplitudes = _select_branches(
+        ss_disp_amp, ss_vel_amp = _select_branches(
             model=model,
             driving_frequencies=driving_frequencies,
             coarse_driving_frequencies=coarse_driving_frequencies,
@@ -231,32 +264,22 @@ def _estimate_initial_conditions(
             steady_state_velocity_amplitudes=steady_state_velocity_amplitudes,
             sweep_direction=sweep_direction,
         ) # Shape: (n_driving_frequencies, n_driving_amplitudes, n_modes)
-      
-        batch_shape = initial_displacement_amplitudes.shape[:-1]
+          
+        # ASSUMPTION: The measured steady-state amplitude is exactly at the peak, and thus velocity is zero.
+        batch_shape = ss_disp_amp.shape[:-1]
         initial_conditions = jnp.concatenate([
-            initial_displacement_amplitudes.reshape(*batch_shape, model.n_modes),
-            initial_velocity_amplitudes.reshape(*batch_shape, model.n_modes)
-        ], axis=-1) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
-
-        # ensure computation completes before timing ends
-        ts.block_until_ready()
-        ys.block_until_ready()
-        elapsed = time.time() - start_time
-        sims_per_sec = n_simulations / elapsed
-        sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-        print(
-            f"Basin exploration: completed in {elapsed:.3f} seconds "
-            f"({sims_per_sec_formatted} simulations/sec)"
-        )
-
+            ss_disp_amp.reshape(*batch_shape, model.n_modes),
+            jnp.zeros((*batch_shape, model.n_modes))
+        ], axis=-1)  # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, 2 * n_modes)
+        
         import matplotlib.pyplot as plt
         init_disp = initial_conditions[..., :model.n_modes]
-        disp_mode0 = init_disp[..., 0]  # shape: (n_freq, n_amp)
-        # plot a separate curve for each driving amplitude
+        disp_mode0 = init_disp[..., 0] # shape: (n_freq, n_amp)
+        plt.figure()
         for j in range(disp_mode0.shape[1]):
             plt.plot(driving_frequencies,
-             disp_mode0[:, j],
-             label=f"Amp={coarse_driving_amplitudes[j]:.3f}")
+                 disp_mode0[:, j],
+                 label=f"Amp={coarse_driving_amplitudes[j]:.3f}")
         plt.xlabel("Driving frequency")
         plt.ylabel("Initial displacement (mode 0)")
         plt.title("Initial displacement vs. frequency for each amplitude")
@@ -282,6 +305,12 @@ def _fine_sweep(
     n_A_coarse    = initial_conditions.shape[1]
     n_params      = initial_conditions.shape[2]        # 2 * n_modes
     n_modes       = model.n_modes
+    
+    n_simulations = driving_frequencies.size * driving_amplitudes.size
+    n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
+    print("\nFine sweep:")
+    print(f"-> running {n_simulations_formatted} simulations in parallel...")
+
 
     # ------------------------------------------------------------------
     # 1.  If necessary, interpolate ICs from the coarse → fine amplitude grid
@@ -303,39 +332,45 @@ def _fine_sweep(
         initial_conditions = jax.vmap(_interp_row)(initial_conditions)
         # shape now (n_f, n_A_fine, 2*n_modes)
 
-    freq_mesh, amp_mesh = jnp.meshgrid(
-        driving_frequencies, driving_amplitudes, indexing="ij"
-    )                                                 # both (n_f, n_A_fine)
+    freq_mesh, amp_mesh = jnp.meshgrid(driving_frequencies, driving_amplitudes, indexing="ij") # both (n_f, n_A_fine)
 
-    freq_flat = freq_mesh.ravel()                    # (n_f * n_A_fine,)
+    freq_flat = freq_mesh.ravel() # (n_f * n_A_fine,)
     amp_flat  = amp_mesh .ravel()
-    ic_flat   = initial_conditions.reshape(
-        -1, n_params
-    )                                                # (n_f * n_A_fine, 2*n_modes)
+    ic_flat   = initial_conditions.reshape(-1, n_params) # (n_f * n_A_fine, 2*n_modes)
+
 
     @jax.jit
-    def _solve(freq, amp, ic):
-        return solver.solve(model, freq, amp, ic)
+    def solve_case(driving_frequency, driving_amplitude, initial_condition):
+        return solver(model, driving_frequency, driving_amplitude, initial_condition, const.ResponseType.FrequencyResponse)
     
+    start_time = time.time()
     if isinstance(solver, SteadyStateSolver):
-        if solver.only_amplitude:
-            # If only_amplitude is True, we only need the steady state amplitudes
-            disp_amp_flat, vel_amp_flat = _get_steady_state_amplitudes(
-                freq_flat, jnp.zeros((freq_flat.size,)), ic_flat[:, :n_modes], ic_flat[:, n_modes:]
-            )
-        else:
-            time_flat, disp_flat, vel_flat = jax.vmap(_solve, in_axes=(0, 0, 0))(
-                freq_flat, amp_flat, ic_flat
-            )
-            #  → time_flat (n_sim, n_time_steps)
-            #    disp_flat (n_sim, n_time_steps, n_modes)
-            #    vel_flat  (n_sim, n_time_steps, n_modes)
+        ts, ys = jax.vmap(solve_case, in_axes=(0, 0, 0))(freq_flat, amp_flat, ic_flat)
+        
+        disp = ys[..., :n_modes]         # (n_sim, n_windows, n_steps, n_modes)
+        vel  = ys[..., n_modes:]         # (n_sim, n_windows, n_steps, n_modes)
 
-            disp_amp_flat, vel_amp_flat = _get_steady_state_amplitudes(
-                freq_flat, time_flat, disp_flat, vel_flat
-            )                                                   # (n_sim, n_modes)
+        # Build a mask that is True on samples that actually contain data (all‑zero windows produced by SteadyStateSolver are ignored)
+        sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1) # (n_sim, n_windows, n_steps)
+        sample_mask = sample_mask[..., None]
 
-    return disp_amp_flat, vel_amp_flat
+        # Peak amplitudes = max over (windows, time) of *valid* samples
+        ss_disp_peak = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0), axis=(1, 2)) # (n_sim, n_modes)
+        ss_vel_peak  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0), axis=(1, 2)) # (n_sim, n_modes)
+    else:
+        ts, ys = jax.vmap(solve_case, in_axes=(0, 0, 0))(freq_flat, amp_flat, ic_flat)
+        
+        ss_disp = ys[..., :n_modes]  # (n_sim, n_windows, n_steps, n_modes)
+        ss_vel = ys[..., n_modes:]     # (n_sim, n_windows, n_steps, n_modes)
+
+        ss_disp_peak, ss_vel_peak = _get_steady_state_amplitudes(freq_flat, ts, ss_disp, ss_vel) # (n_sim, n_modes)
+        
+    elapsed = time.time() - start_time
+    sims_per_sec = n_simulations / elapsed
+    sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+    print(f"-> completed in {elapsed:.3f} seconds "f"({sims_per_sec_formatted} simulations/sec)")       
+
+    return ss_disp_peak, ss_vel_peak
 
 def frequency_sweep(
     model: AbstractModel,
@@ -347,7 +382,22 @@ def frequency_sweep(
             
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
         raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
-               
+    
+    if solver.n_time_steps is None:
+        '''
+        ASSUMPTION: Minimum required sampling frequency for the steady state solver based on gpt prompt, should investigate
+        '''
+        rtol = 0.001
+        max_driving_frequency = jnp.max(driving_frequencies)
+        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * max_driving_frequency
+        
+        one_period = 2.0 * jnp.pi / max_frequency_component
+        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
+        
+        n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+        solver.n_time_steps = n_time_steps
+
+        print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
 
     initial_conditions = _estimate_initial_conditions(
         model=model,
@@ -357,7 +407,7 @@ def frequency_sweep(
         sweep_direction=sweep_direction,
     ) # Shape: (n_driving_frequencies, n_driving_amplitudes, 2 * n_modes)
 
-    steady_state_displacement_amplitudes, steady_state_velocity_amplitudes = _fine_sweep(
+    ss_disp_amp, ss_vel_amp = _fine_sweep(
         model=model,
         initial_conditions=initial_conditions,
         driving_frequencies=driving_frequencies,
@@ -366,22 +416,18 @@ def frequency_sweep(
     )
 
     # ASSUMPTION: Mode superposition validity for nonlinear systems
-    total_steady_state_displacement_amplitude = jnp.sum(steady_state_displacement_amplitudes, axis=1)
-    total_steady_state_velocity_amplitude = jnp.sum(steady_state_velocity_amplitudes, axis=1)
-    
-    # define grid sizes for plotting
-    n_f = driving_frequencies.size
-    n_A = driving_amplitudes.size
-    
+    tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1)
+    tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
+
     frequency_sweep = FrequencySweepResult(
         model=model,
         sweep_direction=sweep_direction,
         driving_frequencies=driving_frequencies, # Shape: (n_driving_frequencies,)
         driving_amplitudes=driving_amplitudes, # Shape: (n_driving_amplitudes,)
-        steady_state_displacement_amplitude=steady_state_displacement_amplitudes, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
-        steady_state_velocity_amplitude=steady_state_velocity_amplitudes, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
-        total_steady_state_displacement_amplitude=total_steady_state_displacement_amplitude, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
-        total_steady_state_velocity_amplitude=total_steady_state_velocity_amplitude, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
+        steady_state_displacement_amplitude=ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        steady_state_velocity_amplitude=ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        total_steady_state_displacement_amplitude=tot_ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
+        total_steady_state_velocity_amplitude=tot_ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
         solver=solver,
     )
 
