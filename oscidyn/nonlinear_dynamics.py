@@ -278,6 +278,21 @@ def _estimate_initial_conditions(
             ss_disp_amp.reshape(*batch_shape, model.n_modes),
             jnp.zeros((*batch_shape, model.n_modes))
         ], axis=-1)  # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, 2 * n_modes)
+        
+        import matplotlib.pyplot as plt
+        init_disp = initial_conditions[..., :model.n_modes]
+        disp_mode0 = init_disp[..., 0] # shape: (n_freq, n_amp)
+        plt.figure()
+        for j in range(disp_mode0.shape[1]):
+            plt.plot(driving_frequencies,
+                 disp_mode0[:, j],
+                 label=f"Amp={coarse_driving_amplitudes[j]:.3f}")
+        plt.xlabel("Driving frequency")
+        plt.ylabel("Initial displacement (mode 0)")
+        plt.title("Initial displacement vs. frequency for each amplitude")
+        plt.legend(title="Driving amplitude")
+        plt.grid(True)
+        plt.show()
 
         return initial_conditions
 
@@ -355,10 +370,8 @@ def _fine_sweep(
         ss_disp = ys[..., :n_modes]  # (n_sim, n_windows, n_steps, n_modes)
         ss_vel = ys[..., n_modes:]     # (n_sim, n_windows, n_steps, n_modes)
 
-        ss_disp_peak, ss_vel_peak = _get_steady_state_amplitudes(freq_flat, ts, ss_disp, ss_vel)
-    
-    print(ss_disp_peak.shape, ss_vel_peak.shape) # (n_sim, n_modes)
-
+        ss_disp_peak, ss_vel_peak = _get_steady_state_amplitudes(freq_flat, ts, ss_disp, ss_vel) # (n_sim, n_modes)
+        
     elapsed = time.time() - start_time
     sims_per_sec = n_simulations / elapsed
     sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
@@ -379,15 +392,20 @@ def frequency_sweep(
     
     if solver.n_time_steps is None:
         '''
-        The Nyquist theorem, also known as the Nyquist-Shannon sampling theorem, states that to accurately digitize an analog signal, 
-        it must be sampled at a rate at least twice the highest frequency component present in that signal.
+        ASSUMPTION: Minimum required sampling frequency for the steady state solver based on gpt prompt, should investigate
         '''
-        highest_frequency = const.MAXIMUM_ORDER_SUPERHARMONICS * driving_frequency * 2
-        n_steps = jnp.floor((t1 - t0) * highest_frequency * 1.1).astype(jnp.int32)
+        rtol = 0.001
+        max_driving_frequency = jnp.max(driving_frequencies)
+        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * max_driving_frequency
         
-        jax.debug.print("shape n_steps: {}", n_steps.shape)
-        return n_steps
-               
+        one_period = 2.0 * jnp.pi / max_frequency_component
+        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.01 # ASSUMPTION: 1.01 is a safety factor to ensure the sampling frequency is above the Nyquist rate
+        
+        n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+        solver.n_time_steps = n_time_steps
+
+        print("\n Automatically determined number of time steps for steady state solver:", n_time_steps)
+
     initial_conditions = _estimate_initial_conditions(
         model=model,
         driving_frequencies=driving_frequencies,

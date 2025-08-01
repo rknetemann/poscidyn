@@ -4,12 +4,22 @@ import jax.numpy as jnp
 import diffrax
 from functools import partial
 import numpy as np
+import os
 
 from .models import AbstractModel
 from . import constants as const 
 
 jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
+jax.config.update('jax_compiler_enable_remat_pass', True)
+
+os.environ['XLA_FLAGS'] = (
+    '--xla_gpu_triton_gemm_any=True '
+    '--xla_gpu_enable_latency_hiding_scheduler=true '
+)
+
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.9' 
+
 
 class AbstractSolver:
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
@@ -30,7 +40,7 @@ class AbstractSolver:
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
-            solver=diffrax.Kvaerno5(),
+            solver=diffrax.Tsit5(),
             t0=t0,
             t1=t1,
             dt0=None,
@@ -45,7 +55,7 @@ class AbstractSolver:
         return sol
 
 class FixedTimeSolver(AbstractSolver):
-    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = 2000,
+    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = None,
                  rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
 
         super().__init__(rtol, atol, max_steps)
@@ -69,12 +79,12 @@ class FixedTimeSolver(AbstractSolver):
         return ts, ys
     
 class FixedTimeSteadyStateSolver(AbstractSolver):
-    def __init__(self, t0: float = 0, n_time_steps: int = 2000, ss_tol:float = 1e-3,
+    def __init__(self, t0: float = 0, n_time_steps: int = None, ss_tol:float = 1e-3,
                  rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
         
         super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
         self.t0 = t0
-        self.n_time_steps = n_time_steps
+        self.n_time_steps = n_time_steps # Can be None, in which case it will be calculated based on the driving frequency 
         
         self.ss_tol = ss_tol
         

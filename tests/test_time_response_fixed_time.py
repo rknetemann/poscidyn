@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import oscidyn
 
 N_MODES = 1
-DRIVING_FREQUENCY = 1.6
+DRIVING_FREQUENCY = 1.356
 DRIVING_AMPLITUDE = 1.0  # Shape: (N_MODES,)
 INITIAL_DISPLACEMENT = np.array([0.0]) # Shape: (N_MODES,)
 INITIAL_VELOCITY = np.array([0.0]) # Shape: (N_MODES,)
@@ -20,23 +20,23 @@ t_end = np.max(tau_d)
 print("Calculated t_end:", t_end)
 
 
-# time_response_standard = oscidyn.time_response(
-#     model = MODEL,
-#     driving_frequency = DRIVING_FREQUENCY,
-#     driving_amplitude = DRIVING_AMPLITUDE,
-#     initial_displacement= INITIAL_DISPLACEMENT,
-#     initial_velocity = INITIAL_VELOCITY,
-#     solver = oscidyn.FixedTimeSolver(t1=250, n_time_steps=10_000, max_steps=1_000_000),
-# )
-
 time_response_standard = oscidyn.time_response(
     model = MODEL,
     driving_frequency = DRIVING_FREQUENCY,
     driving_amplitude = DRIVING_AMPLITUDE,
     initial_displacement= INITIAL_DISPLACEMENT,
     initial_velocity = INITIAL_VELOCITY,
-    solver = oscidyn.FixedTimeSteadyStateSolver(n_time_steps=500, max_steps=4_096*100),
+    solver = oscidyn.FixedTimeSolver(t1=250, n_time_steps=10_000, max_steps=1_000_000),
 )
+
+# time_response_standard = oscidyn.time_response(
+#     model = MODEL,
+#     driving_frequency = DRIVING_FREQUENCY,
+#     driving_amplitude = DRIVING_AMPLITUDE,
+#     initial_displacement= INITIAL_DISPLACEMENT,
+#     initial_velocity = INITIAL_VELOCITY,
+#     solver = oscidyn.FixedTimeSteadyStateSolver(n_time_steps=500, max_steps=4_096*100),
+# )
 
 time_standard, displacements_standard, velocities_standard = time_response_standard
 total_displacement_standard = displacements_standard.sum(axis=1)  # Sum across modes
