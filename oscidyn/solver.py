@@ -18,7 +18,7 @@ os.environ['XLA_FLAGS'] = (
     '--xla_gpu_enable_latency_hiding_scheduler=true '
 )
 
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.85' 
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.9' 
 
 
 class AbstractSolver:
@@ -62,7 +62,6 @@ class FixedTimeSolver(AbstractSolver):
         self.t0 = t0
         self.t1 = t1
         self.n_time_steps = n_time_steps
-        self.ts = jnp.linspace(t0, t1, n_time_steps)
 
     def __call__(self, model: AbstractModel, 
               driving_frequency: jax.Array, 
@@ -70,6 +69,8 @@ class FixedTimeSolver(AbstractSolver):
               initial_condition: jax.Array,
               response: const.ResponseType
               ):
+
+        self.ts = jnp.linspace(self.t0, self.t1, self.n_time_steps)
 
         sol = self.solve(model=model, t0=self.t0, t1=self.t1, ts=self.ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
@@ -115,9 +116,9 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         t_steady_state = self._calculate_t_steady_state(model, driving_frequency).reshape(())
         t_window = self._calculate_t_window(model, driving_frequency, t_steady_state)
         t1 = t_steady_state + t_window
-        ts = jnp.linspace(t_steady_state, t1, self.n_time_steps)
+        self.ts = jnp.linspace(t_steady_state, t1, self.n_time_steps)
 
-        sol = self.solve(model=model, t0=self.t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        sol = self.solve(model=model, t0=self.t0, t1=t1, ts=self.ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)
@@ -141,7 +142,7 @@ class SteadyStateSolver(AbstractSolver):
               initial_condition:  jax.Array, # Shape: (2 * n_modes,) # TO DO: Initial conditions not yet used
               response: const.ResponseType
               ):
-
+        
         if response == const.ResponseType.FrequencyResponse:
             windows_to_save = 1
         elif response == const.ResponseType.TimeResponse:
@@ -173,7 +174,7 @@ class SteadyStateSolver(AbstractSolver):
             t1 = t0 + solve_window
             y0 = ys[previous_window_idx, -1]
 
-            sol = self.solve(model=model, t0=t0, t1=t1, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+            sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
             ts_window = sol.ts # Shape: (n_steps_window,)
             ys_window = sol.ys # Shape: (n_steps_window, state_dim)

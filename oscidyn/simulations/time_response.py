@@ -25,6 +25,21 @@ def time_response(
         raise ValueError(f"Model has {model.n_modes} modes, but initial displacement has shape {initial_displacement.shape}. It should have shape ({model.n_modes},).")
     if model.n_modes != initial_velocity.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
+    
+    if solver.n_time_steps is None:
+        '''
+        ASSUMPTION: Minimum required sampling frequency for the steady state solver based on gpt prompt, should investigate
+        '''
+        rtol = 0.001
+        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * driving_frequency
+        
+        one_period = 2.0 * jnp.pi / max_frequency_component
+        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
+        
+        n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+        solver.n_time_steps = n_time_steps
+
+        print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
 
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
