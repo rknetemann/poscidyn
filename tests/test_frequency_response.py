@@ -11,7 +11,7 @@ import oscidyn
 
 N_MODES = 1
 MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
-DRIVING_FREQUENCY = jnp.linspace(0.1, 2.2, 300) # Shape: (n_driving_frequencies,)
+DRIVING_FREQUENCY = jnp.linspace(0.1, 3.0, 300) # Shape: (n_driving_frequencies,)
 DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 30)  # Shape: (n_driving_amplitudes,)
 
 # frequency_sweep = oscidyn.frequency_sweep(
@@ -22,16 +22,14 @@ DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 30)  # Shape: (n_driving_amplitudes,
 #     solver = oscidyn.SteadyStateSolver(ss_rtol=1e-2, ss_atol=1e-6, n_time_steps=500, max_windows=100, max_steps=4096),
 # )
 
-with jax.profiler.trace("/tmp/profile-data"):
-    frequency_sweep = oscidyn.frequency_sweep(
-        model = MODEL,
-        sweep_direction = oscidyn.SweepDirection.FORWARD,
-        driving_frequencies = DRIVING_FREQUENCY,
-        driving_amplitudes = DRIVING_AMPLITUDE,
-        solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096*20),
-    )
+frequency_sweep = oscidyn.frequency_sweep(
+    model = MODEL,
+    sweep_direction = oscidyn.SweepDirection.FORWARD,
+    driving_frequencies = DRIVING_FREQUENCY,
+    driving_amplitudes = DRIVING_AMPLITUDE,
+    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4096),
+)
 
-jax.profiler.save_device_memory_profile("memory.prof")
 
 n_f = DRIVING_FREQUENCY.shape[0]
 n_a = DRIVING_AMPLITUDE.shape[0]

@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 
 from oscidyn.models import AbstractModel
-from oscidyn.solver import AbstractSolver, FixedTimeSolver, SteadyStateSolver
+from oscidyn.solver import AbstractSolver,SteadyStateSolver
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
 import time
@@ -150,7 +150,7 @@ def _estimate_initial_conditions(
             jnp.min(driving_amplitudes), jnp.max(driving_amplitudes), const.N_COARSE_DRIVING_AMPLITUDES
         ) # Shape: (N_COARSE_DRIVING_AMPLITUDES,)
 
-        max_displacement = 1.0 # TO DO: Determine the max amplitude based on the model or a fixed value
+        max_displacement = 20.0 # TO DO: Determine the max amplitude based on the model or a fixed value
         coarse_initial_displacement = jnp.linspace(
             0.01, max_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
         ) # Shape: (N_COARSE_INITIAL_DISPLACEMENTS,)
@@ -197,22 +197,29 @@ def _estimate_initial_conditions(
             n_sim, n_windows, n_steps, _ = ys.shape
             n_modes = model.n_modes
 
-            ts, ys = sol
+            disp = ys[..., :n_modes]         # (n_sim, n_windows, n_steps, n_modes)
+            vel  = ys[..., n_modes:]         # (n_sim, n_windows, n_steps, n_modes)
 
-            disp = ys[..., :n_modes] # (n_sim, n_windows, n_steps, n_modes)
-            vel  = ys[..., n_modes:] # (n_sim, n_windows, n_steps, n_modes)
+            # ------------------------------------------------------------------
+            # 2.  Build a mask that is True on samples that actually contain data
+            #     (all‑zero windows produced by SteadyStateSolver are ignored)
+            # ------------------------------------------------------------------
+            sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1)      # (n_sim, n_windows, n_steps)
+            sample_mask = sample_mask[..., None]                 # broadcast over modes
 
-            sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1) # (n_sim, n_windows, n_steps)
-            sample_mask = sample_mask[..., None] # broadcast over modes
-
+            # ------------------------------------------------------------------
+            # 3.  Peak amplitudes = max |·| over (windows, time) of *valid* samples
+            # ------------------------------------------------------------------
             disp_peak = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0),
                                 axis=(1, 2))                     # (n_sim, n_modes)
             vel_peak  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0),
                                 axis=(1, 2))                     # (n_sim, n_modes)
 
-            # TO DO: Implement RMS alternative
-            disp_amp = disp_peak
-            vel_amp    = vel_peak
+            # ------------------------------------------------------------------
+            # 4.  Use the names expected further below
+            # ------------------------------------------------------------------
+            displacements = disp_peak
+            velocities    = vel_peak
         else:
             start_time = time.time()
             ts, ys = jax.vmap(solve_case)(
@@ -237,19 +244,19 @@ def _estimate_initial_conditions(
 
             displacements, velocities = _get_steady_state_amplitudes(
                 coarse_driving_frequencies_flat,
-                ts,
-                disp,
-                vel
+                time_flat,
+                steady_state_displacements_flat,
+                steady_state_velocities_flat
             ) # Shape: (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        steady_state_displacement_amplitudes = disp_amp.reshape(
+        steady_state_displacement_amplitudes = displacements.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             model.n_modes
         ) # Shape: (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
 
-        steady_state_velocity_amplitudes  = vel_amp.reshape(
+        steady_state_velocity_amplitudes  = velocities.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS,

@@ -175,8 +175,8 @@ class SteadyStateSolver(AbstractSolver):
 
             sol = self.solve(model=model, t0=t0, t1=t1, y0=y0, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
-            ts_window = sol.ts # (n_steps_window,)
-            ys_window = sol.ys # (n_steps_window, state_dim)
+            ts_window = sol.ts # Shape: (n_steps_window,)
+            ys_window = sol.ys # Shape: (n_steps_window, state_dim)
 
             prev_rms = rms
             prev_max = max
@@ -191,11 +191,10 @@ class SteadyStateSolver(AbstractSolver):
             return ts, ys, rms, max, prev_rms, prev_max, win_idx
         
         # Keep solving solve_windows() until we reach steady state or hit max_windows
-        (ts, ys, _rms, max, _prev_rms, _prev_max, n_windows) = jax.lax.while_loop(self._steady_state_cond, solve_windows, init_window)       
-
+        (ts, ys, _rms, max, _prev_rms, _prev_max, _n_windows) = jax.lax.while_loop(self._steady_state_cond, solve_windows, init_window)       
         return ts, ys
-
-
+        
+        
     @partial(jax.jit, static_argnames=['self'])
     def _steady_state_cond(self, window):
         (_ts, _ys, rms, max, prev_rms, prev_max, win_idx) = window          
