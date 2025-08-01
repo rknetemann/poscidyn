@@ -101,7 +101,7 @@ def _estimate_initial_conditions(
             jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
         ) # Shape: (N_COARSE_DRIVING_AMPLITUDES,)
 
-        max_displacement = 1.0 # TO DO: Determine the max amplitude based on the model or a fixed value
+        max_displacement = 20.0 # TO DO: Determine the max amplitude based on the model or a fixed value
         coarse_initial_displacement = jnp.linspace(
             0.01, max_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
         ) # Shape: (N_COARSE_INITIAL_DISPLACEMENTS,)

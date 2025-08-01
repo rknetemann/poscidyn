@@ -11,7 +11,7 @@ import oscidyn
 
 N_MODES = 1
 MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
-DRIVING_FREQUENCY = jnp.linspace(0.1, 2.2, 300) # Shape: (n_driving_frequencies,)
+DRIVING_FREQUENCY = jnp.linspace(0.1, 3.0, 300) # Shape: (n_driving_frequencies,)
 DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 30)  # Shape: (n_driving_amplitudes,)
 
 frequency_sweep = oscidyn.frequency_sweep(
