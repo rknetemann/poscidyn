@@ -47,7 +47,7 @@ class AbstractSolver:
             max_steps=self.max_steps,
             y0=y0,
             throw=False,
-            #progress_meter=diffrax.TqdmProgressMeter(),
+            progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=ts),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_frequency, driving_amplitude),

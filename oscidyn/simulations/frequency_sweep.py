@@ -48,7 +48,7 @@ def _explore_branches(
     ) -> Tuple[jax.Array, jax.Array]:
         
         n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
-        * const.N_COARSE_INITIAL_DISPLACEMENTS 
+        * const.N_COARSE_INITIAL_DISPLACEMENTS * const.N_COARSE_INITIAL_VELOCITIES
         n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
         print("\nBasin exploration:")
         print(f"-> running {n_simulations_formatted} simulations in parallel...")
@@ -62,29 +62,35 @@ def _explore_branches(
             jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
         ) # (N_COARSE_DRIVING_AMPLITUDES,)
 
-        max_displacement = 20.0 # TO DO: Determine the max amplitude based on the model or a fixed value
+        max_abs_displacement = 10.0 # TO DO: Determine the max amplitude based on the model or a fixed value
         coarse_init_disp = jnp.linspace(
-            0.01, max_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
+            -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
         ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
+        
+        max_abs_velocity = 1000.0 # TO DO: Determine the max velocity based on the model or a fixed value
+        coarse_init_vel = jnp.linspace(
+            -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
+        ) # (N_COARSE_INITIAL_VELOCITIES,)
 
-        coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh = jnp.meshgrid(
-            coarse_drive_freq, coarse_drive_amp, coarse_init_disp, indexing="ij"
-        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS)
+        coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
+            coarse_drive_freq, coarse_drive_amp, coarse_init_disp, coarse_init_vel, indexing="ij"
+        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES)
 
         coarse_drive_freq_flat = coarse_drive_freq_mesh.ravel()
         coarse_drive_amp_flat = coarse_drive_amp_mesh.ravel()
         coarse_init_disp_flat = coarse_init_disp_mesh.ravel()
+        coarse_init_vel_flat = coarse_init_vel_mesh.ravel()
         # (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS)
         
         @jax.jit
-        def solve_case(drive_freq, drive_amp, init_disp):
+        def solve_case(drive_freq, drive_amp, init_disp, init_vel):
             init_disp = jnp.full((model.n_modes,), init_disp)
-            init_vel = jnp.zeros((model.n_modes,))
+            init_vel = jnp.full((model.n_modes,), init_vel)
             init_cond = jnp.concatenate([init_disp, init_vel])
 
-            return solver(model, drive_freq, drive_amp, init_cond, const.ResponseType.FrequencyResponse)    
-        
-        sol = jax.vmap(solve_case)( coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat)
+            return solver(model, drive_freq, drive_amp, init_cond, const.ResponseType.FrequencyResponse)
+
+        sol = jax.vmap(solve_case)(coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat)
 
         if isinstance(solver, SteadyStateSolver):
             ts, ys = sol
@@ -95,8 +101,15 @@ def _explore_branches(
             sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1) # (n_sim, n_windows, n_steps)
             sample_mask = sample_mask[..., None] # broadcast over modes
 
+            # Steady state displacement amplitude, has a corresponding velocity at that time
             ss_disp_amp_mdir = jnp.max(jnp.where(sample_mask, jnp.abs(disp), 0.0), axis=(1, 2)) # (n_sim, n_modes)
+            corres_ss_disp_amp_time_mdir = 
+            corres_ss_vel_mdir = 
+            
+            # Steady state velocity amplitude, has a corresponding displacement at that time
             ss_vel_amp_mdir  = jnp.max(jnp.where(sample_mask, jnp.abs(vel),  0.0), axis=(1, 2)) # (n_sim, n_modes)
+            corres_ss_vel_amp_time_mdir =
+            corres_ss_disp_mdir =
         else:
             ts, ys = sol
 
@@ -109,120 +122,145 @@ def _explore_branches(
                 time_flat,
                 steady_state_displacements_flat,
                 steady_state_velocities_flat
-            ) # (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
+            ) # (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS * N_COARSE_INITIAL_VELOCITIES, n_modes)
 
         ss_disp_amp_mdir = ss_disp_amp_mdir.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
+            const.N_COARSE_INITIAL_VELOCITIES,
             model.n_modes
-        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
+        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
 
-        ss_disp_vel_mdir = ss_vel_amp_mdir.reshape(
+        ss_vel_amp_mdir = ss_vel_amp_mdir.reshape(
             const.N_COARSE_DRIVING_FREQUENCIES, 
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS,
+            const.N_COARSE_INITIAL_VELOCITIES,
             model.n_modes
-        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, n_modes)
+        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
 
         elapsed = time.time() - start_time
         sims_per_sec = n_simulations / elapsed
         sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
         print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
 
-        return ss_disp_amp_mdir, ss_disp_vel_mdir
+        return ss_disp_amp_mdir, corres_ss_vel_mdir_, corres_ss_disp_amp_time_mdir, ss_vel_amp_mdir, corres_ss_disp_mdir, corres_ss_vel_amp_time_mdir
     
 def _select_branches(
     model: AbstractModel,
-    drive_freq: jax.Array,                         # (n_fine_freq,)
-    coarse_drive_freq: jax.Array,                  # (n_coarse_freq,)
-    ss_disp_amp: jax.Array,                        # (n_coarse_freq, n_amp, n_init, n_modes)
-    ss_vel_amp:  jax.Array,                        # (n_coarse_freq, n_amp, n_init, n_modes)
+    drive_freq: jax.Array,              # (n_fine_freq,)
+    coarse_drive_freq: jax.Array,       # (n_coarse_freq,)
+    ss_disp_amp: jax.Array,             # (n_coarse_freq, n_amp, *n_init_axes, n_modes)
+    ss_vel_amp:  jax.Array,             # (n_coarse_freq, n_amp, *n_init_axes, n_modes)
     sweep_direction: SweepDirection,
 ) -> tuple[jax.Array, jax.Array]:
     """
-    Pick the branch that would be traced during an *actual* frequency sweep.
+    Identify the branch that would be followed during an *actual*
+    frequency sweep and interpolate it onto the user-specified
+    frequency grid ``drive_freq``.
 
-    Steps
-    -----
-    1.  Choose a starting solution at the first frequency point
-        ( small-amplitude solution for a forward sweep, large-amplitude for backward).
-    2.  Walk through the remaining coarse frequencies in sweep order and,
-        at every step, choose the *closest* solution (in combined
-        displacement + velocity amplitude space) to the one selected
-        at the previous frequency.
-    3.  Interpolate the resulting coarse branch onto the user-specified
-        frequency grid ``drive_freq``.
+    The function now supports an arbitrary number of initial-condition
+    axes (e.g. initial displacement *and* initial velocity).  All of
+    those axes are flattened into one before the path-following logic.
+
+    Returns
+    -------
+    disp_fine, vel_fine : jax.Array
+        Both of shape (n_fine_freq, n_amp, n_modes)
     """
 
-    # ---------- Convenience: move to NumPy for tiny loops -----------
-    disp_np = np.asarray(ss_disp_amp)              # shape (Nc, Na, Ni, Nm)
+    # -----------------------------------------------------------------
+    # 1.  Convert to NumPy *once* (tiny loops are easier in NumPy)
+    # -----------------------------------------------------------------
+    disp_np = np.asarray(ss_disp_amp)
     vel_np  = np.asarray(ss_vel_amp)
 
-    n_freq_c, n_amp, n_init, n_modes = disp_np.shape
+    # -----------------------------------------------------------------
+    # 2.  Flatten every initial-condition axis into ONE
+    #     -------------------------------------------------------------
+    #     Shapes before  : (Nc, Na, *Ninit_axes, Nm)
+    #     Shapes after   : (Nc, Na, Ninit_flat,   Nm)
+    # -----------------------------------------------------------------
+    if disp_np.ndim < 4:                                  # freq, amp, init, mode
+        raise ValueError(
+            "ss_disp_amp must have at least 4 dimensions "
+            "(freq, amp, init-condition, mode)"
+        )
+
+    n_freq_c, n_amp, *init_axes, n_modes = disp_np.shape
+    n_init_flat = int(np.prod(init_axes))                 # product of all init axes
+
+    disp_np = disp_np.reshape(n_freq_c, n_amp, n_init_flat, n_modes)
+    vel_np  = vel_np.reshape(n_freq_c, n_amp, n_init_flat, n_modes)
+
+    # -----------------------------------------------------------------
+    # 3.  Allocate arrays for the selected branch on the coarse grid
+    # -----------------------------------------------------------------
     disp_branch = np.empty((n_freq_c, n_amp, n_modes), dtype=disp_np.dtype)
     vel_branch  = np.empty_like(disp_branch)
 
-    # -------- Sweep order (ascending ↔ descending) -------------------
+    # -----------------------------------------------------------------
+    # 4.  Determine sweep order and “start-rule”
+    # -----------------------------------------------------------------
     if sweep_direction is SweepDirection.FORWARD:
-        freq_order = range(n_freq_c)               # 0 → Nc-1
-        start_rule = np.argmin                     # smallest amplitude solution
+        freq_order = range(n_freq_c)          # 0 → Nc-1
+        start_rule = np.argmin               # smallest-amplitude solution
     else:
-        freq_order = range(n_freq_c - 1, -1, -1)   # Nc-1 → 0
-        start_rule = np.argmax                     # largest amplitude solution
+        freq_order = range(n_freq_c - 1, -1, -1)  # Nc-1 → 0
+        start_rule = np.argmax                    # largest-amplitude solution
 
     first_fi = freq_order[0]
 
-    # -------- Pick the starting branch at the first frequency -------
-    # Use L2-norm of displacement amplitudes as a proxy magnitude
+    # -----------------------------------------------------------------
+    # 5.  Pick the starting branch at the first frequency
+    # -----------------------------------------------------------------
+    #     Use the L2-norm of displacement amplitudes as a magnitude proxy
     start_idx = start_rule(
-        np.linalg.norm(disp_np[first_fi], axis=-1), axis=-1    # → shape (n_amp,)
-    )                                                          # index along Ni
-
-    # Record the pick
+        np.linalg.norm(disp_np[first_fi], axis=-1), axis=-1     # → (n_amp,)
+    )                                                          # along Ninit_flat
+    breakpoint()
     for j in range(n_amp):
         disp_branch[first_fi, j] = disp_np[first_fi, j, start_idx[j]]
         vel_branch [first_fi, j] = vel_np [first_fi, j, start_idx[j]]
 
-    # -------- Path-follow for the remaining frequencies -------------
+    # -----------------------------------------------------------------
+    # 6.  Path-follow for all remaining coarse frequencies
+    # -----------------------------------------------------------------
     prev_fi = first_fi
     for fi in list(freq_order)[1:]:
         for j in range(n_amp):
-            # State at previous frequency (flatten disp|vel for distance calc)
             prev_state = np.concatenate(
                 [disp_branch[prev_fi, j], vel_branch[prev_fi, j]]
-            )                                            # (2*Nm,)
+            )                                               # (2*Nm,)
 
-            # States at *current* frequency for every initial condition
             cur_states = np.concatenate(
-                [disp_np[fi, j], vel_np[fi, j]], axis=-1 # (Ni, 2*Nm)
+                [disp_np[fi, j], vel_np[fi, j]], axis=-1    # (Ninit_flat, 2*Nm)
             )
 
-            # Euclidean distance in combined space
-            idx_sel = int(np.argmin(np.linalg.norm(cur_states - prev_state, axis=-1)))
+            idx_sel = int(
+                np.argmin(np.linalg.norm(cur_states - prev_state, axis=-1))
+            )
             disp_branch[fi, j] = disp_np[fi, j, idx_sel]
             vel_branch [fi, j] = vel_np [fi, j, idx_sel]
 
         prev_fi = fi
 
-    # Back to JAX
-    disp_branch_jax = jnp.asarray(disp_branch)      # (Nc, Na, Nm)
+    # -----------------------------------------------------------------
+    # 7.  Convert back to JAX and interpolate to the *fine* grid
+    # -----------------------------------------------------------------
+    disp_branch_jax = jnp.asarray(disp_branch)               # (Nc, Na, Nm)
     vel_branch_jax  = jnp.asarray(vel_branch)
 
-    # -----------------------------------------------------------------
-    #  Interpolate from the *coarse* frequency grid to the user grid
-    # -----------------------------------------------------------------
     def _interp_over_freq(coarse_arr: jax.Array) -> jax.Array:
         """
-        coarse_arr: (Nc, Na, Nm)  →  (Nfine, Na, Nm)
-        Vectorised over (amp, mode) with jnp.interp.
+        coarse_arr : (Nc, Na, Nm) → (Nfine, Na, Nm)
         """
         Nc, Na, Nm = coarse_arr.shape
-        # Flatten (amp, mode) so we can vmap a 1-D interp
-        flat      = coarse_arr.transpose(1, 2, 0).reshape(-1, Nc)    # (Na*Nm, Nc)
+        flat      = coarse_arr.transpose(1, 2, 0).reshape(-1, Nc)   # (Na*Nm, Nc)
         interp_fn = jax.vmap(lambda y: jnp.interp(drive_freq, coarse_drive_freq, y))
-        flat_fine = interp_fn(flat)                                  # (Na*Nm, Nfine)
-        return flat_fine.reshape(Na, Nm, -1).transpose(2, 0, 1)      # (Nfine, Na, Nm)
+        flat_fine = interp_fn(flat)                                 # (Na*Nm, Nfine)
+        return flat_fine.reshape(Na, Nm, -1).transpose(2, 0, 1)     # (Nfine, Na, Nm)
 
     disp_fine = _interp_over_freq(disp_branch_jax)   # (Nfine, Na, Nm)
     vel_fine  = _interp_over_freq(vel_branch_jax)
