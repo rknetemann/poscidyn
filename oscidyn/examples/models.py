@@ -114,4 +114,47 @@ class NonlinearOscillator(AbstractModel):
             omega_ref=omega_ref,
             x_ref=x_ref,
         )
+        
+class DuffingOscillator(AbstractModel):
+    omega_ref: float
+    x_ref: float
+    
+    Q: jax.Array  # Shape: (n_modes,)
+    gamma_hat: jax.Array  # Shape: (n_modes,)
+    
+    def rhs(self, tau, state, args):
+        q, v = jnp.split(state, 2)
+        F_omega_hat_arg, F_amp_hat_arg = args
+        F_omega_hat_arg = jnp.asarray(F_omega_hat_arg).reshape(())
+        F_amp_hat_arg = jnp.asarray(F_amp_hat_arg).reshape(())
+        
+        damping_term = (self.omega_ref / self.Q) * v  # Shape: (n_modes,)
+       
+        duffing_term = self.gamma_hat * q**3  # Shape: (n_modes,)
+
+        forcing_term = jnp.zeros((self.n_modes,))
+        forcing_term = forcing_term.at[:1].set(
+            F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
+        )
+
+        a = -damping_term - duffing_term + forcing_term  # Shape: (n_modes,)
+        return jnp.concatenate([v, a])  # Shape: (2 * n_modes,)
+    
+    @classmethod
+    def from_example(cls, n_modes: int) -> DuffingOscillator:
+        if n_modes == 1:
+            omega_ref = 1.0
+            x_ref = 1.0
+            Q = jnp.array([10.0])
+            eta_hat = jnp.array([0.005])
+        else:
+            raise ValueError("Example not found for n_modes={n_modes}.")
+        
+        return cls(
+            n_modes=n_modes,
+            Q=Q,
+            eta_hat=eta_hat,
+            omega_ref=omega_ref,
+            x_ref=x_ref,
+        )
 
