@@ -181,7 +181,6 @@ def _explore_branches(
     freq_target = freq_vals[freq_idx]
     mask = freq_vals == freq_target
 
-    plt.legend()
     plt.xlabel('Driving frequency')
     plt.ylabel('Max steady‐state displacement (mode 0)')
     plt.tight_layout()
@@ -236,22 +235,17 @@ def _select_branches(
         y0     = y_ord[0, idx0]
         t0     = t_ord[0, idx0]
 
-        breakpoint()
-
         def _step(prev_y, xy):
             t_cur, y_cur = xy
             dist  = jnp.sum((y_cur - prev_y) ** 2, axis=-1)
             idx   = jnp.argmin(dist)
             y_sel = y_cur[idx]
             t_sel = t_cur[idx]
-            breakpoint()
             return y_sel, (t_sel, y_sel)
 
         _, (t_rest, y_rest) = jax.lax.scan(_step, y0, (t_ord[1:], y_ord[1:]))
         t_sel_ord = jnp.concatenate((t0[None, :], t_rest), axis=0)
         y_sel_ord = jnp.concatenate((y0[None, :], y_rest), axis=0)
-
-        breakpoint()
 
         t_sel = jax.lax.cond(is_fwd, lambda _: t_sel_ord, lambda _: t_sel_ord[::-1], operand=None)
         y_sel = jax.lax.cond(is_fwd, lambda _: y_sel_ord, lambda _: y_sel_ord[::-1], operand=None)
@@ -272,7 +266,7 @@ def _fine_sweep(
     
     n_simulations = driving_frequencies.shape[0] * driving_amplitudes.shape[0]
     n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
-    print("\Fine sweep:")
+    print("\nFine sweep:")
     print(f"-> running {n_simulations_formatted} simulations in parallel...")
     start_time = time.time()
 
@@ -281,10 +275,34 @@ def _fine_sweep(
     n_freq   = driving_frequencies.shape[0]
     n_amp    = driving_amplitudes.shape[0]
 
-    # coarse ➜ fine interpolation of initial conditions (bilinear)
-    y_init_fine = jax.image.resize(
-        y_max_disp, (n_freq, n_amp, n_state), method="linear"
-    )
+    # coarse ➜ fine polynomial fit of initial conditions
+    deg = 3  # polynomial degree in each variable
+    # define coarse grid coordinates
+    f_coarse = jnp.linspace(jnp.min(driving_frequencies),
+                            jnp.max(driving_frequencies),
+                            y_max_disp.shape[0])
+    a_coarse = jnp.linspace(jnp.min(driving_amplitudes),
+                            jnp.max(driving_amplitudes),
+                            y_max_disp.shape[1])
+    F_c, A_c = jnp.meshgrid(f_coarse, a_coarse, indexing="ij")
+    # flatten coarse data
+    F_flat = F_c.ravel()
+    A_flat = A_c.ravel()
+    Y_flat = y_max_disp.reshape(-1, n_state)  # (n_coarse_freq * n_coarse_amp, n_state)
+
+    # build design matrix using all monomials f^i * a^j with i+j <= deg
+    powers = [(i, j) for i in range(deg+1) for j in range(deg+1-i)]
+    X = jnp.stack([ (F_flat**i) * (A_flat**j) for (i, j) in powers ], axis=1)
+    # solve least-squares for each state dimension
+    coeffs, *_ = jnp.linalg.lstsq(X, Y_flat, rcond=None)  # (n_monomials, n_state)
+
+    # evaluate polynomial on fine grid
+    F_f, A_f = jnp.meshgrid(driving_frequencies, driving_amplitudes, indexing="ij")
+    Ff_flat = F_f.ravel()
+    Af_flat = A_f.ravel()
+    X_fine = jnp.stack([ (Ff_flat**i) * (Af_flat**j) for (i, j) in powers ], axis=1)
+    y_init_flat = X_fine @ coeffs  # (n_freq*n_amp, n_state)
+    y_init_fine = y_init_flat.reshape(n_freq, n_amp, n_state)
 
     # build simulation grid
     freq_mesh, amp_mesh = jnp.meshgrid(
@@ -366,15 +384,19 @@ def frequency_sweep(
     coarse_drive_amp = jnp.linspace(jnp.min(driving_amplitudes), jnp.max(driving_amplitudes), ss_disp_amp.shape[1]) # (n_coarse_amp,)
 
     import matplotlib.pyplot as plt
-    # extract coarse‐grid velocity amplitudes as well
-    ss_vel_amp = y_max_disp[..., model.n_modes:]   # (n_coarse_freq, n_coarse_amp, n_modes)
 
-    # now plot displacement vs coarse‐grid frequency for each amplitude
+    # number of coarse amplitudes
+    n_a = coarse_drive_amp.shape[0]
+
+    # generate a reversed gray‐scale palette from light to dark
+    gray_colors = plt.cm.gray(np.linspace(0.1, 0.9, n_a))[::-1]
+
     fig, ax = plt.subplots()
-    for ia in range(ss_disp_amp.shape[1]):
-        # pick mode 0 or sum over modes if desired
-        disp_curve = ss_disp_amp[:, ia, 0]  
-        ax.plot(coarse_drive_freq, disp_curve, label=f"A={coarse_drive_amp[ia]:.2f}")
+    for ia, amp in enumerate(coarse_drive_amp):
+        color = gray_colors[ia]
+        # steady‐state displacement amplitude for mode 0 at this amplitude
+        disp_curve = ss_disp_amp[:, ia, 0]
+        ax.plot(coarse_drive_freq, disp_curve, color=color, label=f"A={amp:.2f}")
 
     ax.set_xlabel("Driving frequency")
     ax.set_ylabel("Steady‐state displacement amplitude (mode 0)")
