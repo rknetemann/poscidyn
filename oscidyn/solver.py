@@ -55,24 +55,27 @@ class AbstractSolver:
         return sol
 
 class FixedTimeSolver(AbstractSolver):
-    def __init__(self, t1: float, t0: float = 0, n_time_steps: int = None,
+    def __init__(self, duration: float, n_time_steps: int = None,
                  rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
 
         super().__init__(rtol, atol, max_steps)
-        self.t0 = t0
-        self.t1 = t1
+        self.duration = duration
         self.n_time_steps = n_time_steps
 
     def __call__(self, model: AbstractModel, 
               driving_frequency: jax.Array, 
               driving_amplitude: jax.Array, 
               initial_condition: jax.Array,
-              response: const.ResponseType
+              response: const.ResponseType,
+              time_shift: float = 0.0,
               ):
+        
+        t0 = 0.0 + time_shift
+        t1 = t0 + self.duration
 
-        self.ts = jnp.linspace(self.t0, self.t1, self.n_time_steps)
+        ts = jnp.linspace(t0, t1, self.n_time_steps)
 
-        sol = self.solve(model=model, t0=self.t0, t1=self.t1, ts=self.ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)
@@ -80,11 +83,10 @@ class FixedTimeSolver(AbstractSolver):
         return ts, ys
     
 class FixedTimeSteadyStateSolver(AbstractSolver):
-    def __init__(self, t0: float = 0, n_time_steps: int = None, ss_tol:float = 1e-3,
+    def __init__(self, n_time_steps: int = None, ss_tol:float = 1e-3,
                  rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
         
         super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
-        self.t0 = t0
         self.n_time_steps = n_time_steps # Can be None, in which case it will be calculated based on the driving frequency 
         
         self.ss_tol = ss_tol
@@ -97,28 +99,30 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - (1/model.Q)**2) / jnp.max(driving_frequency)) * 1.4
 
         three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
-        t_steady_state = (tau_d + three_periods).astype(jnp.float32) 
+        t_steady_state = (tau_d + three_periods).astype(jnp.float32)  * 1.5 # Add a safety factor of 1.2 to ensure we cover the steady state period
         
         return t_steady_state
 
     def _calculate_t_window(self, model: AbstractModel, driving_frequency, t_steady_state) -> jax.Array:
-        t_window = const.MAXIMUM_ORDER_SUBHARMONICS * (2 * jnp.pi / jnp.max(driving_frequency))
-        
+        t_window = const.MAXIMUM_ORDER_SUBHARMONICS * (2 * jnp.pi / jnp.max(driving_frequency)) * 2.0  # Add a safety factor of 1.2 to ensure we cover the window period
+         
         return t_window
 
     def __call__(self, model: AbstractModel, 
               driving_frequency: jax.Array, 
               driving_amplitude: jax.Array, 
               initial_condition: jax.Array,
-              response: const.ResponseType
+              response: const.ResponseType,
+              time_shift: float = 0.0,
               ):
 
         t_steady_state = self._calculate_t_steady_state(model, driving_frequency).reshape(())
-        t_window = self._calculate_t_window(model, driving_frequency, t_steady_state)
-        t1 = t_steady_state + t_window
-        self.ts = jnp.linspace(t_steady_state, t1, self.n_time_steps)
+        t_window = self._calculate_t_window(model, driving_frequency, t_steady_state) 
+        t0 = 0.0 + time_shift
+        t1 = t_steady_state + t_window + time_shift
+        ts = jnp.linspace(t_steady_state + time_shift, t1, self.n_time_steps)
 
-        sol = self.solve(model=model, t0=self.t0, t1=t1, ts=self.ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)
@@ -140,7 +144,8 @@ class SteadyStateSolver(AbstractSolver):
               driving_frequency: jax.Array, # Shape: (1,)
               driving_amplitude:  jax.Array, # Shape: (n_modes,)
               initial_condition:  jax.Array, # Shape: (2 * n_modes,) # TO DO: Initial conditions not yet used
-              response: const.ResponseType
+              response: const.ResponseType,
+              time_shift: float = 0.0, # TO DO: Not yet used
               ):
         
         if response == const.ResponseType.FrequencyResponse:

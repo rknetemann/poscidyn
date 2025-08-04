@@ -43,7 +43,6 @@ class NonlinearOscillator(AbstractModel):
             F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
         )
 
-        
         a = (
             - damping_term
             - nonlinear_damping_term
