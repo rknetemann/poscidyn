@@ -10,6 +10,7 @@ from oscidyn.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStat
 from oscidyn.constants import SweepDirection
 from oscidyn.results import FrequencySweepResult
 import time
+from mpl_toolkits.mplot3d import Axes3D
 import oscidyn.constants as const
 
 # TO DO: Improve steady state amplitude calculation
@@ -130,14 +131,14 @@ def _explore_branches(
 
         idx_max_disp = jnp.argmax(jnp.abs(ss_disp_flat), axis=1) # (n_sim, n_modes)
         t_max_disp = jnp.take_along_axis(ss_time_flat[:, :, None], idx_max_disp[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
-        q_max_disp = jnp.take_along_axis(ss_disp_flat, idx_max_disp[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
-        v_max_disp = jnp.take_along_axis(ss_vel_flat, idx_max_disp[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
+        q_max_disp = jnp.abs(jnp.take_along_axis(ss_disp_flat, idx_max_disp[:, None, :], axis=1).squeeze(1)) # (n_sim, n_modes)
+        v_max_disp = jnp.abs(jnp.take_along_axis(ss_vel_flat, idx_max_disp[:, None, :], axis=1).squeeze(1)) # (n_sim, n_modes)
         y_max_disp = jnp.concatenate([q_max_disp, v_max_disp], axis=-1) # (n_sim, n_modes * 2)
 
         idx_max_vel = jnp.argmax(jnp.abs(ss_vel_flat), axis=1) # (n_sim, n_modes)
         t_max_vel = jnp.take_along_axis(ss_time_flat[:, :, None], idx_max_vel[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
-        q_max_vel = jnp.take_along_axis(ss_disp_flat, idx_max_vel[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
-        v_max_vel = jnp.take_along_axis(ss_vel_flat, idx_max_vel[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
+        q_max_vel = jnp.abs(jnp.take_along_axis(ss_disp_flat, idx_max_vel[:, None, :], axis=1).squeeze(1))  # (n_sim, n_modes)
+        v_max_vel = jnp.abs(jnp.take_along_axis(ss_vel_flat, idx_max_vel[:, None, :], axis=1).squeeze(1))  # (n_sim, n_modes)
         y_max_vel = jnp.concatenate([q_max_vel, v_max_vel], axis=-1) # (n_sim, n_modes * 2)
 
     t_max_disp = t_max_disp.reshape(
@@ -270,6 +271,8 @@ def _fine_sweep(
     print(f"-> running {n_simulations_formatted} simulations in parallel...")
     start_time = time.time()
 
+    import matplotlib.pyplot as plt
+
     n_modes  = model.n_modes
     n_state  = 2 * n_modes
     n_freq   = driving_frequencies.shape[0]
@@ -296,7 +299,28 @@ def _fine_sweep(
     # solve least-squares for each state dimension
     coeffs, *_ = jnp.linalg.lstsq(X, Y_flat, rcond=None)  # (n_monomials, n_state)
 
-    # evaluate polynomial on fine grid
+    # --- plot fit vs. data for the first state dof (e.g. mode‐0 displacement) ---
+    # evaluate fit back on the coarse grid
+    Y_fit_flat = X @ coeffs                        # (n_coarse_freq * n_coarse_amp, n_state)
+    Z_data = Y_flat[:, 0].reshape(F_c.shape)       # true y for mode0
+    Z_fit  = Y_fit_flat[:, 0].reshape(F_c.shape)   # fitted y
+
+    fig = plt.figure(figsize=(10,4))
+    ax1 = fig.add_subplot(1,2,1, projection='3d')
+    ax1.plot_surface(F_c, A_c, Z_data, cmap='viridis', alpha=0.7)
+    ax1.set_title('Coarse data (mode 0)')
+    ax1.set_xlabel('Frequency'); ax1.set_ylabel('Amplitude'); ax1.set_zlabel('y')
+
+    ax2 = fig.add_subplot(1,2,2, projection='3d')
+    ax2.plot_surface(F_c, A_c, Z_fit, cmap='plasma', alpha=0.7)
+    ax2.set_title('Polynomial fit (mode 0)')
+    ax2.set_xlabel('Frequency'); ax2.set_ylabel('Amplitude'); ax2.set_zlabel('y')
+
+    plt.tight_layout()
+    plt.show()
+    # ---------------------------------------------------------------------------
+
+    # now evaluate polynomial on the fine grid for use as initial conds
     F_f, A_f = jnp.meshgrid(driving_frequencies, driving_amplitudes, indexing="ij")
     Ff_flat = F_f.ravel()
     Af_flat = A_f.ravel()
@@ -383,25 +407,25 @@ def frequency_sweep(
     coarse_drive_freq = jnp.linspace(jnp.min(driving_frequencies), jnp.max(driving_frequencies), ss_disp_amp.shape[0]) # (n_coarse_freq,)
     coarse_drive_amp = jnp.linspace(jnp.min(driving_amplitudes), jnp.max(driving_amplitudes), ss_disp_amp.shape[1]) # (n_coarse_amp,)
 
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
 
-    # number of coarse amplitudes
-    n_a = coarse_drive_amp.shape[0]
+    # # number of coarse amplitudes
+    # n_a = coarse_drive_amp.shape[0]
 
-    # generate a reversed gray‐scale palette from light to dark
-    gray_colors = plt.cm.gray(np.linspace(0.1, 0.9, n_a))[::-1]
+    # # generate a reversed gray‐scale palette from light to dark
+    # gray_colors = plt.cm.gray(np.linspace(0.1, 0.9, n_a))[::-1]
 
-    fig, ax = plt.subplots()
-    for ia, amp in enumerate(coarse_drive_amp):
-        color = gray_colors[ia]
-        # steady‐state displacement amplitude for mode 0 at this amplitude
-        disp_curve = ss_disp_amp[:, ia, 0]
-        ax.plot(coarse_drive_freq, disp_curve, color=color, label=f"A={amp:.2f}")
+    # fig, ax = plt.subplots()
+    # for ia, amp in enumerate(coarse_drive_amp):
+    #     color = gray_colors[ia]
+    #     # steady‐state displacement amplitude for mode 0 at this amplitude
+    #     disp_curve = ss_disp_amp[:, ia, 0]
+    #     ax.plot(coarse_drive_freq, disp_curve, color=color, label=f"A={amp:.2f}")
 
-    ax.set_xlabel("Driving frequency")
-    ax.set_ylabel("Steady‐state displacement amplitude (mode 0)")
-    plt.tight_layout()
-    plt.show()
+    # ax.set_xlabel("Driving frequency")
+    # ax.set_ylabel("Steady‐state displacement amplitude (mode 0)")
+    # plt.tight_layout()
+    # plt.show()
     
 
     ss_disp_amp, ss_vel_amp = _fine_sweep(
