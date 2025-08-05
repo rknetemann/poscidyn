@@ -9,7 +9,7 @@ import os
 from .models import AbstractModel
 from . import constants as const 
 
-jax.config.update("jax_enable_x64", False)
+jax.config.update("jax_enable_x64", True)
 jax.config.update('jax_platform_name', 'gpu')
 jax.config.update('jax_compiler_enable_remat_pass', True)
 
@@ -37,7 +37,7 @@ class AbstractSolver:
               driving_frequency: float, 
               driving_amplitude: float, 
               ) -> diffrax.Solution:
-        
+                
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
@@ -49,7 +49,8 @@ class AbstractSolver:
             throw=False,
             progress_meter=diffrax.TqdmProgressMeter(),
             saveat=diffrax.SaveAt(ts=ts),
-            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0)
+,
             args=(driving_frequency, driving_amplitude),
         )
         return sol
