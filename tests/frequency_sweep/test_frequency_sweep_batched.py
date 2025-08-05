@@ -3,14 +3,18 @@ import numpy as np
 import sys
 import os
 import jax
+import time
 import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
-DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, 3, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
+N_DUFFING = 40
+DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, N_DUFFING, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
 DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 500, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
 DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 10, dtype=oscidyn.const.DTYPE)  # Shape: (n_driving_amplitudes,)
+
+start_time = time.time()
 
 @jax.jit
 def batched_frequency_sweep(
@@ -46,7 +50,29 @@ def batched_frequency_sweep(
         solver=oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=1024, rtol=1e-4, atol=1e-6),
     )
 
-frequency_sweeps = jax.vmap(batched_frequency_sweep)(DUFFING_COEFFICIENTS) # (n_duffing, n_freq * n_amp)
+
+# split Duffing coefficients into 4 parts
+n_d = DUFFING_COEFFICIENTS.shape[0]
+quarter = n_d // 4
+duff_q1 = DUFFING_COEFFICIENTS[:quarter]
+duff_q2 = DUFFING_COEFFICIENTS[quarter:2*quarter]
+duff_q3 = DUFFING_COEFFICIENTS[2*quarter:3*quarter]
+duff_q4 = DUFFING_COEFFICIENTS[3*quarter:]
+
+# run batched sweep on each quarter
+sweeps_q1 = jax.vmap(batched_frequency_sweep)(duff_q1)
+sweeps_q2 = jax.vmap(batched_frequency_sweep)(duff_q2)
+sweeps_q3 = jax.vmap(batched_frequency_sweep)(duff_q3)
+sweeps_q4 = jax.vmap(batched_frequency_sweep)(duff_q4)
+
+# combine results
+frequency_sweeps = jnp.concatenate([sweeps_q1, sweeps_q2, sweeps_q3, sweeps_q4], axis=0)
+
+print(f"Time taken: {time.time() - start_time:.2f} seconds")
+end_time = time.time()
+elapsed = end_time - start_time
+simulations_per_second = N_DUFFING / elapsed
+print(f"Simulations per second: {simulations_per_second:.2f}")
 
 frequency_sweeps = frequency_sweeps.reshape(
     DUFFING_COEFFICIENTS.shape[0], 
