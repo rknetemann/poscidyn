@@ -8,7 +8,7 @@ import oscidyn
 import numpy as np
 
 N_MODES = 1
-MODEL = oscidyn.DuffingOscillator.from_example(n_modes=N_MODES)
+MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
 DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 500) # Shape: (n_driving_frequencies,)
 DRIVING_AMPLITUDE = jnp.linspace(0.01, 1.0, 100)  # Shape: (n_driving_amplitudes,)
 
