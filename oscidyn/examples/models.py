@@ -150,7 +150,7 @@ class DuffingOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             Q = jnp.array([10.0])
-            gamma_hat = jnp.array([-0.03])
+            gamma_hat = jnp.array([0.03])
             omega_0 = jnp.array([1.0])
         else:
             raise ValueError("Example not found for n_modes={n_modes}.")
