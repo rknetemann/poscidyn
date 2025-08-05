@@ -12,8 +12,12 @@
 cd /home/rknetemann/projects/oscidyn
 source .venv/bin/activate
 
+# Necessary for GPU utilization information
 previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/tail -n '+2')
+
 srun python tests/test_frequency_sweep_batched.py
+
+# Necessary for GPU utilization information
 /usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/grep -v -F "$previous"
 
 deactivate
