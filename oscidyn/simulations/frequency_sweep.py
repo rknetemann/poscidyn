@@ -79,7 +79,7 @@ def _explore_branches(
         -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
     ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
     
-    max_abs_velocity = 3.0 # TO DO: Determine the max velocity based on the model or a fixed value
+    max_abs_velocity = 10.0 # TO DO: Determine the max velocity based on the model or a fixed value
     coarse_init_vel = jnp.linspace(
         -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
     ) # (N_COARSE_INITIAL_VELOCITIES,)

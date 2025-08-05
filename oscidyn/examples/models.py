@@ -61,7 +61,7 @@ class NonlinearOscillator(AbstractModel):
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
             Q = jnp.array([100.0])
-            eta_hat = jnp.array([0.005])
+            eta_hat = jnp.array([0.3])
             alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.00)
             gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(0.01)
             delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(-0.00)
@@ -120,23 +120,27 @@ class DuffingOscillator(AbstractModel):
     
     Q: jax.Array  # Shape: (n_modes,)
     gamma_hat: jax.Array  # Shape: (n_modes,)
+
+    omega_0: jax.Array  # Shape: (n_modes,) 
     
     def rhs(self, tau, state, args):
         q, v = jnp.split(state, 2)
         F_omega_hat_arg, F_amp_hat_arg = args
         F_omega_hat_arg = jnp.asarray(F_omega_hat_arg).reshape(())
         F_amp_hat_arg = jnp.asarray(F_amp_hat_arg).reshape(())
-        
-        damping_term = (self.omega_ref / self.Q) * v  # Shape: (n_modes,)
+
+        damping_term = (self.omega_ref / self.omega_0) * (1 / self.Q) * v  # Shape: (n_modes,)
+
+        linear_stiffness_term = (self.omega_0**2 / self.omega_ref **2) * q  # Shape: (n_modes,)
        
-        duffing_term = self.gamma_hat * q**3  # Shape: (n_modes,)
+        cubic_stiffness_term = self.gamma_hat * (self.x_ref**2 / self.omega_ref**2) * q**3  # Shape: (n_modes,)
 
         forcing_term = jnp.zeros((self.n_modes,))
         forcing_term = forcing_term.at[:1].set(
-            F_amp_hat_arg * jnp.cos(F_omega_hat_arg * tau)
+            F_amp_hat_arg * (1 / (self.omega_ref**2 * self.x_ref)) * jnp.cos((F_omega_hat_arg / self.omega_ref) * tau)
         )
 
-        a = -damping_term - duffing_term + forcing_term  # Shape: (n_modes,)
+        a = -damping_term - linear_stiffness_term - cubic_stiffness_term + forcing_term  # Shape: (n_modes,)
         return jnp.concatenate([v, a])  # Shape: (2 * n_modes,)
     
     @classmethod
@@ -145,14 +149,16 @@ class DuffingOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             Q = jnp.array([10.0])
-            eta_hat = jnp.array([0.005])
+            gamma_hat = jnp.array([0.03])
+            omega_0 = jnp.array([1.0])
         else:
             raise ValueError("Example not found for n_modes={n_modes}.")
         
         return cls(
             n_modes=n_modes,
             Q=Q,
-            eta_hat=eta_hat,
+            gamma_hat=gamma_hat,
+            omega_0=omega_0,
             omega_ref=omega_ref,
             x_ref=x_ref,
         )
