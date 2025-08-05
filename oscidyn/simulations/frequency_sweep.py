@@ -61,12 +61,12 @@ def _explore_branches(
     sweep_direction: SweepDirection,
 ) -> Tuple[jax.Array, jax.Array]:
     
-    n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
-    * const.N_COARSE_INITIAL_DISPLACEMENTS * const.N_COARSE_INITIAL_VELOCITIES
-    n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
-    print("\nBasin exploration:")
-    print(f"-> running {n_simulations_formatted} simulations in parallel...")
-    start_time = time.time()
+    # n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
+    # * const.N_COARSE_INITIAL_DISPLACEMENTS * const.N_COARSE_INITIAL_VELOCITIES
+    # n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
+    # print("\nBasin exploration:")
+    # print(f"-> running {n_simulations_formatted} simulations in parallel...")
+    # start_time = time.time()
 
     coarse_drive_freq = jnp.linspace(
         jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES
@@ -174,12 +174,12 @@ def _explore_branches(
         model.n_modes * 2
     ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
     
-    elapsed = time.time() - start_time
-    sims_per_sec = n_simulations / elapsed
-    sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-    print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
+    # elapsed = time.time() - start_time
+    # sims_per_sec = n_simulations / elapsed
+    # sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+    # print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
 
-    plt.plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
+    # plt.plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
 
     return t_max_disp, y_max_disp, t_max_vel, y_max_vel
 
@@ -249,12 +249,12 @@ def _fine_sweep(
     )
 
     disp_init = y_init_fine[..., :n_modes]  # (n_freq, n_amp, n_modes)
-    plt.plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init)
+    #plt.plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init)
 
     n_simulations = driving_frequencies.shape[0] * driving_amplitudes.shape[0]
     n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
-    print("\nFine sweep:")
-    print(f"-> running {n_simulations_formatted} simulations in parallel...")
+    # print("\nFine sweep:")
+    # print(f"-> running {n_simulations_formatted} simulations in parallel...")
     start_time = time.time()
 
     freq_mesh, amp_mesh = jnp.meshgrid(driving_frequencies, driving_amplitudes, indexing="ij")
@@ -277,10 +277,10 @@ def _fine_sweep(
     max_vel  = jnp.max(jnp.abs(ss_vel),  axis=1)   # (n_freq*n_amp, n_modes)
 
 
-    elapsed = time.time() - start_time
-    sims_per_sec = n_simulations / elapsed
-    sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-    print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
+    # elapsed = time.time() - start_time
+    # sims_per_sec = n_simulations / elapsed
+    # sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
+    # print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
 
     return max_disp, max_vel
 
@@ -334,7 +334,7 @@ def frequency_sweep(
     # extract the coarse‐grid steady‐state amplitudes from the selected branches
     ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
 
-    plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
+    # plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
     
     ss_disp_amp, ss_vel_amp = _fine_sweep(
         model=model,
@@ -362,3 +362,66 @@ def frequency_sweep(
     )
 
     return frequency_sweep
+
+def vmap_safe_frequency_sweep(
+    model: AbstractModel,
+    sweep_direction: SweepDirection,
+    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
+    driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
+    solver: AbstractSolver,
+):
+            
+    if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
+        raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
+    
+    # We start by exploring the branches of the system
+    t_max_disp, y_max_disp, t_max_vel, y_max_vel = _explore_branches(
+        model=model,
+        drive_freq=driving_frequencies,
+        drive_amp=driving_amplitudes,
+        solver=solver,
+        sweep_direction=sweep_direction,
+    )
+    # t: # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
+    # y: # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
+    
+    # Based on if it is a forward or backward sweep, we select the right branches
+    t_max_disp_sel, y_max_disp_sel = _select_branches(
+        t_max_disp=t_max_disp,
+        y_max_disp=y_max_disp,
+        sweep_direction=sweep_direction,
+    ) 
+    # t: (n_coarse_freq, n_coarse_amp, n_modes)
+    # y: (n_coarse_freq, n_coarse_amp, n_modes * 2)
+    
+    # extract the coarse‐grid steady‐state amplitudes from the selected branches
+    ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
+
+    # plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
+    
+    ss_disp_amp, ss_vel_amp = _fine_sweep(
+        model=model,
+        t_max_disp=t_max_disp_sel,
+        y_max_disp=y_max_disp_sel,
+        driving_frequencies=driving_frequencies,
+        driving_amplitudes=driving_amplitudes,
+        solver=solver,
+    )
+
+    # ASSUMPTION: Mode superposition validity for nonlinear systems
+    tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1)
+    tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
+
+    # frequency_sweep = FrequencySweepResult(
+    #     model=model,
+    #     sweep_direction=sweep_direction,
+    #     driving_frequencies=driving_frequencies, # Shape: (n_driving_frequencies,)
+    #     driving_amplitudes=driving_amplitudes, # Shape: (n_driving_amplitudes,)
+    #     steady_state_displacement_amplitude=ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
+    #     steady_state_velocity_amplitude=ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
+    #     total_steady_state_displacement_amplitude=tot_ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
+    #     total_steady_state_velocity_amplitude=tot_ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
+    #     solver=solver,
+    # )
+
+    return tot_ss_disp_amp
