@@ -48,8 +48,6 @@ def batched_frequency_sweep(
 
 frequency_sweeps = jax.vmap(batched_frequency_sweep)(DUFFING_COEFFICIENTS) # (n_duffing, n_freq * n_amp)
 
-print(frequency_sweeps.dtype)
-
 frequency_sweeps = frequency_sweeps.reshape(
     DUFFING_COEFFICIENTS.shape[0], 
     DRIVING_FREQUENCIES.shape[0], 
