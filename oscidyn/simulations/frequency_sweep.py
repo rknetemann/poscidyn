@@ -306,7 +306,7 @@ def frequency_sweep(
         one_period = 2.0 * jnp.pi / max_frequency_component
         sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
         
-        n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+        n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int) # Number of time steps to cover one period with the given sampling frequency
         solver.n_time_steps = n_time_steps
 
         print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
