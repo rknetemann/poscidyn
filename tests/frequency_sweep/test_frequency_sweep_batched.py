@@ -81,3 +81,4 @@ for i, ax in enumerate(axes):
 
 plt.tight_layout()
 plt.show()
+plt.savefig("results/frequency_sweep_duffing.png", dpi=300, bbox_inches='tight')
