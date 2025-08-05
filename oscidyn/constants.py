@@ -20,3 +20,5 @@ MAXIMUM_ORDER_SUPERHARMONICS = 10
 N_PERIODS_TO_RETAIN = 5
 MIN_WINDOWS = 3  # Minimum number of windows to consider for convergence
 
+PLOT_GRID = True 
+

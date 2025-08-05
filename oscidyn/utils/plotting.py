@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
 
+import oscidyn.constants as const
+
 def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp):
     # flatten the coarse‐grid for plotting
     freq_vals = coarse_drive_freq_mesh.ravel()
@@ -21,6 +23,7 @@ def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max
     ax.set_xlabel('Driving frequency')
     ax.set_ylabel('Steady-state displacement amplitude')
     ax.set_title('Branch Exploration')
+    ax.grid(const.PLOT_GRID)
     plt.tight_layout()
     plt.show()
 
@@ -44,6 +47,7 @@ def plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp):
     ax.set_xlabel("Driving frequency")
     ax.set_ylabel("Steady-state displacement amplitude")
     ax.set_title("Branch Selection")
+    ax.grid(const.PLOT_GRID)
     plt.tight_layout()
     plt.show()
 
@@ -54,13 +58,18 @@ def plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init):
     # y_init_fine has shape (n_freq, n_amp, n_state), first n_modes entries are displacements
 
     fig, ax = plt.subplots(figsize=(8, 6))
-    for j in range(n_amp):
+    
+    # generate grayscale colors and reverse the sequence - same as other functions
+    gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_amp))[::-1]
+    
+    for j, c in enumerate(gray_colors):
         # plot mode 0 displacement as an example; change index if you want other modes
-        ax.plot(driving_frequencies, disp_init[:, j, 0], label=f"amp={driving_amplitudes[j]:.2f}")
+        ax.plot(driving_frequencies, disp_init[:, j, 0], color=c, 
+                label=f"amp={driving_amplitudes[j]:.2f}")
     ax.set_xlabel("Driving Frequency")
     ax.set_ylabel("Initial Displacement (mode 0)")
     ax.set_title("Interpolated Results")
-    ax.legend()
+    ax.grid(const.PLOT_GRID)
     plt.tight_layout()
     plt.show()
 
@@ -82,5 +91,6 @@ def plot_frequency_sweep(frequency_sweep):
     ax.set_xlabel("Driving frequency")
     ax.set_ylabel("Total steady-state displacement amplitude")
     #ax.legend(title="Drive amplitude")  # Keeping this commented as in original
+    ax.grid(const.PLOT_GRID)
     plt.tight_layout()
     plt.show()

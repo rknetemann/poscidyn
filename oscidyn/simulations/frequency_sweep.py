@@ -237,22 +237,25 @@ def _fine_sweep(
     driving_amplitudes: jax.Array, # (n_amp,)
     solver: AbstractSolver,
 ) -> tuple[jax.Array, jax.Array]:
-    
-    n_simulations = driving_frequencies.shape[0] * driving_amplitudes.shape[0]
-    n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
-    print("\nFine sweep:")
-    print(f"-> running {n_simulations_formatted} simulations in parallel...")
-    start_time = time.time()
 
     n_modes  = model.n_modes
     n_state  = 2 * n_modes
     n_freq   = driving_frequencies.shape[0]
     n_amp    = driving_amplitudes.shape[0]
 
-    # coarse to fine grid using interpolation of initial conditions (bilinear)
+    # coarse to fine grid using interpolation of initial conditions
     y_init_fine = jax.image.resize(
-        y_max_disp, (n_freq, n_amp, n_state), method="linear"
+        y_max_disp, (n_freq, n_amp, n_state), method="bilinear"
     )
+
+    disp_init = y_init_fine[..., :n_modes]  # (n_freq, n_amp, n_modes)
+    plt.plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init)
+
+    n_simulations = driving_frequencies.shape[0] * driving_amplitudes.shape[0]
+    n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
+    print("\nFine sweep:")
+    print(f"-> running {n_simulations_formatted} simulations in parallel...")
+    start_time = time.time()
 
     freq_mesh, amp_mesh = jnp.meshgrid(driving_frequencies, driving_amplitudes, indexing="ij")
     freq_flat = freq_mesh.ravel()
@@ -278,9 +281,6 @@ def _fine_sweep(
     sims_per_sec = n_simulations / elapsed
     sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
     print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
-
-    disp_init = y_init_fine[..., :n_modes]  # (n_freq, n_amp, n_modes)
-    plt.plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init)
 
     return max_disp, max_vel
 
