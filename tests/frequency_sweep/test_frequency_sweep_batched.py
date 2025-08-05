@@ -8,25 +8,26 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
-DUFFING_COEFFICIENTS = jnp.linspace(-0.01, 0.03, 3)  # Shape: (n_duffing,)
-DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 200) # Shape: (n_driving_frequencies,)
-DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 50)  # Shape: (n_driving_amplitudes,)
+DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, 3, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
+DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 500, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
+DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 10, dtype=oscidyn.const.DTYPE)  # Shape: (n_driving_amplitudes,)
 
 @jax.jit
 def batched_frequency_sweep(
     duffing: float,
 ):
-    omega_ref = 1.0
-    x_ref = 1.0
-    omega_0_hat = jnp.array([1.0])
-    Q = jnp.array([10.0])
-    eta_hat = jnp.array([0.005])
-    alpha_hat = jnp.zeros((1, 1, 1))
-    gamma_hat = jnp.zeros((1, 1, 1, 1)).at[0, 0, 0, 0].set(duffing)
-    delta_hat = jnp.zeros((1, 1, 1, 1, 1))
+    n_modes = 1
+    omega_ref = jnp.array(1.0, dtype=oscidyn.const.DTYPE)
+    x_ref = jnp.array(1.0, dtype=oscidyn.const.DTYPE)
+    omega_0_hat = jnp.array([1.0], dtype=oscidyn.const.DTYPE)
+    Q = jnp.array([10.0], dtype=oscidyn.const.DTYPE)
+    eta_hat = jnp.array([0.005], dtype=oscidyn.const.DTYPE)
+    alpha_hat = jnp.zeros((1, 1, 1), dtype=oscidyn.const.DTYPE)
+    gamma_hat = jnp.zeros((1, 1, 1, 1), dtype=oscidyn.const.DTYPE).at[0, 0, 0, 0].set(duffing)
+    delta_hat = jnp.zeros((1, 1, 1, 1, 1), dtype=oscidyn.const.DTYPE)
 
     model = oscidyn.NonlinearOscillator(
-        n_modes=1,
+        n_modes=n_modes,
         Q=Q,
         eta_hat=eta_hat,
         alpha_hat=alpha_hat,
@@ -46,6 +47,8 @@ def batched_frequency_sweep(
     )
 
 frequency_sweeps = jax.vmap(batched_frequency_sweep)(DUFFING_COEFFICIENTS) # (n_duffing, n_freq * n_amp)
+
+print(frequency_sweeps.dtype)
 
 frequency_sweeps = frequency_sweeps.reshape(
     DUFFING_COEFFICIENTS.shape[0], 

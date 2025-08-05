@@ -69,21 +69,21 @@ def _explore_branches(
     # start_time = time.time()
 
     coarse_drive_freq = jnp.linspace(
-        jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES
+        jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES, dtype=const.DTYPE
     ) # (N_COARSE_DRIVING_FREQUENCIES,)
 
     coarse_drive_amp = jnp.linspace(
-        jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
+        jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES, dtype=const.DTYPE
     ) # (N_COARSE_DRIVING_AMPLITUDES,)
 
     max_abs_displacement = 10.0 # TO DO: Determine the max amplitude based on the model or a fixed value
     coarse_init_disp = jnp.linspace(
-        -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
+        -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS, dtype=const.DTYPE
     ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
     
     max_abs_velocity = 10.0 # TO DO: Determine the max velocity based on the model or a fixed value
     coarse_init_vel = jnp.linspace(
-        -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
+        -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES, dtype=const.DTYPE
     ) # (N_COARSE_INITIAL_VELOCITIES,)
 
     coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
@@ -248,14 +248,14 @@ def _fine_sweep(
         y_max_disp, (n_freq, n_amp, n_state), method="bilinear"
     )
 
-    disp_init = y_init_fine[..., :n_modes]  # (n_freq, n_amp, n_modes)
+    #disp_init = y_init_fine[..., :n_modes]  # (n_freq, n_amp, n_modes)
     #plt.plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init)
 
-    n_simulations = driving_frequencies.shape[0] * driving_amplitudes.shape[0]
-    n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
-    # print("\nFine sweep:")
-    # print(f"-> running {n_simulations_formatted} simulations in parallel...")
-    start_time = time.time()
+    #n_simulations = driving_frequencies.shape[0] * driving_amplitudes.shape[0]
+    #n_simulations_formatted = f"{n_simulations:,}".replace(",", ".")
+    #print("\nFine sweep:")
+    #print(f"-> running {n_simulations_formatted} simulations in parallel...")
+    #start_time = time.time()
 
     freq_mesh, amp_mesh = jnp.meshgrid(driving_frequencies, driving_amplitudes, indexing="ij")
     freq_flat = freq_mesh.ravel()

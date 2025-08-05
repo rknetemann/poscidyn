@@ -9,7 +9,7 @@ import os
 from .models import AbstractModel
 from . import constants as const 
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", False)
 jax.config.update('jax_platform_name', 'gpu')
 jax.config.update('jax_compiler_enable_remat_pass', True)
 
