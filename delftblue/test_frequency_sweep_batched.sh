@@ -9,15 +9,15 @@
 #SBATCH --mem-per-cpu=4G
 #SBATCH --account=education-me-msc-me
 
-cd /home/rknetemann/projects/oscidyn
-source .venv/bin/activate
-
 # Necessary for GPU utilization information
 previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/tail -n '+2')
 
+cd /home/rknetemann/projects/oscidyn
+source .venv/bin/activate
+
 srun python tests/frequency_sweep/test_frequency_sweep_batched.py
+
+deactivate
 
 # Necessary for GPU utilization information
 /usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/grep -v -F "$previous"
-
-deactivate

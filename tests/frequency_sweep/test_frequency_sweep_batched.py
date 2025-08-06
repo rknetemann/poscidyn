@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
+
 N_DUFFING = 40
 DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, N_DUFFING, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
 DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 500, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
@@ -82,6 +83,7 @@ frequency_sweeps = frequency_sweeps.reshape(
 
 n_d = DUFFING_COEFFICIENTS.shape[0]
 n_a = DRIVING_AMPLITUDES.shape[0]
+
 
 # prepare grayscale colors (reversed)
 gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_a))[::-1]
