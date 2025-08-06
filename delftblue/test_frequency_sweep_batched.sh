@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #SBATCH --job-name="test_frequency_sweep_batched"
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu-a100
 #SBATCH --time=00:10:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
