@@ -15,6 +15,8 @@ previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utili
 cd /home/rknetemann/projects/oscidyn
 source .venv/bin/activate
 
+which python
+
 srun python tests/frequency_sweep/test_frequency_sweep_batched.py
 
 deactivate
