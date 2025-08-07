@@ -5,15 +5,16 @@ import os
 import jax
 import time
 import matplotlib.pyplot as plt
+import tensorstore as ts
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
-N_DUFFING = 30
+N_DUFFING = 20
 N_DUFFING_IN_PARALLEL = 10
 
 DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, N_DUFFING, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
-DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 500, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
+DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 200, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
 DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 10, dtype=oscidyn.const.DTYPE)  # Shape: (n_driving_amplitudes,)
 
 start_time = time.time()
@@ -49,7 +50,7 @@ def batched_frequency_sweep(
         sweep_direction=oscidyn.SweepDirection.FORWARD,
         driving_frequencies=DRIVING_FREQUENCIES,
         driving_amplitudes=DRIVING_AMPLITUDES,
-        solver=oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=1024, rtol=1e-4, atol=1e-6),
+        solver=oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=512, rtol=1e-4, atol=1e-6),
     )
 
 # Process N_DUFFING_IN_PARALLEL coefficients at a time
