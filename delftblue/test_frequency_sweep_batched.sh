@@ -4,12 +4,12 @@
 #SBATCH --partition=gpu-a100
 #SBATCH --time=00:10:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
-#SBATCH --mem-per-cpu=4G
+#SBATCH --mem-per-cpu=8G
 #SBATCH --account=education-me-msc-me
 
-module load 2024r1
+echo "Starting test_frequency_sweep_batched.sh"
 
 # Necessary for GPU utilization information
 previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/tail -n '+2')
@@ -17,9 +17,6 @@ previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utili
 cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
-
-echo "Running test_frequency_sweep_batched.py with Python path:"
-which python
 
 srun python tests/frequency_sweep/test_frequency_sweep_batched.py
 
