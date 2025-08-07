@@ -16,9 +16,8 @@ frequency_sweep = oscidyn.frequency_sweep(
     sweep_direction = oscidyn.SweepDirection.FORWARD,
     driving_frequencies = DRIVING_FREQUENCY,
     driving_amplitudes = DRIVING_AMPLITUDE,
-    #solver = oscidyn.FixedTimeSolver(t1=200, max_steps=4_096),
-    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, rtol=1e-4, atol=1e-6),
-    #solver = oscidyn.SteadyStateSolver(rtol=1e-4, atol=1e-6, max_steps=4_096),
+    #solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, rtol=1e-4, atol=1e-6),
+    solver = oscidyn.FixedTimeSolver(duration=1000.0, n_time_steps=1024, rtol=1e-4, atol=1e-6),
 )
 
 oscidyn.plot_frequency_sweep(frequency_sweep)

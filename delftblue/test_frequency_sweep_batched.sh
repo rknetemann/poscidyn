@@ -15,6 +15,7 @@ module load 2024r1
 previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/tail -n '+2')
 
 cd /home/rknetemann/projects/oscidyn
+
 source .venv/bin/activate
 
 echo "Running test_frequency_sweep_batched.py with Python path:"

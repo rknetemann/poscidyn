@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
+import os
 
 
 N_DUFFING = 40
@@ -81,32 +82,43 @@ frequency_sweeps = frequency_sweeps.reshape(
     DRIVING_AMPLITUDES.shape[0],
 ) # (n_duffing, n_freq, n_amp)
 
+# ensure output directory exists
+out_dir = "results/frequency_sweep_batched"
+os.makedirs(out_dir, exist_ok=True)
+
 n_d = DUFFING_COEFFICIENTS.shape[0]
 n_a = DRIVING_AMPLITUDES.shape[0]
-
 
 # prepare grayscale colors (reversed)
 gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_a))[::-1]
 
-# create one subplot per Duffing coefficient
-fig, axes = plt.subplots(n_d, 1, sharex=True, figsize=(8, 4 * n_d))
+# group every 4 Duffing coefficients into one figure
+group_size = 4
+for start in range(0, n_d, group_size):
+    end = min(start + group_size, n_d)
+    this_slice = slice(start, end)
+    current_coefs = DUFFING_COEFFICIENTS[this_slice]
+    num_subplots = current_coefs.shape[0]
 
-# if there's only one subplot, wrap it in a list for consistency
-if n_d == 1:
-    axes = [axes]
+    fig, axes = plt.subplots(num_subplots, 1, sharex=True, figsize=(8, 4 * num_subplots))
+    if num_subplots == 1:
+        axes = [axes]
 
-for i, ax in enumerate(axes):
-    for j, c in enumerate(gray_colors):
-        ax.plot(
-            DRIVING_FREQUENCIES,
-            frequency_sweeps[i, :, j],
-            color=c
-        )
-    ax.set_title(f"Duffing = {float(DUFFING_COEFFICIENTS[i]):.3g}")
-    ax.set_xlabel("Driving frequency")
-    ax.set_ylabel("Steady-state displacement amplitude")
-    ax.grid(True)
+    for idx, ax in enumerate(axes):
+        i = start + idx
+        for cidx, c in enumerate(gray_colors):
+            ax.plot(
+                DRIVING_FREQUENCIES,
+                frequency_sweeps[i, :, cidx],
+                color=c
+            )
+        ax.set_title(f"Duffing = {float(DUFFING_COEFFICIENTS[i]):.3g}")
+        ax.set_ylabel("Steady-state displacement amplitude")
+        ax.grid(True)
 
-plt.tight_layout()
-plt.show()
-plt.savefig("results/frequency_sweep_duffing.png", dpi=300, bbox_inches='tight')
+    axes[-1].set_xlabel("Driving frequency")
+    plt.tight_layout()
+
+    fname = f"frequency_sweep_duffing_{start+1:03d}_to_{end:03d}.png"
+    fig.savefig(os.path.join(out_dir, fname), dpi=300, bbox_inches='tight')
+    plt.close(fig)

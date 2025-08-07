@@ -179,7 +179,7 @@ def _explore_branches(
     # sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
     # print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
 
-    # plt.plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
+    #plt.plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
 
     return t_max_disp, y_max_disp, t_max_vel, y_max_vel
 
@@ -334,7 +334,7 @@ def frequency_sweep(
     # extract the coarse‐grid steady‐state amplitudes from the selected branches
     ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
 
-    # plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
+    #plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
     
     ss_disp_amp, ss_vel_amp = _fine_sweep(
         model=model,
