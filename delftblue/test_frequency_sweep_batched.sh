@@ -9,6 +9,8 @@
 #SBATCH --mem-per-cpu=4G
 #SBATCH --account=education-me-msc-me
 
+module load 2024r1
+
 # Necessary for GPU utilization information
 previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/tail -n '+2')
 
