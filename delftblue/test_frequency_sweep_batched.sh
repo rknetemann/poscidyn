@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
-#SBATCH --mem-per-cpu=8192M
+#SBATCH --mem-per-cpu=8000M
 #SBATCH --account=education-me-msc-me
 
 echo "Starting test_frequency_sweep_batched.sh"
