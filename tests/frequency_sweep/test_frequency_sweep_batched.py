@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
-import os
 
+N_DUFFING = 30
+N_DUFFING_IN_PARALLEL = 10
 
-N_DUFFING = 40
 DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, N_DUFFING, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
 DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 500, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
 DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 10, dtype=oscidyn.const.DTYPE)  # Shape: (n_driving_amplitudes,)
@@ -52,73 +52,19 @@ def batched_frequency_sweep(
         solver=oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=1024, rtol=1e-4, atol=1e-6),
     )
 
-
-# split Duffing coefficients into 4 parts
+# Process N_DUFFING_IN_PARALLEL coefficients at a time
 n_d = DUFFING_COEFFICIENTS.shape[0]
-quarter = n_d // 4
-duff_q1 = DUFFING_COEFFICIENTS[:quarter]
-duff_q2 = DUFFING_COEFFICIENTS[quarter:2*quarter]
-duff_q3 = DUFFING_COEFFICIENTS[2*quarter:3*quarter]
-duff_q4 = DUFFING_COEFFICIENTS[3*quarter:]
+n_batches = (n_d + N_DUFFING_IN_PARALLEL - 1) // N_DUFFING_IN_PARALLEL  # Ceiling division
 
-# run batched sweep on each quarter
-sweeps_q1 = jax.vmap(batched_frequency_sweep)(duff_q1)
-sweeps_q2 = jax.vmap(batched_frequency_sweep)(duff_q2)
-sweeps_q3 = jax.vmap(batched_frequency_sweep)(duff_q3)
-sweeps_q4 = jax.vmap(batched_frequency_sweep)(duff_q4)
-
-# combine results
-frequency_sweeps = jnp.concatenate([sweeps_q1, sweeps_q2, sweeps_q3, sweeps_q4], axis=0)
+for i in range(n_batches):
+    start_idx = i * N_DUFFING_IN_PARALLEL
+    end_idx = min(start_idx + N_DUFFING_IN_PARALLEL, n_d)
+    
+    batch_duffing = DUFFING_COEFFICIENTS[start_idx:end_idx]
+    batch_sweeps = jax.vmap(batched_frequency_sweep)(batch_duffing)
 
 print(f"Time taken: {time.time() - start_time:.2f} seconds")
 end_time = time.time()
 elapsed = end_time - start_time
 simulations_per_second = N_DUFFING / elapsed
 print(f"Simulations per second: {simulations_per_second:.2f}")
-
-frequency_sweeps = frequency_sweeps.reshape(
-    DUFFING_COEFFICIENTS.shape[0], 
-    DRIVING_FREQUENCIES.shape[0], 
-    DRIVING_AMPLITUDES.shape[0],
-) # (n_duffing, n_freq, n_amp)
-
-# ensure output directory exists
-out_dir = "results/frequency_sweep_batched"
-os.makedirs(out_dir, exist_ok=True)
-
-n_d = DUFFING_COEFFICIENTS.shape[0]
-n_a = DRIVING_AMPLITUDES.shape[0]
-
-# prepare grayscale colors (reversed)
-gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_a))[::-1]
-
-# group every 4 Duffing coefficients into one figure
-group_size = 4
-for start in range(0, n_d, group_size):
-    end = min(start + group_size, n_d)
-    this_slice = slice(start, end)
-    current_coefs = DUFFING_COEFFICIENTS[this_slice]
-    num_subplots = current_coefs.shape[0]
-
-    fig, axes = plt.subplots(num_subplots, 1, sharex=True, figsize=(8, 4 * num_subplots))
-    if num_subplots == 1:
-        axes = [axes]
-
-    for idx, ax in enumerate(axes):
-        i = start + idx
-        for cidx, c in enumerate(gray_colors):
-            ax.plot(
-                DRIVING_FREQUENCIES,
-                frequency_sweeps[i, :, cidx],
-                color=c
-            )
-        ax.set_title(f"Duffing = {float(DUFFING_COEFFICIENTS[i]):.3g}")
-        ax.set_ylabel("Steady-state displacement amplitude")
-        ax.grid(True)
-
-    axes[-1].set_xlabel("Driving frequency")
-    plt.tight_layout()
-
-    fname = f"frequency_sweep_duffing_{start+1:03d}_to_{end:03d}.png"
-    fig.savefig(os.path.join(out_dir, fname), dpi=300, bbox_inches='tight')
-    plt.close(fig)
