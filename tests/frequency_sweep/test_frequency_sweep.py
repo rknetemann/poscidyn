@@ -16,7 +16,7 @@ frequency_sweep = oscidyn.frequency_sweep(
     sweep_direction = oscidyn.SweepDirection.FORWARD,
     driving_frequencies = DRIVING_FREQUENCY,
     driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=512, rtol=1e-4, atol=1e-6),
+    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=512, rtol=1e-4, atol=1e-6, progress_bar=False),
     #solver = oscidyn.FixedTimeSolver(duration=1000.0, n_time_steps=512, rtol=1e-4, atol=1e-6),
 )
 

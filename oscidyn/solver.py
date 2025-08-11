@@ -10,11 +10,12 @@ from .models import AbstractModel
 from . import constants as const 
 
 class AbstractSolver:
-    def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+    def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096, progress_bar: bool = True):
 
         self.rtol = rtol
         self.atol = atol
         self.max_steps = max_steps
+        self.progress_bar = progress_bar
     
     def solve(self, 
               model: AbstractModel,
@@ -25,6 +26,8 @@ class AbstractSolver:
               driving_frequency: float, 
               driving_amplitude: float, 
               ) -> diffrax.Solution:
+        
+        progress_meter = diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter()
                 
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
@@ -73,9 +76,9 @@ class FixedTimeSolver(AbstractSolver):
     
 class FixedTimeSteadyStateSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = None, ss_tol:float = 1e-3,
-                 rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
+                 rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096, progress_bar: bool = True):
         
-        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
+        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps, progress_bar=progress_bar)
         self.n_time_steps = n_time_steps # Can be None, in which case it will be calculated based on the driving frequency 
         
         self.ss_tol = ss_tol
