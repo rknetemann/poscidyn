@@ -29,6 +29,3 @@ with h5py.File(HDF5_FILE, 'w') as f:
         g.attrs["max_driving_frequency"] = max_freq
         g.attrs["min_driving_amplitude"] = min_amp
         g.attrs["max_driving_amplitude"] = max_amp
-
-with h5py.File(HDF5_FILE, 'r') as f:
-    print(list(f.keys()))

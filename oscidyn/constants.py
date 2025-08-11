@@ -24,3 +24,5 @@ MIN_WINDOWS = 3  # Minimum number of windows to consider for convergence
 PLOT_GRID = True
 
 DTYPE = jax.numpy.float32
+
+XLA_PYTHON_CLIENT_MEM_FRACTION = 0.85

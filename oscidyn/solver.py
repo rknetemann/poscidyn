@@ -9,18 +9,6 @@ import os
 from .models import AbstractModel
 from . import constants as const 
 
-jax.config.update("jax_enable_x64", False)
-jax.config.update('jax_platform_name', 'gpu')
-jax.config.update('jax_compiler_enable_remat_pass', True)
-
-os.environ['XLA_FLAGS'] = (
-    '--xla_gpu_triton_gemm_any=True '
-    '--xla_gpu_enable_latency_hiding_scheduler=true '
-)
-
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.9' 
-
-
 class AbstractSolver:
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096):
 
