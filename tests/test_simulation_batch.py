@@ -300,21 +300,17 @@ if __name__ == "__main__":
 
     # Open HDF5 once; master is sole writer
     with h5py.File(filename, "w") as h5f:
-        settings = {
-            "DRIVING_FREQUENCIES": np.asarray(DRIVING_FREQUENCIES).tolist(),
-            "DRIVING_AMPLITUDES": np.asarray(DRIVING_AMPLITUDES).tolist(),
-            "sweep_direction": "FORWARD",
-            "solver": {
-                "name": "FixedTimeSteadyStateSolver",
-                "max_steps": 4096,
-                "n_time_steps": 512,
-                "rtol": 1e-4,
-                "atol": 1e-6
-            },
-            "n_simulations_in_parallel_per_gpu": int(n_simulations_in_parallel_per_gpu),
-        }
-        h5f.attrs["settings"] = json.dumps(settings)
-        h5f.attrs["date"] = timestamp
+        h5f.attrs['n_simulations'] = n_duffing
+        h5f.attrs['n_simulations_in_parallel_per_gpu'] = n_simulations_in_parallel_per_gpu
+        h5f.attrs['driving_frequencies'] = DRIVING_FREQUENCIES
+        h5f.attrs['driving_amplitudes'] = DRIVING_AMPLITUDES
+        h5f.attrs['sweep_direction'] = "forward"
+        h5f.attrs['solver'] = "FixedTimeSteadyStateSolver"
+        h5f.attrs['max_steps'] = 4096
+        h5f.attrs['n_time_steps'] = 512
+        h5f.attrs['rtol'] = 1e-4
+        h5f.attrs['atol'] = 1e-6
+        h5f.attrs["created_date"] = timestamp
 
         completed_sims = 0
         sim_index = 0
@@ -334,7 +330,7 @@ if __name__ == "__main__":
                     sim_id = f"simulation_{sim_index:08d}"
                     grp = h5f.create_group(sim_id)
                     grp.create_dataset("maximum_steady_state_displacement", data=results[i])
-                    grp.attrs["dimensionless_parameters"] = np.array([duff_batch[i]])
+                    grp.attrs["gamma"] = np.array([duff_batch[i]])
                     sim_index += 1
                     completed_sims += 1
                     pbar.update(1)
