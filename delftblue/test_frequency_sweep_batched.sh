@@ -9,7 +9,7 @@
 #SBATCH --mem-per-cpu=8000M
 #SBATCH --account=education-me-msc-me
 
-export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.98
 export N_SIMULATIONS_IN_PARALLEL_PER_GPU=100
 export N_DUFFING=4000
 

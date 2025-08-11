@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
     # ISO timestamp for file naming & metadata
     timestamp = datetime.now().isoformat(timespec='seconds').replace(":", "-")
-    filename = f"{filepath}simulation_batch_{timestamp}.h5"
+    filename = f"{filepath}simulation_batch_{timestamp}.hdf5"
 
     ctx = multiprocessing.get_context("spawn")
     task_queue = ctx.Queue()

@@ -1,7 +1,14 @@
 import h5py
 import numpy as np
+import tkinter as tk
+from tkinter import filedialog
 
-HDF5_FILE = '/home/raymo/Projects/parameter-identification-nanomechanical-resonators/tests/other/simulations.hdf5'
+root = tk.Tk()
+root.withdraw()
+HDF5_FILE = filedialog.askopenfilename(
+    title="Select HDF5 file",
+    filetypes=[("HDF5 files", "*.hdf5"), ("All files", "*.*")]
+)
 
 with h5py.File(HDF5_FILE, 'r') as f:
     for sim_id in f["simulations"]:
