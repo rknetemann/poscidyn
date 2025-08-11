@@ -5,3 +5,4 @@ optax==0.2.4
 diffrax==0.7.0
 meson==1.7.2
 tqdm==4.67.1
+h5py==3.14.0

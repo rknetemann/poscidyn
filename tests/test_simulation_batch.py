@@ -172,7 +172,7 @@ def worker_process(gpu_id: int, task_queue: Queue, result_queue: Queue):
 if __name__ == "__main__":
     # ISO timestamp for file naming & metadata
     timestamp = datetime.now().isoformat(timespec='seconds')
-    filename = f"/home/raymo/Projects/parameter-identification-nanomechanical-resonators/tests/simulation_batch_{timestamp}.h5"
+    filename = f"tests/simulation_batch_{timestamp}.h5"
 
     ctx = multiprocessing.get_context("spawn")
     task_queue = ctx.Queue()
@@ -181,6 +181,8 @@ if __name__ == "__main__":
     gpu_ids = get_available_gpu_ids()
     if not gpu_ids:
         raise RuntimeError("No GPUs detected. Set CUDA_VISIBLE_DEVICES or install CUDA/JAX correctly.")
+
+    print(f"Detected {len(gpu_ids)} GPU(s): {gpu_ids}")
 
     workers = []
     for gpu in gpu_ids:
