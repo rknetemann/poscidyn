@@ -17,7 +17,7 @@ cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
 
-srun python tests/frequency_sweep/test_frequency_sweep_batched.py
+srun python tests/test_simulation_batch.py
 
 deactivate
 
