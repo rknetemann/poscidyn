@@ -26,7 +26,7 @@ class AbstractSolver:
               driving_frequency: float, 
               driving_amplitude: float, 
               ) -> diffrax.Solution:
-        
+                
         progress_meter = diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter()
                 
         sol = diffrax.diffeqsolve(
@@ -38,7 +38,7 @@ class AbstractSolver:
             max_steps=self.max_steps,
             y0=y0,
             throw=False,
-            progress_meter=diffrax.TqdmProgressMeter(),
+            progress_meter=progress_meter,
             saveat=diffrax.SaveAt(ts=ts),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0)
 ,

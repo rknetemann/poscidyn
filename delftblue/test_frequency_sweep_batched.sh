@@ -2,17 +2,16 @@
 #
 #SBATCH --job-name="test_frequency_sweep_batched"
 #SBATCH --partition=gpu-a100
-#SBATCH --time=00:10:00
+#SBATCH --time=00:59:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --gpus-per-task=1
+#SBATCH --gpus-per-task=2
 #SBATCH --mem-per-cpu=8000M
 #SBATCH --account=education-me-msc-me
 
-echo "Starting test_frequency_sweep_batched.sh"
-
-# Necessary for GPU utilization information
-previous=$(/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/tail -n '+2')
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9
+export N_SIMULATIONS_IN_PARALLEL_PER_GPU=100
+export N_DUFFING=4000
 
 cd /home/rknetemann/projects/oscidyn
 
@@ -22,5 +21,3 @@ srun python tests/frequency_sweep/test_frequency_sweep_batched.py
 
 deactivate
 
-# Necessary for GPU utilization information
-/usr/bin/nvidia-smi --query-accounted-apps='gpu_utilization,mem_utilization,max_memory_usage,time' --format='csv' | /usr/bin/grep -v -F "$previous"
