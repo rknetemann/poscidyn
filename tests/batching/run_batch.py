@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-batch_of_params = jnp.array([0, 1, 2, 3, 4])  # Example batch of parameters
+batch_of_params = jnp.array([0, 1, 2, 3, 4, 5])  # Example batch of parameters
 
 def simulate(params):
     # Simulate some computation with the parameters
