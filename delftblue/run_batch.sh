@@ -4,9 +4,9 @@
 #SBATCH --partition=gpu-a100
 #SBATCH --time=00:59:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --gpus-per-task=2
-#SBATCH --mem-per-cpu=8000M
+#SBATCH --cpus-per-task=4
+#SBATCH --gpus-per-task=1
+#SBATCH --mem-per-cpu=4000M
 #SBATCH --account=education-me-msc-me
 #SBATCH --array=0-99
 
