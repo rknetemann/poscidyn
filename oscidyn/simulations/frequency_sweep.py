@@ -58,7 +58,7 @@ def _explore_branches(
     drive_freq: jax.Array, # (n_freq,)
     drive_amp:  jax.Array, # (n_amp,)
     solver: AbstractSolver,
-    sweep_direction: SweepDirection,
+    sweep_direction: int,
 ) -> Tuple[jax.Array, jax.Array]:
     
     # n_simulations = const.N_COARSE_DRIVING_FREQUENCIES * const.N_COARSE_DRIVING_AMPLITUDES \
@@ -186,7 +186,7 @@ def _explore_branches(
 def _select_branches(
     t_max_disp: jax.Array, # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
     y_max_disp: jax.Array, # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, 2 * n_modes)
-    sweep_direction: SweepDirection,
+    sweep_direction: int,
 ) -> tuple[jax.Array, jax.Array]:
 
     n_coarse_freq, n_coarse_amp, n_init_disp, n_init_vel, n_modes = t_max_disp.shape
@@ -196,7 +196,7 @@ def _select_branches(
     t_branches = t_max_disp.reshape(n_coarse_freq, n_coarse_amp, n_branches, n_modes) # (n_coarse_freq, n_coarse_amp, n_branches, n_modes)
     y_branches = y_max_disp.reshape(n_coarse_freq, n_coarse_amp, n_branches, n_state) # (n_coarse_freq, n_coarse_amp, n_branches, n_modes * 2)
 
-    is_fwd = sweep_direction == const.SweepDirection.FORWARD
+    is_fwd = sweep_direction == 1
     idx_fwd = jnp.arange(n_coarse_freq, dtype=int) # (n_coarse_freq,)
     idx_bwd = jnp.arange(n_coarse_freq - 1, -1, -1, dtype=int) # (n_coarse_freq,)
 
@@ -365,7 +365,7 @@ def frequency_sweep(
 
 def vmap_safe_frequency_sweep(
     model: AbstractModel,
-    sweep_direction: SweepDirection,
+    sweep_direction: int, # 1 for forward, -1 for backward
     driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
     driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
     solver: AbstractSolver,

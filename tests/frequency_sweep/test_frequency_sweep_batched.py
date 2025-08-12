@@ -62,6 +62,7 @@ for i in range(n_batches):
     end_idx = min(start_idx + N_DUFFING_IN_PARALLEL, n_d)
     
     batch_duffing = DUFFING_COEFFICIENTS[start_idx:end_idx]
+    print(batch_duffing.shape)
     batch_sweeps = jax.vmap(batched_frequency_sweep)(batch_duffing)
 
 print(f"Time taken: {time.time() - start_time:.2f} seconds")
