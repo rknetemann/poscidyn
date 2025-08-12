@@ -10,11 +10,13 @@ from tqdm import tqdm
 import subprocess
 import time
 import numpy as np
+import h5py
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.gpu_monitor import GpuMonitor
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
+import argparse
 
 driving_frequencies = jnp.linspace(0.1, 2.0, 200)
 driving_amplitudes = jnp.linspace(0.01, 1.0, 10)
@@ -72,39 +74,67 @@ simulate_sub_batch = jax.vmap(simulate) # input args: (n_parallel_sim, n_params)
 params = jnp.column_stack((Q, gamma, sweep_direction))
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        task_number = int(sys.argv[1])
-        n_parallel_sims = np.linspace(2, 300, 100, dtype=int)  # Parallel simulations per device
-        n_parallel_sim = n_parallel_sims[task_number]
-    else:
-        n_parallel_sim = 10
+    parser = argparse.ArgumentParser(description="Batch simulate nonlinear oscillator frequency sweeps")
+    parser.add_argument(
+        "--n_parallel_sim",
+        type=int,
+        default=2,
+        nargs="?",
+        help="Amount of simulations to run in parallel (default: 2)"
+    )
+    parser.add_argument(
+        "--file_name",
+        type=str,
+        default=None,
+        help="Optional output file name for results"
+    )
+    parser.add_argument(
+        "--file_overwrite",
+        action="store_true",
+        help="Overwrite output file if it exists"
+    )
+
+    args = parser.parse_args()
+
+    n_parallel_sim = args.n_parallel_sim
+    file_name = args.file_name
+    file_overwrite = args.file_overwrite
+
+    if file_name:
+        dir_path = os.path.dirname(file_name)
+        if dir_path and not os.path.exists(dir_path):
+            os.makedirs(dir_path, exist_ok=True)
+        if os.path.exists(file_name) and not file_overwrite:
+            print(f"Error: File '{file_name}' already exists. Use --file_overwrite to overwrite file.", file=sys.stderr)
+            sys.exit(1)
     
     n_sim = len(Q)
     n_sub_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
     
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Sub-batches: {n_sub_batches}")
     
-    start_time = time.time()
-    with GpuMonitor(interval=0.5) as gm:
-        pbar = tqdm(range(n_sub_batches), desc="Simulating", unit="batch", dynamic_ncols=True)
-        for i in pbar:
-            start_idx = i * n_parallel_sim
-            end_idx = min(start_idx + n_parallel_sim, n_sim)
+    with h5py.File(file_name, 'w') as f:
+        with GpuMonitor(interval=0.5) as gm:
+            pbar = tqdm(range(n_sub_batches), desc="Simulating", unit="batch", dynamic_ncols=True)
+            start_time = time.time()
+            for i in pbar:
+                start_idx = i * n_parallel_sim
+                end_idx = min(start_idx + n_parallel_sim, n_sim)
 
-            batch_params = params[start_idx:end_idx]
-            t0 = time.time()
-            batch_sweeps = simulate_sub_batch(batch_params)
-            elapsed = time.time() - t0
+                batch_params = params[start_idx:end_idx]
+                t0 = time.time()
+                batch_sweeps = simulate_sub_batch(batch_params)
+                elapsed = time.time() - t0
 
-            n_in_batch = batch_params.shape[0]
-            secs_per_sim = elapsed / n_in_batch
+                n_in_batch = batch_params.shape[0]
+                secs_per_sim = elapsed / n_in_batch
 
-            postfix_parts = [f"{secs_per_sim:.2f}s/sim"]
-            gpu_line = gm.summary()
-            if gpu_line:
-                postfix_parts.append(gpu_line)
+                postfix_parts = [f"{secs_per_sim:.2f}s/sim"]
+                gpu_line = gm.summary()
+                if gpu_line:
+                    postfix_parts.append(gpu_line)
 
-            pbar.set_postfix_str("   ".join(postfix_parts))
+                pbar.set_postfix_str("   ".join(postfix_parts))
 
     print(f"Time taken: {time.time() - start_time:.2f} seconds")
     elapsed = time.time() - start_time
