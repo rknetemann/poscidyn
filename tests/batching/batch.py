@@ -19,8 +19,8 @@ import oscidyn
 driving_frequencies = jnp.linspace(0.1, 2.0, 200)
 driving_amplitudes = jnp.linspace(0.01, 1.0, 10)
 
-Q = jnp.linspace(1.1, 10.0, 4)  
-gamma = jnp.linspace(-0.001, 0.001, 4)  
+Q = jnp.linspace(1.1, 10.0, 50)  
+gamma = jnp.linspace(-0.001, 0.001, 50)  
 sweep_direction = jnp.array([-1, 1])
 
 n_modes = 1
