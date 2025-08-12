@@ -1,9 +1,23 @@
 import jax
-import os
-#jax.distributed.initialize()
+import jax.numpy as jnp
 
-print(os.environ.get("CUDA_VISIBLE_DEVICES"))
+batch_of_params = jnp.array([0, 1, 2, 3, 4])  # Example batch of parameters
 
-print("jax.device_count()", jax.device_count())
-print("jax.local_device_count()", jax.local_device_count())
-print("jax.devices()", jax.devices())
+def simulate(params):
+    # Simulate some computation with the parameters
+    some_result = params * 2  
+    return some_result
+
+# Parallelize across devices
+parallel_simulate = jax.pmap(simulate, axis_name="devices")
+
+# Split your batch for each device
+n_devices = jax.device_count()
+params_shards = jnp.array_split(batch_of_params, n_devices)
+
+print("Parameters for each device:", params_shards)
+
+# Put shards on GPUs and run
+results = parallel_simulate(jnp.array(params_shards))
+
+print("Results from each device:", results)
