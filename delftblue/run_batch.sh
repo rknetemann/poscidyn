@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --job-name="test_frequency_sweep_batched"
+#SBATCH --job-name="run_batch"
 #SBATCH --partition=gpu-a100
 #SBATCH --time=00:59:00
 #SBATCH --ntasks=1
@@ -17,7 +17,7 @@ cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
 
-srun python tests/test_simulation_batch.py
+srun python tests/batching/run_batch.py --batch-size 150 --monitor tmp/batch_file.hdf5
 
 deactivate
 
