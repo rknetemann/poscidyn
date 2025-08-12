@@ -34,7 +34,7 @@ gamma = gamma.flatten()
 sweep_direction = sweep_direction.flatten()
 
 n_sim = len(Q)
-n_parallel_sim_per_device = 15
+n_parallel_sim_per_device = 20
 n_devices = jax.device_count()
 n_sub_batches = math.ceil(n_sim / (n_parallel_sim_per_device * n_devices)) # Example: 1001 simulations, 10 simulations per device, 2 devices -> 51 sub-batches
 
