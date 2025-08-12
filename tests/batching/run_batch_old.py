@@ -1,9 +1,14 @@
+import os
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"  # Disable preallocation to avoid OOM errors
+
 import jax
 import jax.numpy as jnp
 import math
-import os
+
 import sys
 from tqdm import tqdm
+import subprocess
+import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
@@ -29,9 +34,11 @@ gamma = gamma.flatten()
 sweep_direction = sweep_direction.flatten()
 
 n_sim = len(Q)
-n_parallel_sim_per_device = 10
+n_parallel_sim_per_device = 15
 n_devices = jax.device_count()
-n_sub_batches = math.ceil(n_sim / (n_parallel_sim_per_device * n_devices)) # Example: 1001 simulations, 10 simulations per device, 4 devices -> 26 sub-batches
+n_sub_batches = math.ceil(n_sim / (n_parallel_sim_per_device * n_devices)) # Example: 1001 simulations, 10 simulations per device, 2 devices -> 51 sub-batches
+
+print(f"Total simulations: {n_sim}, Devices: {n_devices}, Parallel simulations per device: {n_parallel_sim_per_device}, Sub-batches: {n_sub_batches}")
 
 def split_sub_batches(Q, gamma, sweep_direction, n_devices):
     params = jnp.column_stack((Q, gamma, sweep_direction))
@@ -68,6 +75,23 @@ def simulate(params): # params: (n_params,)
         driving_amplitudes=driving_amplitudes,
         solver=solver,
     )
+
+def _gpu_postfix_smi():
+    try:
+        # Query GPU id, util %, memory used, memory total (CSV, no header)
+        smi_out = subprocess.check_output([
+            "nvidia-smi",
+            "--query-gpu=index,utilization.gpu,memory.used,memory.total",
+            "--format=csv,noheader,nounits"
+        ], encoding="utf-8")
+        lines = smi_out.strip().split("\n")
+        parts = []
+        for line in lines:
+            gid, util, mem_used, mem_total = [x.strip() for x in line.split(",")]
+            parts.append(f"GPU{gid} {util:>3}% {int(mem_used)/1024:.1f}GB/{int(mem_total)/1024:.1f}GB")
+        return " | ".join(parts)
+    except Exception:
+        return ""
     
 params_shards = split_sub_batches(Q, gamma, sweep_direction, n_devices) # (n_devices, n_sim/n_devices, n_params)
 
@@ -75,34 +99,39 @@ simulate_sub_batch = jax.vmap(simulate) # input args: (n_sims_per_device, n_para
 parallel_sub_batch_simulate = jax.pmap(simulate_sub_batch, axis_name="devices") # input args: (n_devices, n_sims_per_device, n_params)
 
 
-# Make sure we have a plain Python list of shard arrays
 params_shards_list = [jnp.asarray(s) for s in split_sub_batches(Q, gamma, sweep_direction, n_devices)]
 
-for i in tqdm(range(n_sub_batches)):
-    device_batches = []
-    start = i * n_parallel_sim_per_device
-    end = start + n_parallel_sim_per_device
+last_postfix_time = 0.0
+with tqdm(range(n_sub_batches), desc="Simulating", unit="sub") as pbar:
+    for i in pbar:
+        device_batches = []
+        start = i * n_parallel_sim_per_device
+        end = start + n_parallel_sim_per_device
 
-    for shard in params_shards_list:
-        shard_len = shard.shape[0]
+        for shard in params_shards_list:
+            shard_len = shard.shape[0]
 
-        if start >= shard_len:
-            # Nothing left in this shard; pad with the last available row (or zeros if empty)
-            if shard_len > 0:
-                batch = jnp.repeat(shard[-1:, :], n_parallel_sim_per_device, axis=0)
+            if start >= shard_len:
+                if shard_len > 0:
+                    batch = jnp.repeat(shard[-1:, :], n_parallel_sim_per_device, axis=0)
+                else:
+                    batch = jnp.zeros((n_parallel_sim_per_device, shard.shape[1]), dtype=oscidyn.const.DTYPE)
             else:
-                batch = jnp.zeros((n_parallel_sim_per_device, shard.shape[1]), dtype=oscidyn.const.DTYPE)
-        else:
-            # Take the slice and pad to fixed size if needed
-            chunk = shard[start:min(end, shard_len)]
-            if chunk.shape[0] < n_parallel_sim_per_device:
-                pad_count = n_parallel_sim_per_device - chunk.shape[0]
-                pad_row = chunk[-1:, :]  # repeat the last row
-                chunk = jnp.vstack([chunk, jnp.repeat(pad_row, pad_count, axis=0)])
-            batch = chunk
+                chunk = shard[start:min(end, shard_len)]
+                if chunk.shape[0] < n_parallel_sim_per_device:
+                    pad_count = n_parallel_sim_per_device - chunk.shape[0]
+                    pad_row = chunk[-1:, :]
+                    chunk = jnp.vstack([chunk, jnp.repeat(pad_row, pad_count, axis=0)])
+                batch = chunk
 
-        device_batches.append(batch)
+            device_batches.append(batch)
 
-    sub_batch_params_shards = jnp.stack(device_batches, axis=0)  # (n_devices, n_parallel_sim_per_device, n_params)
-    result = parallel_sub_batch_simulate(sub_batch_params_shards)
-    # TODO: collect/trim `result` if you want to discard padded repeats.
+        sub_batch_params_shards = jnp.stack(device_batches, axis=0)
+
+        result = parallel_sub_batch_simulate(sub_batch_params_shards)
+        # jax.tree_util.tree_map(lambda x: x.block_until_ready(), result)  # Ensure completion before measuring
+
+        now = time.monotonic()
+        if now - last_postfix_time > 0.25:
+            pbar.set_postfix_str(_gpu_postfix_smi())
+            last_postfix_time = now
