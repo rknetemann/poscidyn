@@ -22,7 +22,7 @@ driving_frequencies = jnp.linspace(0.1, 2.0, 200)
 driving_amplitudes = jnp.linspace(0.01, 1.0, 10)
 
 Q = jnp.linspace(1.1, 10.0, 50)  
-gamma = jnp.linspace(0.001, 0.03, 50)  
+gamma = jnp.linspace(-0.001, 0.003, 50)  
 sweep_direction = jnp.array([-1, 1])
 
 n_modes = 1
@@ -37,6 +37,9 @@ Q, gamma, sweep_direction = jnp.meshgrid(Q, gamma, sweep_direction)
 Q = Q.flatten()
 gamma = gamma.flatten()
 sweep_direction = sweep_direction.flatten()
+
+params = jnp.column_stack((Q, gamma, sweep_direction))
+params = params[jnp.argsort(params[:, 0])] # sort by Q values (column 0)
 
 def simulate(params): # params: (n_params,)
     Q_val, gamma_val, direction = params
@@ -76,10 +79,16 @@ params = jnp.column_stack((Q, gamma, sweep_direction))
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Batch simulate nonlinear oscillator frequency sweeps")
     parser.add_argument(
+        "--n_batches",
+        type=int,
+        default=2,
+        help="Number of batches to divide the simulations into (default: 2)"
+    )
+    parser.add_argument(
         "--batch_id",
-        type=str,
-        default="",
-        help="Batch identifier of the simulation (default: empty string, no ID specified)"
+        type=int,
+        default=0,
+        help="Which batch to run (default: 0)"
     )
     parser.add_argument(
         "--n_parallel_sim",
@@ -102,6 +111,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    n_batches = args.n_batches
     batch_id = args.batch_id
     n_parallel_sim = args.n_parallel_sim
     file_name = args.file_name
@@ -122,8 +132,11 @@ if __name__ == "__main__":
     else:
         datetime = time.strftime("%Y-%m-%d_%H:%M:%S")
         file_name = f"batch_{datetime}{batch_id_formatted}.hdf5"
-    
-    n_sim = len(Q)
+
+    param_batches = [params[i::n_batches] for i in range(n_batches)]
+    param_batch = param_batches[batch_id]
+
+    n_sim = len(param_batch)
     n_sub_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
     
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Sub-batches: {n_sub_batches}")
@@ -137,6 +150,7 @@ if __name__ == "__main__":
         hdf5.attrs['n_parallel_simulations'] = n_parallel_sim
         hdf5.attrs['n_sub_batches'] = n_sub_batches
         hdf5.attrs['started_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
+        hdf5.attrs['completed_at'] = ""
 
         with GpuMonitor(interval=0.5) as gm:
             pbar = tqdm(range(n_sub_batches), desc="Simulating", unit="batch", dynamic_ncols=True)

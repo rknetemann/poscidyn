@@ -2,3 +2,5 @@
 __pycache__
 out/
 tmp/
+*.hdf5
+*.h5
