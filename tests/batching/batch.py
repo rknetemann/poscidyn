@@ -129,33 +129,32 @@ if __name__ == "__main__":
         datetime = time.strftime("%Y-%m-%d_%H:%M:%S")
         file_name = f"batch_{datetime}{task_id_formatted}.hdf5"
 
-    param_batches = [params[i::n_tasks] for i in range(n_tasks)]
-    param_batch = param_batches[task_id]
+    task_param = [params[i::n_tasks] for i in range(n_tasks)][task_id]
 
-    n_sim = len(param_batch)
-    n_sub_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
+    n_sim = len(task_param)
+    n_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
     
-    print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Sub-batches: {n_sub_batches}")
+    print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Batches: {n_batches}")
     
     with h5py.File(file_name, 'w') as hdf5:
         hdf5.create_dataset('drving_frequencies', data=driving_frequencies)
         hdf5.create_dataset('driving_amplitudes', data=driving_amplitudes)
-        hdf5.create_dataset('params', data=params)
+        hdf5.create_dataset('params', data=task_param)
         hdf5.attrs['task_id'] = task_id
         hdf5.attrs['n_simulations'] = n_sim
         hdf5.attrs['n_parallel_simulations'] = n_parallel_sim
-        hdf5.attrs['n_sub_batches'] = n_sub_batches
+        hdf5.attrs['n_batches'] = n_batches
         hdf5.attrs['started_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
         hdf5.attrs['completed_at'] = ""
 
         with GpuMonitor(interval=0.5) as gm:
-            pbar = tqdm(range(n_sub_batches), desc="Simulating", unit="batch", dynamic_ncols=True)
+            pbar = tqdm(range(n_batches), desc="Simulating", unit="batch", dynamic_ncols=True)
             start_time = time.time()
             for i in pbar:
                 start_idx = i * n_parallel_sim
                 end_idx = min(start_idx + n_parallel_sim, n_sim)
 
-                batch_params = params[start_idx:end_idx]
+                batch_params = task_param[start_idx:end_idx]
                 t0 = time.time()
                 batch_sweeps = simulate_sub_batch(batch_params)
                 elapsed = time.time() - t0
