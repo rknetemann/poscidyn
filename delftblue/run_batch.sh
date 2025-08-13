@@ -19,7 +19,7 @@ mkdir -p output
 
 source .venv/bin/activate
 
-srun python tests/batching/batch.py --n_batches 100 --batch_id $SLURM_ARRAY_TASK_ID --n_parallel_sim 128 --file_name "output/batch_$(date +%Y-%m-%d_%H:%M:%S)_$SLURM_ARRAY_TASK_ID.hdf5"
+srun python tests/batching/batch.py --n_batches 10 --batch_id $SLURM_ARRAY_TASK_ID --n_parallel_sim 128 --file_name "output/batch_$(date +%Y-%m-%d_%H:%M:%S)_$SLURM_ARRAY_TASK_ID.hdf5"
 
 deactivate
 
