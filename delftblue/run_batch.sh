@@ -13,7 +13,6 @@
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.99
 
-echo "$(pwd)"
 cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
@@ -22,3 +21,4 @@ srun python tests/batching/batch.py --n_tasks 2 --task_id $SLURM_ARRAY_TASK_ID -
 
 deactivate
 
+echo "$(pwd)"
