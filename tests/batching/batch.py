@@ -70,8 +70,6 @@ def simulate(params): # params: (n_params,)
     
 simulate_sub_batch = jax.vmap(simulate) # input args: (n_parallel_sim, n_params)
 
-params = jnp.column_stack((Q, gamma, sweep_direction))
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Batch simulate nonlinear oscillator frequency sweeps")
     parser.add_argument(
