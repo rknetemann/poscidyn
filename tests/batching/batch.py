@@ -18,14 +18,14 @@ driving_frequencies = jnp.linspace(0.1, 2.0, 200)
 driving_amplitudes = jnp.linspace(0.01, 1.0, 10)
 
 Q = jnp.linspace(1.1, 10.0, 50)  
-gamma = jnp.linspace(-0.001, 0.001, 50)  
+gamma = jnp.linspace(-0.003, 0.003, 50)  
 sweep_direction = jnp.array([-1, 1])
 
 n_modes = 1
 omega_ref = jnp.array(1.0, dtype=oscidyn.const.DTYPE)
 x_ref = jnp.array(1.0, dtype=oscidyn.const.DTYPE)
 omega_0 = jnp.array([1.0],   dtype=oscidyn.const.DTYPE)
-eta = jnp.array([0.005], dtype=oscidyn.const.DTYPE)
+eta = jnp.array([0.000], dtype=oscidyn.const.DTYPE)
 alpha0 = jnp.zeros((1, 1, 1), dtype=oscidyn.const.DTYPE)
 delta0 = jnp.zeros((1, 1, 1, 1, 1), dtype=oscidyn.const.DTYPE)
 
