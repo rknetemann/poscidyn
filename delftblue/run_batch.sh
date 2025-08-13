@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=8000M
-#SBATCH --output output/slurm%A_%a.out
+#SBATCH --output delftblue/output/slurm%A_%a.out
 #SBATCH --array=0-99
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.99
@@ -18,7 +18,7 @@ cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
 
-srun python tests/batching/batch.py --n_batches 10 --batch_id $SLURM_ARRAY_TASK_ID --n_parallel_sim 128 --file_name "output/batch_$(date +%Y-%m-%d_%H:%M:%S)_$SLURM_ARRAY_TASK_ID.hdf5"
+srun python tests/batching/batch.py --n_batches 10 --batch_id $SLURM_ARRAY_TASK_ID --n_parallel_sim 128 --file_name "delftblue/output/batch_$(date +%Y-%m-%d_%H:%M:%S)_$SLURM_ARRAY_TASK_ID.hdf5"
 
 deactivate
 
