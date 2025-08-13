@@ -14,7 +14,7 @@
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.99
 
 echo "$(pwd)"
-cd /home/rknetemann/projects/oscidynl
+cd /home/rknetemann/projects/oscidyn
 mkdir -p output
 
 source .venv/bin/activate
