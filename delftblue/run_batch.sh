@@ -9,7 +9,7 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=8000M
 #SBATCH --output delftblue/output/slurm%A_%a.out
-#SBATCH --array=0-99
+#SBATCH --array=0-1
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.99
 
