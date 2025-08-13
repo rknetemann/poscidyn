@@ -22,7 +22,7 @@ driving_frequencies = jnp.linspace(0.1, 2.0, 200)
 driving_amplitudes = jnp.linspace(0.01, 1.0, 10)
 
 Q = jnp.linspace(1.1, 10.0, 50)  
-gamma = jnp.linspace(-0.001, 0.001, 50)  
+gamma = jnp.linspace(0.001, 0.03, 50)  
 sweep_direction = jnp.array([-1, 1])
 
 n_modes = 1
@@ -76,6 +76,12 @@ params = jnp.column_stack((Q, gamma, sweep_direction))
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Batch simulate nonlinear oscillator frequency sweeps")
     parser.add_argument(
+        "--batch_id",
+        type=str,
+        default="",
+        help="Batch identifier of the simulation (default: empty string, no ID specified)"
+    )
+    parser.add_argument(
         "--n_parallel_sim",
         type=int,
         default=2,
@@ -96,9 +102,15 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    batch_id = args.batch_id
     n_parallel_sim = args.n_parallel_sim
     file_name = args.file_name
     file_overwrite = args.file_overwrite
+
+    if batch_id != "":
+        batch_id_formatted = f"_{batch_id}"
+    else:
+        batch_id_formatted = ""
 
     if file_name:
         dir_path = os.path.dirname(file_name)
@@ -107,13 +119,25 @@ if __name__ == "__main__":
         if os.path.exists(file_name) and not file_overwrite:
             print(f"Error: File '{file_name}' already exists. Use --file_overwrite to overwrite file.", file=sys.stderr)
             sys.exit(1)
+    else:
+        datetime = time.strftime("%Y-%m-%d_%H:%M:%S")
+        file_name = f"batch_{datetime}{batch_id_formatted}.hdf5"
     
     n_sim = len(Q)
     n_sub_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
     
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Sub-batches: {n_sub_batches}")
     
-    with h5py.File(file_name, 'w') as f:
+    with h5py.File(file_name, 'w') as hdf5:
+        hdf5.create_dataset('drving_frequencies', data=driving_frequencies)
+        hdf5.create_dataset('driving_amplitudes', data=driving_amplitudes)
+        hdf5.create_dataset('params', data=params)
+        hdf5.attrs['batch_id'] = batch_id
+        hdf5.attrs['n_simulations'] = n_sim
+        hdf5.attrs['n_parallel_simulations'] = n_parallel_sim
+        hdf5.attrs['n_sub_batches'] = n_sub_batches
+        hdf5.attrs['started_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
+
         with GpuMonitor(interval=0.5) as gm:
             pbar = tqdm(range(n_sub_batches), desc="Simulating", unit="batch", dynamic_ncols=True)
             start_time = time.time()
@@ -126,6 +150,18 @@ if __name__ == "__main__":
                 batch_sweeps = simulate_sub_batch(batch_params)
                 elapsed = time.time() - t0
 
+                for j, batch_sweep in enumerate(batch_sweeps): # batch_sweep: (n_driving_frequencies * n_driving_amplitudes)
+                    sim_index = start_idx + j
+                    sim_width = len(str(n_sim))
+                    sim_id = f"simulation_{sim_index:0{sim_width-1}d}"
+                    grp = hdf5.create_group(sim_id)
+                    
+                    grp.attrs['Q'] = batch_params[j, 0]
+                    grp.attrs['gamma'] = batch_params[j, 1]
+                    grp.attrs['sweep_direction'] = batch_params[j, 2]
+                    
+                    grp.create_dataset('max_steady_state_displacement', data=batch_sweep)
+
                 n_in_batch = batch_params.shape[0]
                 secs_per_sim = elapsed / n_in_batch
 
@@ -135,6 +171,11 @@ if __name__ == "__main__":
                     postfix_parts.append(gpu_line)
 
                 pbar.set_postfix_str("   ".join(postfix_parts))
+                hdf5.attrs['max_gpu_usage'] = gm.max_summary() if gm._max_summary else ""
+        
+            hdf5.attrs['completed_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
+            hdf5.attrs['elapsed_time'] = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+            hdf5.attrs['n_simulations_per_second'] = n_sim / (time.time() - start_time)
 
     print(f"Time taken: {time.time() - start_time:.2f} seconds")
     elapsed = time.time() - start_time

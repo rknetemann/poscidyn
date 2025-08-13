@@ -10,6 +10,8 @@ class GpuMonitor:
         with GpuMonitor(interval=1.0) as gm:
             ...
             pbar.set_postfix_str(gm.summary())
+            # or for max values:
+            pbar.set_postfix_str(gm.max_summary())
     """
     def __init__(self, interval: float = 1.0):
         self.interval = interval
@@ -17,6 +19,8 @@ class GpuMonitor:
         self._lock = threading.Lock()
         self._summary: str = ""
         self._stats: List[Dict] = []
+        self._max_stats: List[Dict] = []  # Store maximum values
+        self._max_summary: str = ""
         self._thread: Optional[threading.Thread] = None
         self._use_nvml = False
         self._nvml = None
@@ -65,12 +69,57 @@ class GpuMonitor:
     def stats(self) -> List[Dict]:
         with self._lock:
             return list(self._stats)
+            
+    def max_stats(self) -> List[Dict]:
+        """Return the maximum GPU stats observed since monitoring began."""
+        with self._lock:
+            return list(self._max_stats)
 
     def summary(self) -> str:
         with self._lock:
             return self._summary
+            
+    def max_summary(self) -> str:
+        """Return a summary string of the maximum GPU stats observed."""
+        with self._lock:
+            return self._max_summary
 
     # --- internals ---
+
+    def _update_max_stats(self, current_stats: List[Dict]):
+        """Update maximum stats based on current values."""
+        if not self._max_stats:
+            # Initialize max_stats with the first reading
+            self._max_stats = [stat.copy() for stat in current_stats]
+            return
+            
+        # Ensure max_stats has entries for all GPUs
+        gpu_indices = {stat["index"] for stat in current_stats}
+        max_indices = {stat["index"] for stat in self._max_stats}
+        
+        # Add any missing GPUs to max_stats
+        for idx in gpu_indices - max_indices:
+            for stat in current_stats:
+                if stat["index"] == idx:
+                    self._max_stats.append(stat.copy())
+                    break
+        
+        # Update max values
+        for current in current_stats:
+            for i, max_stat in enumerate(self._max_stats):
+                if max_stat["index"] == current["index"]:
+                    max_stat["util"] = max(max_stat["util"], current["util"])
+                    max_stat["used_gb"] = max(max_stat["used_gb"], current["used_gb"])
+        
+        # Generate max summary string
+        parts = []
+        for stat in sorted(self._max_stats, key=lambda x: x["index"]):
+            i = stat["index"]
+            util = stat["util"]
+            used_gb = stat["used_gb"]
+            total_gb = stat["total_gb"]
+            parts.append(f"GPU{i}: {util}% {used_gb:.1f}GB/{total_gb:.1f}GB")
+        self._max_summary = " | ".join(parts)
 
     def _run(self):
         while not self._stop.is_set():
@@ -103,6 +152,7 @@ class GpuMonitor:
         with self._lock:
             self._stats = stats
             self._summary = summary
+            self._update_max_stats(stats)
 
     def _poll_nvidia_smi(self):
         import subprocess
@@ -128,3 +178,4 @@ class GpuMonitor:
         with self._lock:
             self._stats = stats
             self._summary = summary
+            self._update_max_stats(stats)
