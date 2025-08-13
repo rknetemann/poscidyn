@@ -8,13 +8,14 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=8000M
-#SBATCH --output output/slurm%A-%a.out
-#SBATCH --mail-type=ALL,ARRAY_TASKS
+#SBATCH --output output/slurm%A_%a.out
 #SBATCH --array=0-99
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.99
 
-cd /home/rknetemann/projects/oscidyn
+echo "$(pwd)"
+cd /home/rknetemann/projects/oscidynl
+mkdir -p output
 
 source .venv/bin/activate
 
