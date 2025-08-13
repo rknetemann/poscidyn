@@ -1,15 +1,11 @@
 import os
-#os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"  
-#os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "false"  # Disable preallocation to avoid OOM errors
 import jax
 import jax.numpy as jnp
 import sys
 import time
 import math
 from tqdm import tqdm
-import subprocess
 import time
-import numpy as np
 import h5py
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -22,7 +18,7 @@ driving_frequencies = jnp.linspace(0.1, 2.0, 200)
 driving_amplitudes = jnp.linspace(0.01, 1.0, 10)
 
 Q = jnp.linspace(1.1, 10.0, 50)  
-gamma = jnp.linspace(-0.001, 0.003, 50)  
+gamma = jnp.linspace(-0.001, 0.001, 50)  
 sweep_direction = jnp.array([-1, 1])
 
 n_modes = 1
@@ -79,16 +75,16 @@ params = jnp.column_stack((Q, gamma, sweep_direction))
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Batch simulate nonlinear oscillator frequency sweeps")
     parser.add_argument(
-        "--n_batches",
+        "--n_tasks",
         type=int,
         default=2,
-        help="Number of batches to divide the simulations into (default: 2)"
+        help="Number of tasks to divide the batches into (default: 2)"
     )
     parser.add_argument(
-        "--batch_id",
+        "--task_id",
         type=int,
         default=0,
-        help="Which batch to run (default: 0)"
+        help="Which task to run (default: 0)"
     )
     parser.add_argument(
         "--n_parallel_sim",
@@ -111,16 +107,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    n_batches = args.n_batches
-    batch_id = args.batch_id
+    n_tasks = args.n_tasks
+    task_id = args.task_id
     n_parallel_sim = args.n_parallel_sim
     file_name = args.file_name
     file_overwrite = args.file_overwrite
 
-    if batch_id != "":
-        batch_id_formatted = f"_{batch_id}"
+    if task_id != "":
+        task_id_formatted = f"_{task_id}"
     else:
-        batch_id_formatted = ""
+        task_id_formatted = ""
 
     if file_name:
         dir_path = os.path.dirname(file_name)
@@ -131,10 +127,10 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         datetime = time.strftime("%Y-%m-%d_%H:%M:%S")
-        file_name = f"batch_{datetime}{batch_id_formatted}.hdf5"
+        file_name = f"batch_{datetime}{task_id_formatted}.hdf5"
 
-    param_batches = [params[i::n_batches] for i in range(n_batches)]
-    param_batch = param_batches[batch_id]
+    param_batches = [params[i::n_tasks] for i in range(n_tasks)]
+    param_batch = param_batches[task_id]
 
     n_sim = len(param_batch)
     n_sub_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
@@ -145,7 +141,7 @@ if __name__ == "__main__":
         hdf5.create_dataset('drving_frequencies', data=driving_frequencies)
         hdf5.create_dataset('driving_amplitudes', data=driving_amplitudes)
         hdf5.create_dataset('params', data=params)
-        hdf5.attrs['batch_id'] = batch_id
+        hdf5.attrs['task_id'] = task_id
         hdf5.attrs['n_simulations'] = n_sim
         hdf5.attrs['n_parallel_simulations'] = n_parallel_sim
         hdf5.attrs['n_sub_batches'] = n_sub_batches
