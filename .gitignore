@@ -4,3 +4,4 @@ out/
 tmp/
 *.hdf5
 *.h5
+.venv
