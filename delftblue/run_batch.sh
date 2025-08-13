@@ -18,7 +18,7 @@ cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
 
-srun python tests/batching/batch.py --n_batches 2 --batch_id $SLURM_ARRAY_TASK_ID --n_parallel_sim 128 --file_name "delftblue/output/batch_$(date +%Y-%m-%d_%H:%M:%S)_$SLURM_ARRAY_TASK_ID.hdf5"
+srun python tests/batching/batch.py --n_tasks 2 --task_id $SLURM_ARRAY_TASK_ID --n_parallel_sim 128 --file_name "delftblue/output/batch_$(date +%Y-%m-%d_%H:%M:%S)_$SLURM_ARRAY_TASK_ID.hdf5"
 
 deactivate
 
