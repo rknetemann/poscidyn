@@ -133,7 +133,7 @@ if __name__ == "__main__":
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Batches: {n_batches}")
     
     with h5py.File(file_name, 'w') as hdf5:
-        hdf5.create_dataset('drving_frequencies', data=driving_frequencies)
+        hdf5.create_dataset('driving_frequencies', data=driving_frequencies)
         hdf5.create_dataset('driving_amplitudes', data=driving_amplitudes)
         hdf5.create_dataset('params', data=task_param)
         hdf5.attrs['task_id'] = task_id
