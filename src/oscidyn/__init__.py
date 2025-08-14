@@ -1,12 +1,12 @@
-from .constants import *
-from .solver import *
+from .simulation.constants import *
+from .simulation.solver import *
 
-from .examples.models import *
+from .simulation.examples.models import *
 
-from .simulations.frequency_sweep import frequency_sweep, vmap_safe_frequency_sweep
-from .simulations.time_response import time_response
+from .simulation.simulations.frequency_sweep import frequency_sweep, vmap_safe_frequency_sweep
+from .simulation.simulations.time_response import time_response
 
-from .utils.plotting import *
+from .simulation.utils.plotting import *
 
 """
 A Python toolkit for simulating and visualizing nonlinear oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.

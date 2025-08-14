@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
 
-import oscidyn.constants as const
+import oscidyn.simulation.constants as const
 
 def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp):
     # flatten the coarse‐grid for plotting

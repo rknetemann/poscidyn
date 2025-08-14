@@ -1,10 +1,10 @@
 # results.py
 import matplotlib.pyplot as plt
 
-from oscidyn.models import AbstractModel
-from oscidyn.solver import AbstractSolver
-from oscidyn.constants import SweepDirection
-import oscidyn.constants as const
+from oscidyn.simulation.models import AbstractModel
+from oscidyn.simulation.solver import AbstractSolver
+from oscidyn.simulation.constants import SweepDirection
+import oscidyn.simulation.constants as const
 
 class FrequencySweepResult():
     def __init__(self, model: AbstractModel, sweep_direction: SweepDirection,

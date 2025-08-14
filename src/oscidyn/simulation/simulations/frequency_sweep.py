@@ -5,14 +5,14 @@ import jax.numpy as jnp
 from typing import Tuple
 import numpy as np
 
-from oscidyn.models import AbstractModel
-from oscidyn.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStateSolver, FixedTimeSolver
-from oscidyn.constants import SweepDirection
-from oscidyn.results import FrequencySweepResult
+from oscidyn.simulation.models import AbstractModel
+from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStateSolver, FixedTimeSolver
+from oscidyn.simulation.constants import SweepDirection
+from oscidyn.simulation.results import FrequencySweepResult
 import time
 from mpl_toolkits.mplot3d import Axes3D
-import oscidyn.constants as const
-import oscidyn.utils.plotting as plt
+import oscidyn.simulation.constants as const
+import oscidyn.simulation.utils.plotting as plt
 
 # TO DO: Improve steady state amplitude calculation
 # ASSUMPTION: The steady state is already reached in the time response

@@ -4,13 +4,13 @@ import jax
 import jax.numpy as jnp
 from typing import Tuple
 import numpy as np
-
-from oscidyn.models import AbstractModel
-from oscidyn.solver import AbstractSolver,SteadyStateSolver
-from oscidyn.constants import SweepDirection
-from oscidyn.results import FrequencySweepResult
 import time
-import oscidyn.constants as const
+
+from oscidyn.simulation.models import AbstractModel
+from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver
+from oscidyn.simulation.constants import SweepDirection
+from oscidyn.simulation.results import FrequencySweepResult
+import oscidyn.simulation.constants as const
 
 def time_response(
     model: AbstractModel,
