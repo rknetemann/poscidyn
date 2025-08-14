@@ -2,7 +2,7 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-from typing import Tuple
+from typing import Tuple, Dict
 import numpy as np
 
 from oscidyn.simulation.models import AbstractModel
@@ -290,7 +290,7 @@ def frequency_sweep(
     driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
     driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
     solver: AbstractSolver,
-) -> tuple:
+) -> Dict[str, jax.Array]:
             
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
         raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
@@ -308,8 +308,6 @@ def frequency_sweep(
         
         n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int) # Number of time steps to cover one period with the given sampling frequency
         solver.n_time_steps = n_time_steps
-
-        print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
 
     # We start by exploring the branches of the system
     t_max_disp, y_max_disp, t_max_vel, y_max_vel = _explore_branches(
@@ -349,67 +347,10 @@ def frequency_sweep(
     tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1)
     tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
 
-    frequency_sweep = FrequencySweepResult(
-        model=model,
-        sweep_direction=sweep_direction,
-        driving_frequencies=driving_frequencies, # Shape: (n_driving_frequencies,)
-        driving_amplitudes=driving_amplitudes, # Shape: (n_driving_amplitudes,)
-        steady_state_displacement_amplitude=ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
-        steady_state_velocity_amplitude=ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
-        total_steady_state_displacement_amplitude=tot_ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
-        total_steady_state_velocity_amplitude=tot_ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
-        solver=solver,
-    )
-
-    return frequency_sweep
-
-def vmap_safe_frequency_sweep(
-    model: AbstractModel,
-    sweep_direction: int, # 1 for forward, -1 for backward
-    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
-    driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
-    solver: AbstractSolver,
-):
-            
-    if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
-        raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
-    
-    # We start by exploring the branches of the system
-    t_max_disp, y_max_disp, t_max_vel, y_max_vel = _explore_branches(
-        model=model,
-        drive_freq=driving_frequencies,
-        drive_amp=driving_amplitudes,
-        solver=solver,
-        sweep_direction=sweep_direction,
-    )
-    # t: # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
-    # y: # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
-    
-    # Based on if it is a forward or backward sweep, we select the right branches
-    t_max_disp_sel, y_max_disp_sel = _select_branches(
-        t_max_disp=t_max_disp,
-        y_max_disp=y_max_disp,
-        sweep_direction=sweep_direction,
-    ) 
-    # t: (n_coarse_freq, n_coarse_amp, n_modes)
-    # y: (n_coarse_freq, n_coarse_amp, n_modes * 2)
-    
-    # extract the coarse‐grid steady‐state amplitudes from the selected branches
-    ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
-
-    # plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
-    
-    ss_disp_amp, ss_vel_amp = _fine_sweep(
-        model=model,
-        t_max_disp=t_max_disp_sel,
-        y_max_disp=y_max_disp_sel,
-        driving_frequencies=driving_frequencies,
-        driving_amplitudes=driving_amplitudes,
-        solver=solver,
-    )
-
-    # ASSUMPTION: Mode superposition validity for nonlinear systems
-    tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1) # (n_driving_frequencies * n_driving_amplitudes,)
-    tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
-
-    return tot_ss_disp_amp
+    result = {
+        'ss_disp_amp': ss_disp_amp, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        'ss_vel_amp': ss_vel_amp, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        'tot_ss_disp_amp': tot_ss_disp_amp, # (n_driving_frequencies * n_driving_amplitudes,)
+        'tot_ss_vel_amp': tot_ss_vel_amp, # (n_driving_frequencies * n_driving_amplitudes,)
+    }
+    return result

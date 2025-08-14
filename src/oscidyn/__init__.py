@@ -3,7 +3,7 @@ from .simulation.solver import *
 
 from .simulation.examples.models import *
 
-from .simulation.simulations.frequency_sweep import frequency_sweep, vmap_safe_frequency_sweep
+from .simulation.simulations.frequency_sweep import frequency_sweep
 from .simulation.simulations.time_response import time_response
 
 from .simulation.utils.plotting import *

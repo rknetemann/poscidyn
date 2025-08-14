@@ -7,6 +7,7 @@ import math
 from tqdm import tqdm
 import time
 import h5py
+import numpy as np
 
 from utils.gpu_monitor import GpuMonitor
 import oscidyn
@@ -55,10 +56,10 @@ def simulate(params): # params: (n_params,)
     )
     
     solver = oscidyn.FixedTimeSteadyStateSolver(
-        max_steps=4096, n_time_steps=512, rtol=1e-4, atol=1e-6, progress_bar=False
+        max_steps=4096, rtol=1e-4, atol=1e-6, progress_bar=False
     )
 
-    return oscidyn.vmap_safe_frequency_sweep(
+    return oscidyn.frequency_sweep(
         model=model,
         sweep_direction=direction,
         driving_frequencies=driving_frequencies,
@@ -132,11 +133,10 @@ if __name__ == "__main__":
     
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Batches: {n_batches}")
     
-    
     with h5py.File(file_name, 'w') as hdf5:
-        hdf5.create_dataset('driving_frequencies', data=driving_frequencies)
-        hdf5.create_dataset('driving_amplitudes', data=driving_amplitudes)
-        hdf5.create_dataset('params', data=task_param)
+        hdf5.create_dataset('driving_frequencies', data=np.asarray(driving_frequencies))
+        hdf5.create_dataset('driving_amplitudes', data=np.asarray(driving_amplitudes))
+        hdf5.create_dataset('params', data=np.asarray(task_param))
         hdf5.attrs['task_id'] = task_id
         hdf5.attrs['n_simulations'] = n_sim
         hdf5.attrs['n_parallel_simulations'] = n_parallel_sim
@@ -158,20 +158,20 @@ if __name__ == "__main__":
                 batch_sweeps = simulate_sub_batch(batch_params)
                 elapsed = time.time() - t0
 
-                for j, batch_sweep in enumerate(batch_sweeps): # batch_sweep: (n_driving_frequencies * n_driving_amplitudes)
-                    sim_index = start_idx + j
-                    sim_width = len(str(n_sim))
-                    sim_id = f"simulation_{sim_index:0{sim_width-1}d}"
-                
-                    ds = grp.create_dataset(sim_id, data=batch_sweep)
-                    
-                    ds.attrs['Q'] = batch_params[j, 0]
-                    ds.attrs['gamma'] = batch_params[j, 1]
-                    ds.attrs['sweep_direction'] = batch_params[j, 2]
-                    
-
                 n_in_batch = batch_params.shape[0]
-                secs_per_sim = elapsed / n_in_batch
+                sim_width = len(str(n_sim - 1)) if n_sim > 1 else 1
+                for j in range(n_in_batch):
+                    sim_index = start_idx + j
+                    sim_id = f"simulation_{sim_index:0{sim_width}d}"
+
+                    tot_amp = np.asarray(batch_sweeps['tot_ss_disp_amp'][j])
+                    ds = grp.create_dataset(sim_id, data=tot_amp)
+
+                    ds.attrs['Q'] = float(batch_params[j, 0])
+                    ds.attrs['gamma'] = float(batch_params[j, 1])
+                    ds.attrs['sweep_direction'] = int(batch_params[j, 2])
+
+                secs_per_sim = elapsed / max(n_in_batch, 1)
 
                 postfix_parts = [f"{secs_per_sim:.2f}s/sim"]
                 gpu_line = gm.summary()

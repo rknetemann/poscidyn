@@ -18,9 +18,11 @@ cd /home/rknetemann/projects/oscidyn
 
 source .venv/bin/activate
 
-OUTDIR="results/raw/batch_$(date +%Y-%m-%d_%H-%M-%S)"
-mkdir -p $OUTDIR
+OUTDIR="results/raw"
+mkdir -p "$OUTDIR"
 
-srun python tools/batch.py --n_tasks=2 --task_id=$SLURM_ARRAY_TASK_ID --n_parallel_sim=128 --file_name=$OUTDIR/batch_$SLURM_ARRAY_TASK_ID.hdf5
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+
+srun python tools/batch.py --n_tasks=2 --task_id=$SLURM_ARRAY_TASK_ID --n_parallel_sim=128 --file_name="$OUTDIR/batch_${SLURM_ARRAY_TASK_ID}_${TIMESTAMP}.hdf5"
 
 deactivate
