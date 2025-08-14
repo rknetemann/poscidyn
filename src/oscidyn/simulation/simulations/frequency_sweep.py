@@ -409,7 +409,7 @@ def vmap_safe_frequency_sweep(
     )
 
     # ASSUMPTION: Mode superposition validity for nonlinear systems
-    tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1)
+    tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1) # (n_driving_frequencies * n_driving_amplitudes,)
     tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
 
     return tot_ss_disp_amp

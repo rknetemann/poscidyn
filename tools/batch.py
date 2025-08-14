@@ -132,6 +132,7 @@ if __name__ == "__main__":
     
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Batches: {n_batches}")
     
+    
     with h5py.File(file_name, 'w') as hdf5:
         hdf5.create_dataset('driving_frequencies', data=driving_frequencies)
         hdf5.create_dataset('driving_amplitudes', data=driving_amplitudes)
@@ -142,6 +143,8 @@ if __name__ == "__main__":
         hdf5.attrs['n_batches'] = n_batches
         hdf5.attrs['started_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
         hdf5.attrs['completed_at'] = ""
+        
+        grp = hdf5.create_group('simulations')
 
         with GpuMonitor(interval=0.5) as gm:
             pbar = tqdm(range(n_batches), desc="Simulating", unit="batch", dynamic_ncols=True)
@@ -159,13 +162,13 @@ if __name__ == "__main__":
                     sim_index = start_idx + j
                     sim_width = len(str(n_sim))
                     sim_id = f"simulation_{sim_index:0{sim_width-1}d}"
-                    grp = hdf5.create_group(sim_id)
+                
+                    ds = grp.create_dataset(sim_id, data=batch_sweep)
                     
-                    grp.attrs['Q'] = batch_params[j, 0]
-                    grp.attrs['gamma'] = batch_params[j, 1]
-                    grp.attrs['sweep_direction'] = batch_params[j, 2]
+                    ds.attrs['Q'] = batch_params[j, 0]
+                    ds.attrs['gamma'] = batch_params[j, 1]
+                    ds.attrs['sweep_direction'] = batch_params[j, 2]
                     
-                    grp.create_dataset('max_steady_state_displacement', data=batch_sweep)
 
                 n_in_batch = batch_params.shape[0]
                 secs_per_sim = elapsed / n_in_batch
