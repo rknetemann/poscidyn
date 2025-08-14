@@ -8,9 +8,7 @@ from tqdm import tqdm
 import time
 import h5py
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.gpu_monitor import GpuMonitor
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 import argparse
 

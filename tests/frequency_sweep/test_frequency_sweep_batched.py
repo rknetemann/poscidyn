@@ -7,7 +7,6 @@ import time
 import matplotlib.pyplot as plt
 import tensorstore as ts
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import oscidyn
 
 N_DUFFING = 20
