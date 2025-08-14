@@ -412,16 +412,4 @@ def vmap_safe_frequency_sweep(
     tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1)
     tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
 
-    # frequency_sweep = FrequencySweepResult(
-    #     model=model,
-    #     sweep_direction=sweep_direction,
-    #     driving_frequencies=driving_frequencies, # Shape: (n_driving_frequencies,)
-    #     driving_amplitudes=driving_amplitudes, # Shape: (n_driving_amplitudes,)
-    #     steady_state_displacement_amplitude=ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
-    #     steady_state_velocity_amplitude=ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes, n_modes)
-    #     total_steady_state_displacement_amplitude=tot_ss_disp_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
-    #     total_steady_state_velocity_amplitude=tot_ss_vel_amp, # Shape: (n_driving_frequencies * n_driving_amplitudes,)
-    #     solver=solver,
-    # )
-
     return tot_ss_disp_amp
