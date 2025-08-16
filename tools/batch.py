@@ -164,6 +164,7 @@ if __name__ == "__main__":
                     sim_index = start_idx + j
                     sim_id = f"simulation_{sim_index:0{sim_width}d}"
 
+                    print(batch_sweeps['model'].Q) #
                     tot_amp = np.asarray(batch_sweeps['tot_ss_disp_amp'][j])
                     ds = grp.create_dataset(sim_id, data=tot_amp)
 

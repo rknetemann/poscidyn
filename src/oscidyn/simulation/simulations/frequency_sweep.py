@@ -352,5 +352,6 @@ def frequency_sweep(
         'ss_vel_amp': ss_vel_amp, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
         'tot_ss_disp_amp': tot_ss_disp_amp, # (n_driving_frequencies * n_driving_amplitudes,)
         'tot_ss_vel_amp': tot_ss_vel_amp, # (n_driving_frequencies * n_driving_amplitudes,)
+        'model': model,
     }
     return result
