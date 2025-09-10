@@ -89,7 +89,7 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         '''
         driving_frequency = jnp.asarray(driving_frequency).reshape(())
         tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - (1/model.Q)**2) / jnp.max(driving_frequency)) * 1.4
-
+        
         three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
         t_steady_state = (tau_d + three_periods).astype(jnp.float32)  * 1.5 # Add a safety factor of 1.2 to ensure we cover the steady state period
         

@@ -74,6 +74,7 @@ def plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init):
     plt.show()
 
 def plot_frequency_sweep(frequency_sweep):
+    print(frequency_sweep)
     n_f = frequency_sweep.driving_frequencies.shape[0]
     n_a = frequency_sweep.driving_amplitudes.shape[0]
     amps = frequency_sweep.total_steady_state_displacement_amplitude.reshape(n_f, n_a)
