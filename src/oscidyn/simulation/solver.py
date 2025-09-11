@@ -32,6 +32,7 @@ class AbstractSolver:
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
+            adjoint=diffrax.RecursiveCheckpointAdjoint(checkpoints=4096*1),
             t0=t0,
             t1=t1,
             dt0=None,
@@ -40,7 +41,7 @@ class AbstractSolver:
             throw=False,
             progress_meter=progress_meter,
             saveat=diffrax.SaveAt(ts=ts),
-            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0)
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.3, icoeff=0.3, dcoeff=0.0)
 ,
             args=(driving_frequency, driving_amplitude),
         )
@@ -88,7 +89,7 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
         '''
         driving_frequency = jnp.asarray(driving_frequency).reshape(())
-        tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - (1/model.Q)**2) / jnp.max(driving_frequency)) * 1.4
+        tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - 1 / (4 * model.Q**2)) / jnp.max(driving_frequency)) * 1.4
         
         three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
         t_steady_state = (tau_d + three_periods).astype(jnp.float32)  * 1.5 # Add a safety factor of 1.2 to ensure we cover the steady state period

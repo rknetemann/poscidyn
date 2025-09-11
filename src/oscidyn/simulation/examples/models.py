@@ -18,7 +18,7 @@ class NonlinearOscillator(AbstractModel):
     gamma_hat:      jax.Array                               # Shape: (n_modes,n_modes,n_modes,n_modes)
     delta_hat:      jax.Array                               # Shape: (n_modes,n_modes,n_modes,n_modes,n_modes)
                     
-    omega_0: jax.Array                                      # Shape: (n_modes,) 
+    omega_0_hat: jax.Array                                  # Shape: (n_modes,) 
     
     def rhs(self, tau, state, args):
         q, v   = jnp.split(state, 2)
@@ -61,7 +61,7 @@ class NonlinearOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
-            Q = jnp.array([1000.0])
+            Q = jnp.array([100.0])
             eta_hat = jnp.array([0.000])
             alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.00)
             gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(-0.005)
@@ -113,5 +113,54 @@ class NonlinearOscillator(AbstractModel):
             omega_0_hat=omega_0_hat,
             omega_ref=omega_ref,
             x_ref=x_ref,
+        )
+
+@oscimodel
+class DuffingOscillator(AbstractModel):
+    omega_ref:      float
+    x_ref:          float 
+                    
+    Q:              jax.Array                               # Shape: (n_modes,)
+    alpha:          jax.Array                               # Shape: (n_modes,)                    
+    
+    def rhs(self, tau, state, args):
+        q, v   = jnp.split(state, 2)
+        r, g = args
+        r = jnp.asarray(r).reshape(())
+        g   = jnp.asarray(g).reshape(())
+        
+        damping_term = (1 / self.Q) * v # Shape: (n_modes,)
+                
+        linear_stiffness_term = q # Shape: (n_modes,)
+
+        cubic_stiffness_term = self.alpha * q**3
+        
+        forcing_term = jnp.zeros((self.n_modes,))
+        forcing_term = forcing_term.at[:1].set(
+            g * jnp.cos(r * tau)
+        )
+
+        a = (
+            - damping_term
+            - linear_stiffness_term
+            - cubic_stiffness_term
+            + forcing_term
+        ) # Shape: (n_modes,)
+        return jnp.concatenate([v, a]) # Shape: (2 * n_modes,)
+    
+    @classmethod
+    def from_example(cls, n_modes: int) -> NonlinearOscillator:
+        if n_modes == 1:
+            omega_ref = 1.0
+            x_ref = 1.0
+            Q = jnp.array([10_000.0])
+            alpha = jnp.array([0.100])
+        
+        return cls(
+            n_modes=n_modes,
+            omega_ref=omega_ref,
+            x_ref=x_ref,
+            Q=Q,
+            alpha=alpha,
         )
 
