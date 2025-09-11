@@ -1,6 +1,7 @@
 # solver.py
 import jax
 import jax.numpy as jnp
+#jax.config.update("jax_enable_x64", True)
 import diffrax
 from functools import partial
 import numpy as np
@@ -32,7 +33,7 @@ class AbstractSolver:
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
-            adjoint=diffrax.RecursiveCheckpointAdjoint(checkpoints=4096*1),
+            adjoint=diffrax.RecursiveCheckpointAdjoint(),
             t0=t0,
             t1=t1,
             dt0=None,
@@ -41,7 +42,7 @@ class AbstractSolver:
             throw=False,
             progress_meter=progress_meter,
             saveat=diffrax.SaveAt(ts=ts),
-            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.3, icoeff=0.3, dcoeff=0.0)
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0)
 ,
             args=(driving_frequency, driving_amplitude),
         )

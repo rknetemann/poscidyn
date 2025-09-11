@@ -61,10 +61,10 @@ class NonlinearOscillator(AbstractModel):
             omega_ref = 1.0
             x_ref = 1.0
             omega_0_hat = jnp.array([1.0])
-            Q = jnp.array([100.0])
+            Q = jnp.array([1000.0])
             eta_hat = jnp.array([0.000])
             alpha_hat = jnp.zeros((n_modes, n_modes, n_modes)).at[0,0,0].set(0.00)
-            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(-0.005)
+            gamma_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0].set(-0.05)
             delta_hat = jnp.zeros((n_modes, n_modes, n_modes, n_modes, n_modes)).at[0, 0, 0, 0, 0].set(-0.00)
         elif n_modes == 2:
             omega_ref = 1.0
@@ -153,8 +153,8 @@ class DuffingOscillator(AbstractModel):
         if n_modes == 1:
             omega_ref = 1.0
             x_ref = 1.0
-            Q = jnp.array([10_000.0])
-            alpha = jnp.array([0.100])
+            Q = jnp.array([1_000.0])
+            alpha = jnp.array([1.800])
         
         return cls(
             n_modes=n_modes,
