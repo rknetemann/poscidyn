@@ -1,25 +1,23 @@
 from jax import numpy as jnp
-import numpy as np
-import sys
-import os
-
+import time
 import oscidyn
 
-N_MODES = 1
-MODEL = oscidyn.NonlinearOscillator.from_example(n_modes=N_MODES)
+MODEL = oscidyn.DuffingOscillator(Q=jnp.array([100]), gamma=jnp.array([0.01]))
+SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 200) # Shape: (n_driving_frequencies,)
-DRIVING_AMPLITUDE = jnp.linspace(0.1, 1.0, 10)  # Shape: (n_driving_amplitudes,)
+DRIVING_AMPLITUDE = jnp.linspace(1*1e-2, 100*1e-2, 10)  # Shape: (n_driving_amplitudes,)
+SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*200, rtol=1e-4, atol=1e-7, progress_bar=True)
+PRECISION = oscidyn.Precision.SINGLE
 
-import time
 start_time = time.time()
 
 frequency_sweep = oscidyn.frequency_sweep(
     model = MODEL,
-    sweep_direction = oscidyn.SweepDirection.FORWARD,
+    sweep_direction = SWEEP_DIRECTION,
     driving_frequencies = DRIVING_FREQUENCY,
     driving_amplitudes = DRIVING_AMPLITUDE,
-    solver = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*100, rtol=1e-4, atol=1e-6, progress_bar=False),
-    #solver = oscidyn.FixedTimeSolver(duration=1000.0, n_time_steps=512, rtol=1e-4, atol=1e-6),
+    solver = SOLVER,
+    precision = PRECISION,
 )
 
 print("Frequency sweep completed in %.2f seconds." % (time.time() - start_time))

@@ -7,7 +7,7 @@ import numpy as np
 
 from oscidyn.simulation.models import AbstractModel
 from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStateSolver, FixedTimeSolver
-from oscidyn.simulation.constants import SweepDirection
+from oscidyn.simulation.constants import SweepDirection, Precision
 from oscidyn.simulation.results import FrequencySweepResult
 import time
 from mpl_toolkits.mplot3d import Axes3D
@@ -69,21 +69,21 @@ def _explore_branches(
     # start_time = time.time()
 
     coarse_drive_freq = jnp.linspace(
-        jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES, dtype=const.DTYPE
+        jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES
     ) # (N_COARSE_DRIVING_FREQUENCIES,)
 
     coarse_drive_amp = jnp.linspace(
-        jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES, dtype=const.DTYPE
+        jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
     ) # (N_COARSE_DRIVING_AMPLITUDES,)
 
     max_abs_displacement = 10.0 # TO DO: Determine the max amplitude based on the model or a fixed value
     coarse_init_disp = jnp.linspace(
-        -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS, dtype=const.DTYPE
+        -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
     ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
     
     max_abs_velocity = 10.0 # TO DO: Determine the max velocity based on the model or a fixed value
     coarse_init_vel = jnp.linspace(
-        -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES, dtype=const.DTYPE
+        -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
     ) # (N_COARSE_INITIAL_VELOCITIES,)
 
     coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
@@ -290,8 +290,14 @@ def frequency_sweep(
     driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
     driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
     solver: AbstractSolver,
+    precision: Precision = Precision.DOUBLE,
 ) -> Dict[str, jax.Array]:
             
+    if precision == Precision.DOUBLE:
+        jax.config.update("jax_enable_x64", True)
+    elif precision == Precision.SINGLE:
+        jax.config.update("jax_enable_x64", False)
+
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
         raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
     

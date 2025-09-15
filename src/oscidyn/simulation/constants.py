@@ -6,6 +6,10 @@ class SweepDirection(Enum):
     FORWARD  = auto()
     BACKWARD = auto()
 
+class Precision(Enum):
+    SINGLE = auto()
+    DOUBLE = auto()
+
 class ResponseType(Enum):
     FrequencyResponse = auto()
     TimeResponse      = auto()
@@ -22,7 +26,5 @@ N_PERIODS_TO_RETAIN = 5
 MIN_WINDOWS = 3  # Minimum number of windows to consider for convergence
 
 PLOT_GRID = True
-
-DTYPE = jax.numpy.float32
 
 XLA_PYTHON_CLIENT_MEM_FRACTION = 0.85
