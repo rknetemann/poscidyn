@@ -4,8 +4,8 @@ import oscidyn
 
 MODEL = oscidyn.DuffingOscillator(Q=jnp.array([100]), gamma=jnp.array([0.01]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 200) # Shape: (n_driving_frequencies,)
-DRIVING_AMPLITUDE = jnp.linspace(1*1e-2, 100*1e-2, 10)  # Shape: (n_driving_amplitudes,)
+DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 200)
+DRIVING_AMPLITUDE = jnp.linspace(1*1e-2, 100*1e-2, 10)
 SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*200, rtol=1e-4, atol=1e-7, progress_bar=True)
 PRECISION = oscidyn.Precision.SINGLE
 

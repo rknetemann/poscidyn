@@ -1,10 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
-import sys
-import os
-
-
 import oscidyn
 
 MODEL = oscidyn.DuffingOscillator(n_modes=1, Q=1000, gamma=0.010, omega_ref=1.0, x_ref=1.0)
