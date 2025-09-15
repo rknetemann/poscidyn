@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 
 import sys
 import os
+
+
 import oscidyn
 
 MODEL = oscidyn.DuffingOscillator(n_modes=1, Q=1000, gamma=0.010, omega_ref=1.0, x_ref=1.0)
@@ -30,7 +32,12 @@ plt.plot(time_steady_state, total_displacement_steady_state, label='Total Displa
 plt.plot(time_steady_state, total_velocity_steady_state, label='Total Velocity')
 plt.xlabel('Time')
 plt.ylabel('Response')
-plt.title('Steady-State Time Response')
+plt.title(
+    "Steady-State Time Response\n"
+    f"Q = [{', '.join(f'{float(q):.2f}' for q in np.ravel(np.asarray(MODEL.Q)))}], "
+    f"gamma = [{', '.join(f'{float(g):.2f}' for g in np.ravel(np.asarray(MODEL.alpha)))}], "
+    f"f = {DRIVING_AMPLITUDE:.2f}"
+)
 plt.legend()
 plt.grid()
 plt.show()
