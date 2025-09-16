@@ -2,10 +2,11 @@ from jax import numpy as jnp
 import time
 import oscidyn
 
-MODEL = oscidyn.DuffingOscillator(Q=jnp.array([10]), gamma=jnp.array([0.01]))
+Q, gamma = 10.0, 0.01
+MODEL = oscidyn.DuffingOscillator(Q=jnp.array([Q]), gamma=jnp.array([gamma]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 200)
-DRIVING_AMPLITUDE = jnp.linspace(1*1e-3, 100*1e-3, 10)
+DRIVING_AMPLITUDE = jnp.linspace(1*1/Q, 10*1/Q, 10)
 SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*200, rtol=1e-4, atol=1e-7, progress_bar=True)
 PRECISION = oscidyn.Precision.SINGLE
 
