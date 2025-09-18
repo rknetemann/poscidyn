@@ -26,7 +26,8 @@ class AbstractSolver:
               t1: float, 
               ts: jax.Array,
               y0: jax.Array,
-              driving_frequency: float, 
+              driving_frequency_1: float, 
+              driving_frequency_2: float,
               driving_amplitude: float, 
               ) -> diffrax.Solution:
                 
@@ -41,11 +42,11 @@ class AbstractSolver:
             dt0=None,
             max_steps=self.max_steps,
             y0=y0,
-            throw=True,
+            throw=False,
             progress_meter=progress_meter,
             saveat=diffrax.SaveAt(ts=ts),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0),
-            args=(driving_amplitude, driving_frequency),
+            args=(driving_amplitude, driving_frequency_1, driving_frequency_2),
         )
         return sol
 
@@ -58,7 +59,8 @@ class FixedTimeSolver(AbstractSolver):
         self.n_time_steps = n_time_steps
 
     def __call__(self, model: AbstractModel, 
-              driving_frequency: jax.Array, 
+              driving_frequency_1: jax.Array, 
+              driving_frequency_2: jax.Array,
               driving_amplitude: jax.Array, 
               initial_condition: jax.Array,
               response: const.ResponseType,
@@ -70,7 +72,7 @@ class FixedTimeSolver(AbstractSolver):
 
         ts = jnp.linspace(t0, t1, self.n_time_steps)
 
-        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency_1=driving_frequency_1, driving_frequency_2=driving_frequency_2, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)
@@ -95,21 +97,23 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         return time_window
 
     def __call__(self, model: AbstractModel, 
-              driving_frequency: jax.Array, 
+              driving_frequency_1: jax.Array, 
+              driving_frequency_2: jax.Array, 
               driving_amplitude: jax.Array, 
               initial_condition: jax.Array,
               response: const.ResponseType,
               time_shift: float = 0.0,
               ):
 
-        settling_time = model.t_steady_state(driving_frequency, self.ss_tol) # Shape: ()
-        steady_state_window = self._calculate_time_window(model, driving_frequency) 
+        min_driving_frequency = driving_frequency_1
+        settling_time = model.t_steady_state(min_driving_frequency, self.ss_tol) # Shape: ()
+        steady_state_window = self._calculate_time_window(model, min_driving_frequency) 
         t0 = 0.0 + time_shift # Time to start numerical integration
         t1 = settling_time + steady_state_window + time_shift # Time to end numerical integration
 
         ts = jnp.linspace(settling_time + time_shift, t1, self.n_time_steps) # Time steps to save
 
-        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency_1=driving_frequency_1, driving_frequency_2=driving_frequency_2, driving_amplitude=driving_amplitude)
 
         ts = sol.ts  # Shape: (n_steps,)
         ys = sol.ys  # Shape: (n_steps, state_dim)

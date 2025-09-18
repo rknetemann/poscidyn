@@ -14,7 +14,8 @@ import oscidyn.simulation.constants as const
 
 def time_response(
     model: AbstractModel,
-    driving_frequency: jax.Array, # Shape: (1,)
+    driving_frequency_1: jax.Array, # Shape: (1,)
+    driving_frequency_2: jax.Array, # Shape: (1,)
     driving_amplitude: jax.Array, # Shape: (n_modes,)
     initial_displacement: jax.Array, # Shape: (n_modes,)
     initial_velocity: jax.Array, # Shape: (n_modes,)
@@ -31,7 +32,8 @@ def time_response(
         ASSUMPTION: Minimum required sampling frequency for the steady state solver based on gpt prompt, should investigate
         '''
         rtol = 0.001
-        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * driving_frequency
+        max_driving_frequency = driving_frequency_2
+        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * max_driving_frequency
         
         one_period = 2.0 * jnp.pi / max_frequency_component
         sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
@@ -45,7 +47,8 @@ def time_response(
 
     ts, ys = solver(
         model=model,
-        driving_frequency=driving_frequency,
+        driving_frequency_1=driving_frequency_1,
+        driving_frequency_2=driving_frequency_2,
         driving_amplitude=driving_amplitude,
         initial_condition=initial_condition,
         response=const.ResponseType.TimeResponse

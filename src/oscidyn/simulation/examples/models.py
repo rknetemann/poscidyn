@@ -16,12 +16,12 @@ class BaseDuffingOscillator(AbstractModel):
 
     def rhs(self, t, state, args):
         q, dq_dt   = jnp.split(state, 2)
-        g4, g5 = [jnp.asarray(v).reshape(()) for v in args]
+        g4, g5, g6 = [jnp.asarray(v).reshape(()) for v in args]
 
         damping_term = self.g1 * dq_dt
         linear_stiffness_term = self.g2 * q
         cubic_stiffness_term = self.g3 * q**3
-        forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(g4 * jnp.cos(g5 * t))
+        forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(g4 * jnp.cos(g5 * t) + g4 * jnp.cos(g6 * t))
 
         d2q_dt2 = (
             - damping_term
