@@ -1,9 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from jax import numpy as jnp
 import oscidyn
 
-MODEL = oscidyn.DuffingOscillator(n_modes=1, Q=1000, gamma=0.010, omega_ref=1.0, x_ref=1.0)
-SOLVER = oscidyn.FixedTimeSolver(duration=10000, n_time_steps=20000, max_steps=4_096*5, rtol=1e-4, atol=1e-7)
+Q, omega_0, gamma = 10.0, 1.0, 10.0
+MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
+#MODEL = oscidyn.BaseDuffingOscillator(g1=jnp.array([omega_0/(Q)]), g2=jnp.array([omega_0]), g3=jnp.array([gamma]))
+#SOLVER = oscidyn.FixedTimeSolver(duration=10000, n_time_steps=20000, max_steps=4_096*5, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*200, rtol=1e-6, atol=1e-9, progress_bar=True)
 DRIVING_FREQUENCY = 1.0
 DRIVING_AMPLITUDE = 1.0
 INITIAL_DISPLACEMENT = np.array([0.0])
@@ -29,9 +33,6 @@ plt.xlabel('Time')
 plt.ylabel('Response')
 plt.title(
     "Steady-State Time Response\n"
-    f"Q = [{', '.join(f'{float(q):.2f}' for q in np.ravel(np.asarray(MODEL.Q)))}], "
-    f"gamma = [{', '.join(f'{float(g):.2f}' for g in np.ravel(np.asarray(MODEL.alpha)))}], "
-    f"f = {DRIVING_AMPLITUDE:.2f}"
 )
 plt.legend()
 plt.grid()
