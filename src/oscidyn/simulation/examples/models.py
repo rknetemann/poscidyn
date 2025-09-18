@@ -41,14 +41,12 @@ class BaseDuffingOscillator(AbstractModel):
         Calculates the settling time for a given Q-factor and driving frequency.
         Equation from Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
         '''
-        Q = jnp.sqrt(self.g2) / self.g1
+        Q = jnp.max(jnp.sqrt(self.g2) / self.g1)
         driving_frequency = jnp.asarray(driving_frequency).reshape(())
         tau_d = -2 * Q * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * Q**2)) / jnp.max(driving_frequency)) * 1.4
 
         three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
         t_steady_state = (tau_d + three_periods)  * const.SAFETY_FACTOR_T_STEADY_STATE
-
-        jax.debug.print("Settling time calculated: {t_steady_state}", t_steady_state=t_steady_state)
         
         return t_steady_state
 
