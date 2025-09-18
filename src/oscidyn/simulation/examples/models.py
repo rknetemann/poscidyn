@@ -4,51 +4,75 @@ import jax
 import jax.numpy as jnp
 
 from ..models import AbstractModel, oscimodel
-
-@oscimodel
-class DuffingOscillator(AbstractModel):
-                  
-    Q:              jax.Array # Shape: (n_modes,)
-    gamma:          jax.Array # Shape: (n_modes,)                    
+from .. import constants as const
+from dataclasses import field
     
+@oscimodel
+class BaseDuffingOscillator(AbstractModel):
+
+    g1: jax.Array
+    g2: jax.Array
+    g3: jax.Array
+
     def rhs(self, t, state, args):
-        q, v   = jnp.split(state, 2)
-        omega, F = [jnp.asarray(v).reshape(()) for v in args]
+        q, dq_dt   = jnp.split(state, 2)
+        g4, g5 = [jnp.asarray(v).reshape(()) for v in args]
 
-        damping_term = (1 / self.Q) * v # Shape: (n_modes,)
-                
-        linear_stiffness_term = q # Shape: (n_modes,)
+        damping_term = self.g1 * dq_dt
+        linear_stiffness_term = self.g2 * q
+        cubic_stiffness_term = self.g3 * q**3
+        forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(g4 * jnp.cos(g5 * t))
 
-        cubic_stiffness_term = self.gamma * q**3
-        
-        forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(
-            F * jnp.cos(omega * t)
-        )
-
-        a = (
+        d2q_dt2 = (
             - damping_term
             - linear_stiffness_term
             - cubic_stiffness_term
             + forcing_term
         ) 
 
-        return jnp.concatenate([v, a])
+        return jnp.concatenate([dq_dt, d2q_dt2])
     
     @property
     def n_modes(self) -> int:
-        return self.Q.shape[0]
+        return self.g1.shape[0]
+
+    def t_steady_state(self, driving_frequency: float, ss_tol: float) -> float:
+        '''driving_frequency
+        Calculates the settling time for a given Q-factor and driving frequency.
+        Equation from Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
+        '''
+        Q = jnp.sqrt(self.g2) / self.g1
+        driving_frequency = jnp.asarray(driving_frequency).reshape(())
+        tau_d = -2 * Q * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * Q**2)) / jnp.max(driving_frequency)) * 1.4
+
+        three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
+        t_steady_state = (tau_d + three_periods)  * const.SAFETY_FACTOR_T_STEADY_STATE
+
+        jax.debug.print("Settling time calculated: {t_steady_state}", t_steady_state=t_steady_state)
+        
+        return t_steady_state
+
+
+@oscimodel
+class DuffingOscillator(BaseDuffingOscillator):
+                  
+    Q: jax.Array # Shape: (n_modes,)
+    gamma: jax.Array # Shape: (n_modes,)   
+    omega_0: jax.Array # Shape: (n_modes,)      
+    
+    @property
+    def g1(self) -> jax.Array:
+        return 1/self.Q
+    
+    @property
+    def g2(self) -> jax.Array:
+        return self.omega_0**2
+
+    @property
+    def g3(self) -> jax.Array:
+        return self.gamma
     
     @classmethod
     def from_example(cls, n_modes: int) -> DuffingOscillator:
-        if n_modes == 1:
-            omega_ref = 1.0
-            x_ref = 1.0
-            Q = jnp.array([10000.0])
-            gamma = jnp.array([0.010])
-        
-        return cls(
-            omega_ref=omega_ref,
-            x_ref=x_ref,
-            Q=Q,
-            gamma=gamma,
-        )
+        raise NotImplementedError("Initialization from example not implemented yet.")
+    

@@ -10,8 +10,7 @@ import os
 from .models import AbstractModel
 from . import constants as const 
 
-SAFETY_FACTOR_T_STEADY_STATE = 1.5
-SAFETY_FACTOR_T_WINDOW = 2.0
+
 
 class AbstractSolver:
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096, progress_bar: bool = True):
@@ -45,9 +44,8 @@ class AbstractSolver:
             throw=True,
             progress_meter=progress_meter,
             saveat=diffrax.SaveAt(ts=ts),
-            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0)
-,
-            args=(driving_frequency, driving_amplitude),
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0),
+            args=(driving_amplitude, driving_frequency),
         )
         return sol
 
@@ -87,25 +85,12 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         self.n_time_steps = n_time_steps # Can be None, in which case it will be calculated based on the driving frequency 
         
         self.ss_tol = ss_tol
-        
-    def _calculate_settling_time(self, model: AbstractModel, driving_frequency) -> float:
-        '''
-        Calculates the settling time for a given Q-factor and driving frequency.
-        Equation from Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
-        '''
-        driving_frequency = jnp.asarray(driving_frequency).reshape(())
-        tau_d = -2 * model.Q * jnp.log(self.ss_tol * jnp.sqrt(1 - 1 / (4 * model.Q**2)) / jnp.max(driving_frequency)) * 1.4
-        
-        three_periods = 3 * (2 * jnp.pi / jnp.max(driving_frequency))
-        t_steady_state = (tau_d + three_periods)  * SAFETY_FACTOR_T_STEADY_STATE
-        
-        return t_steady_state
 
     def _calculate_time_window(self, model: AbstractModel, driving_frequency) -> jax.Array:
         '''
         Calculate the minimum time window/ time period to capture all harmonics.
         '''
-        time_window = const.MAXIMUM_ORDER_SUBHARMONICS * (2 * jnp.pi / jnp.max(driving_frequency)) * SAFETY_FACTOR_T_WINDOW 
+        time_window = const.MAXIMUM_ORDER_SUBHARMONICS * (2 * jnp.pi / jnp.max(driving_frequency)) * const.SAFETY_FACTOR_T_WINDOW 
          
         return time_window
 
@@ -117,7 +102,7 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
               time_shift: float = 0.0,
               ):
 
-        settling_time = self._calculate_settling_time(model, driving_frequency).reshape(())
+        settling_time = model.t_steady_state(driving_frequency, self.ss_tol) # Shape: ()
         steady_state_window = self._calculate_time_window(model, driving_frequency) 
         t0 = 0.0 + time_shift # Time to start numerical integration
         t1 = settling_time + steady_state_window + time_shift # Time to end numerical integration

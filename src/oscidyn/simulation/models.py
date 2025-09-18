@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import jax
 
-oscimodel = lambda cls: dataclass(eq=False)(cls)
+oscimodel = lambda cls: dataclass(eq=False, kw_only=True)(cls)
 
 @oscimodel
 class AbstractModel:

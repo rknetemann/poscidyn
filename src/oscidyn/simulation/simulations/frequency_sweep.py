@@ -314,6 +314,7 @@ def frequency_sweep(
         
         n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int) # Number of time steps to cover one period with the given sampling frequency
         solver.n_time_steps = n_time_steps
+        
 
     # We start by exploring the branches of the system
     t_max_disp, y_max_disp, t_max_vel, y_max_vel = _explore_branches(

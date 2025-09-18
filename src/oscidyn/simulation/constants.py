@@ -27,4 +27,9 @@ MIN_WINDOWS = 3  # Minimum number of windows to consider for convergence
 
 PLOT_GRID = True
 
+SAFETY_FACTOR_T_STEADY_STATE = 1.5
+SAFETY_FACTOR_T_WINDOW = 2.0
+
+STEADY_STATE_TOLERANCE = 1e-3
+
 XLA_PYTHON_CLIENT_MEM_FRACTION = 0.85
