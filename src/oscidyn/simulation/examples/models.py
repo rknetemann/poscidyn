@@ -49,28 +49,11 @@ class BaseDuffingOscillator(AbstractModel):
         t_steady_state = (tau_d + three_periods)  * const.SAFETY_FACTOR_T_STEADY_STATE
         
         return t_steady_state
-
-
-@oscimodel
-class DuffingOscillator(BaseDuffingOscillator):
-                  
-    Q: jax.Array # Shape: (n_modes,)
-    gamma: jax.Array # Shape: (n_modes,)   
-    omega_0: jax.Array # Shape: (n_modes,)      
-    
-    @property
-    def g1(self) -> jax.Array:
-        return 1/self.Q
-    
-    @property
-    def g2(self) -> jax.Array:
-        return self.omega_0**2
-
-    @property
-    def g3(self) -> jax.Array:
-        return self.gamma
     
     @classmethod
-    def from_example(cls, n_modes: int) -> DuffingOscillator:
-        raise NotImplementedError("Initialization from example not implemented yet.")
-    
+    def from_physical_params(cls, Q: jax.Array, omega_0: jax.Array, gamma: jax.Array) -> BaseDuffingOscillator:
+        g1 = omega_0/Q
+        g2 = omega_0**2
+        g3 = gamma
+        
+        return cls(g1=g1, g2=g2, g3=g3)

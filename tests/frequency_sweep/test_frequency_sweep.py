@@ -3,9 +3,8 @@ import time
 import oscidyn
 
 Q, omega_0, gamma = 10.0, 1.0, 0.01
-#MODEL = oscidyn.DuffingOscillator(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
-#MODEL = oscidyn.DuffingOscillator(Q=jnp.array([Q]), gamma=jnp.array([gamma]))
-#MODEL = oscidyn.BaseDuffingOscillator(g1=jnp.array([omega_0/(Q)]), g2=jnp.array([omega_0]), g3=jnp.array([1.5]))
+MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
+MODEL = oscidyn.BaseDuffingOscillator(g1=jnp.array([omega_0/(Q)]), g2=jnp.array([omega_0]), g3=jnp.array([1.5]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 200)
 #DRIVING_AMPLITUDE = jnp.linspace(1*1/Q, 10*1/Q, 10)
