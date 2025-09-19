@@ -1,7 +1,7 @@
 from .simulation.constants import *
 from .simulation.solver import *
 
-from .simulation.examples.models import *
+from .simulation.models import *
 
 from .simulation.simulations.frequency_sweep import frequency_sweep
 from .simulation.simulations.time_response import time_response

@@ -10,8 +10,6 @@ import os
 from .models import AbstractModel
 from . import constants as const 
 
-
-
 class AbstractSolver:
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096, progress_bar: bool = True):
 
@@ -108,6 +106,35 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         t1 = settling_time + steady_state_window + time_shift # Time to end numerical integration
 
         ts = jnp.linspace(settling_time + time_shift, t1, self.n_time_steps) # Time steps to save
+
+        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+
+        ts = sol.ts  # Shape: (n_steps,)
+        ys = sol.ys  # Shape: (n_steps, state_dim)
+
+        return ts, ys
+    
+class ShootingSolver(AbstractSolver):
+    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, rtol: float = 1e-6, atol: float = 1e-6):
+
+        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
+        self.n_time_steps = n_time_steps 
+
+    def __call__(self,
+              model: AbstractModel, 
+              driving_frequency: jax.Array, # Shape: (1,)
+              driving_amplitude:  jax.Array, # Shape: (n_modes,)
+              initial_condition:  jax.Array, # Shape: (2 * n_modes,)
+              response: const.ResponseType,
+              time_shift: float = 0.0, # TO DO: Not yet used
+              ):
+        
+        drive_period = 2.0 * jnp.pi / driving_frequency
+        t0 = 0.0 + time_shift
+        t1 = drive_period + time_shift
+        ts = jnp.linspace(t0, t1, self.n_time_steps)
+        n_modes = model.n_modes
+        state_dim = 2 * n_modes
 
         sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
 
