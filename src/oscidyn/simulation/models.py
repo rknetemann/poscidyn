@@ -13,14 +13,7 @@ class AbstractModel:
     rhs_jit: callable = field(init=False, repr=False)
 
     def __post_init__(self):
-        self._build_rhs()
-
-    def _build_rhs(self):
-        # ensure the subclass has implemented an `rhs` method
-        if not hasattr(self, "rhs") or not callable(getattr(self, "rhs")):
-            raise NotImplementedError(f"{type(self).__name__}.rhs() is not implemented.")
-        # JIT‐compile the RHS
-        self.rhs_jit = jax.jit(self.rhs)
+        pass
     
 @oscimodel
 class BaseDuffingOscillator(AbstractModel):
@@ -28,23 +21,35 @@ class BaseDuffingOscillator(AbstractModel):
     g2: jax.Array
     g3: jax.Array
 
-    def rhs(self, t, state, args):
-        q, dq_dt   = jnp.split(state, 2)
+    def f(self, t, state, args):
+        x, dx_dt   = jnp.split(state, 2)
         g4, g5 = [jnp.asarray(v).reshape(()) for v in args]
 
-        damping_term = self.g1 * dq_dt
-        linear_stiffness_term = self.g2 * q
-        cubic_stiffness_term = self.g3 * q**3
+        damping_term = self.g1 * dx_dt
+        linear_stiffness_term = self.g2 * x
+        cubic_stiffness_term = self.g3 * x**3
         forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(g4 * jnp.cos(g5 * t))
 
-        d2q_dt2 = (
+        d2x_dt2 = (
             - damping_term
             - linear_stiffness_term
             - cubic_stiffness_term
             + forcing_term
         ) 
 
-        return jnp.concatenate([dq_dt, d2q_dt2])
+        return jnp.concatenate([dx_dt, d2x_dt2])
+
+    def J(self, t, state, args):
+        x, dx_dt   = jnp.split(state, 2)
+
+        zero_block = jnp.zeros((self.n_modes, self.n_modes))
+        identity_block = jnp.eye(self.n_modes)
+        A_bottom_left = -jnp.diag(self.g2 + 3 * self.g3 * x**2)
+        A_bottom_right = -jnp.diag(self.g1)
+
+        A = jnp.block([[zero_block, identity_block],
+                       [A_bottom_left, A_bottom_right]])
+        return A
     
     @property
     def n_modes(self) -> int:

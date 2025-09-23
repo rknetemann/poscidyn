@@ -75,23 +75,25 @@ def newton_shooting(x0=None, maxit=15, tol=1e-10):
 
     for k in range(maxit):
         yT, XT = flow_and_stm(x0)
-        S = yT - x0
-        if norm(S, ord=np.inf) < tol:
+        F = yT - x0
+        
+        if norm(F, ord=np.inf) < tol:
             # Floquet multipliers from XT
             multipliers = eigvals(XT)
             return x0, yT, XT, multipliers, k
+        
         Jsh = XT - np.eye(2)
 
-        # Solve (XT - I) dx = -S with a tiny Tikhonov if near-singular
+        # Solve (XT - I) dx = -F with a tiny Tikhonov if near-singular
         try:
-            dx = solve(Jsh, -S)
+            dx = solve(Jsh, -F)
         except np.linalg.LinAlgError:
             lam = 1e-8
-            dx = solve(Jsh.T@Jsh + lam*np.eye(2), -Jsh.T@S)
+            dx = solve(Jsh.T@Jsh + lam*np.eye(2), -Jsh.T@F)
 
         # Simple backtracking to ensure residual decrease
         lam = 1.0
-        r0 = norm(S)
+        r0 = norm(F)
         for _ in range(8):
             x_try = x0 + lam*dx
             r_try = norm(shooting_residual(x_try))

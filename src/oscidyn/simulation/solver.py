@@ -115,33 +115,139 @@ class FixedTimeSteadyStateSolver(AbstractSolver):
         return ts, ys
     
 class ShootingSolver(AbstractSolver):
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, rtol: float = 1e-6, atol: float = 1e-6):
-
+    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
+                 rtol: float = 1e-6, atol: float = 1e-6, progress_bar: bool = False):
         super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
-        self.n_time_steps = n_time_steps 
+        self.n_time_steps = n_time_steps
+        self.progress_bar = progress_bar
 
     def __call__(self,
-              model: AbstractModel, 
-              driving_frequency: jax.Array, # Shape: (1,)
-              driving_amplitude:  jax.Array, # Shape: (n_modes,)
-              initial_condition:  jax.Array, # Shape: (2 * n_modes,)
-              response: const.ResponseType,
-              time_shift: float = 0.0, # TO DO: Not yet used
-              ):
-        
-        drive_period = 2.0 * jnp.pi / driving_frequency
+                 model: AbstractModel,
+                 driving_frequency: jax.Array,   # shape (1,) or scalar
+                 driving_amplitude: jax.Array,   # shape (n_modes,) — here we assume 1 mode
+                 initial_condition: jax.Array,   # shape (2,) for single-mode Duffing
+                 response: const.ResponseType,
+                 time_shift: float = 0.0):
+
+        # ----- Period and sample times -----
+        Om = float(driving_frequency)                 # ensure scalar
+        T  = 2.0 * jnp.pi / Om *6
+
         t0 = 0.0 + time_shift
-        t1 = drive_period + time_shift
+        t1 = T   + time_shift
         ts = jnp.linspace(t0, t1, self.n_time_steps)
-        n_modes = model.n_modes
-        state_dim = 2 * n_modes
 
-        sol = self.solve(model=model, t0=t0, t1=t1, ts=ts, y0=initial_condition, driving_frequency=driving_frequency, driving_amplitude=driving_amplitude)
+        # ----- Newton–shooting settings -----
+        tol   = 1e-10
+        maxit = 12
 
-        ts = sol.ts  # Shape: (n_steps,)
-        ys = sol.ys  # Shape: (n_steps, state_dim)
+        # Newton loop state: (k, y0, YT, converged)
+        init_state = (0,
+                      initial_condition,            # no copy needed unless you mutate in-place
+                      jnp.eye(2),                   # placeholder YT
+                      False)
+
+        def cond_fun(state):
+            k, _, __, converged = state
+            return (k < maxit) & (~converged)
+
+        def body_fun(state):
+            k, y0, _, _ = state
+
+            # Augmented initial condition [y0; vec(I)]
+            Y_init = jnp.eye(2).reshape(-1)         # pack 2x2 STM row-major
+            y_aug0 = jnp.concatenate([y0, Y_init])
+
+            # Integrate over one period from 0 to T (no need to save many points here)
+            sol = self._solve(model,
+                               t0=0.0, t1=T,
+                               ts=jnp.array([0.0, T]),     # save only endpoints for Newton
+                               y0=y_aug0,
+                               driving_frequency=Om,
+                               driving_amplitude=driving_amplitude)
+
+            # Extract state and STM at t = T
+            y_aug_T = sol.ys[-1]                   # last saved point is at T
+            yT      = y_aug_T[:2]
+            YT      = y_aug_T[2:].reshape(2, 2)
+
+            # Residual and convergence
+            R = yT - y0
+            converged = jnp.linalg.norm(R, ord=jnp.inf) < tol
+
+            # Newton step: (YT - I) dy0 = -R
+            Jmat = YT - jnp.eye(2)
+            dy0  = jnp.linalg.solve(Jmat, -R)
+
+            # Update only if not yet converged
+            y0_new = jnp.where(converged, y0, y0 + dy0)
+            return (k + 1, y0_new, YT, converged)
+
+        # Run Newton iterations
+        k_final, y0_star, YT, converged = jax.lax.while_loop(cond_fun, body_fun, init_state)
+        if not converged:
+            raise RuntimeError("Shooting (forced) did not converge")
+
+        # ----- Final pass: return one period time response with the converged y0 -----
+        Y_init = jnp.eye(2).reshape(-1)
+        y_aug0 = jnp.concatenate([y0_star, Y_init])
+
+        sol = self._solve(model,
+                          t0=t0, t1=t1,
+                          ts=ts,
+                          y0=y_aug0,
+                          driving_frequency=Om,
+                          driving_amplitude=driving_amplitude)
+
+        ys_aug = sol.ys                          # shape (N, 6) for 2D + 4 STM entries
+        ys     = ys_aug[:, :2]                   # physical state over one period
 
         return ts, ys
+
+    def _solve(self,
+               model: AbstractModel,
+               t0: float,
+               t1: float,
+               ts: jax.Array,
+               y0: jax.Array,
+               driving_frequency: float,
+               driving_amplitude: jax.Array) -> diffrax.Solution:
+
+
+        @jax.jit
+        def rhs(t, y_aug, args):
+            y  = y_aug[:2]
+            X  = y_aug[2:].reshape(2, 2)
+
+            fy = model.f(t, y, args)      
+            A  = model.J(t, y, args)
+
+            dXdt = A @ X
+            return jnp.hstack([fy, dXdt.reshape(-1)])
+
+        term = diffrax.ODETerm(rhs)
+        solver = diffrax.Tsit5()
+        adj    = diffrax.RecursiveCheckpointAdjoint()
+        pm     = diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter()
+
+        sol = diffrax.diffeqsolve(
+            terms=term,
+            solver=solver,
+            adjoint=adj,
+            t0=t0,
+            t1=t1,
+            dt0=None,
+            max_steps=self.max_steps,
+            y0=y0,
+            saveat=diffrax.SaveAt(ts=ts),
+            throw=True,
+            progress_meter=pm,
+            stepsize_controller=diffrax.PIDController(
+                rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0
+            ),
+            args=(driving_amplitude, driving_frequency),
+        )
+        return sol
 
 class SteadyStateSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096, rtol: float = 1e-6, atol: float = 1e-6, 
