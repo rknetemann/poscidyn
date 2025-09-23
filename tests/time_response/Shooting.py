@@ -1,12 +1,13 @@
 import numpy as np
 from numpy.linalg import solve, eigvals, norm
 from scipy.integrate import solve_ivp
+import timeit
 
 # Parameters
 w0   = 1.0      # natural frequency
-Q    = 20000.0    # quality factor (weak damping -> large Q)
-gamma= 0.0      # cubic stiffness
-F    = 0.12     # forcing amplitude
+Q    = 1000.0    # quality factor (weak damping -> large Q)
+gamma= -1.5      # cubic stiffness
+F    = 0.2     # forcing amplitude
 w    = 1.0     # forcing frequency
 T    = 2*np.pi/w
 
@@ -80,6 +81,7 @@ def newton_shooting(x0=None, maxit=15, tol=1e-10):
             # Floquet multipliers from XT
             multipliers = eigvals(XT)
             return x0, yT, XT, multipliers, k
+        
         Jsh = XT - np.eye(2)
 
         # Solve (XT - I) dx = -S with a tiny Tikhonov if near-singular
@@ -104,9 +106,21 @@ def newton_shooting(x0=None, maxit=15, tol=1e-10):
 
     raise RuntimeError("Newton did not converge; try a different seed/params.")
 
-# --- run it ---
-x0, yT, XT, mu, iters = newton_shooting(x0 = np.array([0.7, 0.0]))
+# --- run it with timing ---
+
+def run_shooting():
+    # perform one shooting solve
+    return newton_shooting()
+
+# do a single run to get and display results
+x0, yT, XT, mu, iters = run_shooting()
 print("Converged in", iters, "Newton steps.")
 print("Periodic initial state x0* =", x0)
 print("Residual ||Phi_T(x0*)-x0*|| =", norm(yT - x0))
 print("Floquet multipliers:", mu)
+
+# now time 1000 runs
+n_runs = 1000
+total_time = timeit.timeit("run_shooting()", globals=globals(), number=n_runs)
+print(f"Total time for {n_runs} runs: {total_time:.4f} s")
+print(f"Average time per run: {total_time/n_runs:.6f} s")
