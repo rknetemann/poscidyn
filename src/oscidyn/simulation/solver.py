@@ -128,81 +128,92 @@ class ShootingSolver(AbstractSolver):
                  initial_condition: jax.Array,   # shape (2,) for single-mode Duffing
                  response: const.ResponseType,
                  time_shift: float = 0.0):
-
-        # ----- Period and sample times -----
-        Om = float(driving_frequency)                 # ensure scalar
-        T  = 2.0 * jnp.pi / Om *6
-
+        
+        T = const.MAXIMUM_ORDER_SUBHARMONICS * 2.0 * jnp.pi / driving_frequency  # Period of oscillation including subharmonics
         t0 = 0.0 + time_shift
-        t1 = T   + time_shift
-        ts = jnp.linspace(t0, t1, self.n_time_steps)
+        t1 = T + time_shift
+        ts = jnp.linspace(0.0, T, self.n_time_steps)
+                
+        TOL = 1e-4
 
-        # ----- Newton–shooting settings -----
-        tol   = 1e-10
-        maxit = 12
+        def _converged_cond(carry):
+            y0, yT, ys, multipliers = carry
+            shooting_residual = jnp.linalg.norm(F, ord=jnp.inf)
+            jax.debug.print("Shooting residual: {}", shooting_residual)
+            return shooting_residual > TOL
+        
+        def _newton_shooting(y0):
+            X0 = jnp.eye(2).reshape(-1)  # Initial condition for the state transition matrix (flattened)
+            y0_aug = jnp.hstack([y0, X0])
 
-        # Newton loop state: (k, y0, YT, converged)
-        init_state = (0,
-                      initial_condition,            # no copy needed unless you mutate in-place
-                      jnp.eye(2),                   # placeholder YT
-                      False)
+            ys_aug = self._solve(model, t0, t1, ts, y0_aug, driving_frequency, driving_amplitude).ys
+            ys = ys_aug[:, :2]
+            yT = ys_aug[-1, :2]
+            XT = ys_aug[-1, 2:].reshape(2, 2)
+            
+            F = yT - y0
+            J = XT - jnp.eye(2)
+            
+            r = jnp.linalg.norm(F, ord=jnp.inf)
+            
+            mu = jnp.linalg.eigvals(XT)
+            
+            return y0, yT, ys, F, J, r, mu
 
-        def cond_fun(state):
-            k, _, __, converged = state
-            return (k < maxit) & (~converged)
+        def _shooting_iteration(carry):
+            y0, yT, ys, multipliers = carry
 
-        def body_fun(state):
-            k, y0, _, _ = state
+            y0, yT, ys, F, J, r, mu = _newton_shooting(y0)
+                      
+            dy0 = jnp.linalg.solve(J, -F)
+            
+            def _line_search_cond(carry):
+                i, lam, y0, dy0, r, done = carry
+                return jnp.logical_and(~done, i < 8)
 
-            # Augmented initial condition [y0; vec(I)]
-            Y_init = jnp.eye(2).reshape(-1)         # pack 2x2 STM row-major
-            y_aug0 = jnp.concatenate([y0, Y_init])
+            def _line_search_iteration(carry):
+                i, lam, y0, dy0, r, done = carry
 
-            # Integrate over one period from 0 to T (no need to save many points here)
-            sol = self._solve(model,
-                               t0=0.0, t1=T,
-                               ts=jnp.array([0.0, T]),     # save only endpoints for Newton
-                               y0=y_aug0,
-                               driving_frequency=Om,
-                               driving_amplitude=driving_amplitude)
+                y0_try = y0 + lam * dy0
+                y0_try, yT, ys, F, J, r_try, mu = _newton_shooting(y0_try)
 
-            # Extract state and STM at t = T
-            y_aug_T = sol.ys[-1]                   # last saved point is at T
-            yT      = y_aug_T[:2]
-            YT      = y_aug_T[2:].reshape(2, 2)
+                success = r_try < 0.7 * r
 
-            # Residual and convergence
-            R = yT - y0
-            converged = jnp.linalg.norm(R, ord=jnp.inf) < tol
+                # Accept step if successful; otherwise halve step size and continue
+                y0 = jnp.where(success, y0_try, y0)
+                done = jnp.logical_or(done, success)
+                lam = jnp.where(success, lam, lam * 0.5)
 
-            # Newton step: (YT - I) dy0 = -R
-            Jmat = YT - jnp.eye(2)
-            dy0  = jnp.linalg.solve(Jmat, -R)
+                return (i + 1, lam, y0, dy0, r, done)          
+            
+            init_carry = (
+                jnp.array(0, dtype=jnp.int32),           # i
+                jnp.array(1.0, dtype=y0.dtype),          # lam
+                y0,                                      # y0
+                dy0,                                     # dy0
+                r,                                       # r
+                jnp.array(False),                        # done
+            )
 
-            # Update only if not yet converged
-            y0_new = jnp.where(converged, y0, y0 + dy0)
-            return (k + 1, y0_new, YT, converged)
+            i, lam, y0_after_ls, dy0, r, done = jax.lax.while_loop(
+                _line_search_cond, _line_search_iteration, init_carry
+            )
 
-        # Run Newton iterations
-        k_final, y0_star, YT, converged = jax.lax.while_loop(cond_fun, body_fun, init_state)
-        if not converged:
-            raise RuntimeError("Shooting (forced) did not converge")
-
-        # ----- Final pass: return one period time response with the converged y0 -----
-        Y_init = jnp.eye(2).reshape(-1)
-        y_aug0 = jnp.concatenate([y0_star, Y_init])
-
-        sol = self._solve(model,
-                          t0=t0, t1=t1,
-                          ts=ts,
-                          y0=y_aug0,
-                          driving_frequency=Om,
-                          driving_amplitude=driving_amplitude)
-
-        ys_aug = sol.ys                          # shape (N, 6) for 2D + 4 STM entries
-        ys     = ys_aug[:, :2]                   # physical state over one period
-
-        return ts, ys
+            # for-else fallback: if never succeeded, use last resort y0 + dy0
+            y0 = jnp.where(done, y0_after_ls, y0 + dy0)  
+                        
+            return y0, yT, ys, mu
+        
+        init_carry = (
+            initial_condition,
+            jnp.zeros((self.n_time_steps, 2 + 4)),
+            jnp.full((2,), jnp.inf),
+            jnp.zeros((2,), dtype=jnp.complex64),
+        )
+        
+        y0, ys, F, multipliers = jax.lax.while_loop(_converged_cond, _shooting_iteration, init_carry)
+        
+        return ts, ys[:, :2]  # Return time and state (displacement and velocity)
 
     def _solve(self,
                model: AbstractModel,
@@ -213,27 +224,22 @@ class ShootingSolver(AbstractSolver):
                driving_frequency: float,
                driving_amplitude: jax.Array) -> diffrax.Solution:
 
-
         @jax.jit
-        def rhs(t, y_aug, args):
+        def aug_rhs(t, y_aug, args):
             y  = y_aug[:2]
             X  = y_aug[2:].reshape(2, 2)
 
-            fy = model.f(t, y, args)      
-            A  = model.J(t, y, args)
+            f = model.f(t, y, args)      
+            f_y  = model.f_y(t, y, args)
 
-            dXdt = A @ X
-            return jnp.hstack([fy, dXdt.reshape(-1)])
-
-        term = diffrax.ODETerm(rhs)
-        solver = diffrax.Tsit5()
-        adj    = diffrax.RecursiveCheckpointAdjoint()
-        pm     = diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter()
+            dydt = f
+            dXdt = f_y @ X
+            return jnp.hstack([dydt, dXdt.reshape(-1)])
 
         sol = diffrax.diffeqsolve(
-            terms=term,
-            solver=solver,
-            adjoint=adj,
+            terms=diffrax.ODETerm(aug_rhs),
+            solver=diffrax.Tsit5(),
+            adjoint=diffrax.RecursiveCheckpointAdjoint(),
             t0=t0,
             t1=t1,
             dt0=None,
@@ -241,7 +247,7 @@ class ShootingSolver(AbstractSolver):
             y0=y0,
             saveat=diffrax.SaveAt(ts=ts),
             throw=True,
-            progress_meter=pm,
+            progress_meter=diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(
                 rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0
             ),

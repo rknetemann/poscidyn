@@ -3,16 +3,16 @@ import matplotlib.pyplot as plt
 from jax import numpy as jnp
 import oscidyn
 
-Q, omega_0, gamma = 100.0, 1.0, 0.2
+Q, omega_0, gamma = 10000.0, 1.0, 0.2
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 #MODEL = oscidyn.BaseDuffingOscillator(g1=jnp.array([omega_0/(Q)]), g2=jnp.array([omega_0]), g3=jnp.array([gamma]))
 #SOLVER = oscidyn.FixedTimeSolver(duration=5000, n_time_steps=20000, max_steps=4_096*5, rtol=1e-4, atol=1e-7)
 #SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*200, rtol=1e-4, atol=1e-7, progress_bar=True)
 SOLVER = oscidyn.ShootingSolver(max_steps=4_096*200, rtol=1e-4, atol=1e-7, progress_bar=True)
-DRIVING_FREQUENCY = 1.275
-DRIVING_AMPLITUDE = 0.2
-INITIAL_DISPLACEMENT = np.array([0.0])
-INITIAL_VELOCITY = np.array([0.0]) 
+DRIVING_FREQUENCY = 1.0
+DRIVING_AMPLITUDE = 0.12
+INITIAL_DISPLACEMENT = np.array([9.31755028e-01])
+INITIAL_VELOCITY = np.array([7.51328207e-04]) 
 
 time_response_steady_state = oscidyn.time_response(
     model = MODEL,

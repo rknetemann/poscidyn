@@ -39,7 +39,7 @@ class BaseDuffingOscillator(AbstractModel):
 
         return jnp.concatenate([dx_dt, d2x_dt2])
 
-    def J(self, t, state, args):
+    def f_y(self, t, state, args):
         x, dx_dt   = jnp.split(state, 2)
 
         zero_block = jnp.zeros((self.n_modes, self.n_modes))
