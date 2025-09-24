@@ -1,5 +1,6 @@
 from .simulation.constants import *
-from .simulation.solver import *
+from .simulation.solvers.abstract_solver import *
+from .simulation.solvers.shooting_solver import *
 
 from .simulation.models import *
 

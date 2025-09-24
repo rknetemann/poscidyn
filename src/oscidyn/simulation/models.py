@@ -17,9 +17,15 @@ class AbstractModel:
     
 @oscimodel
 class BaseDuffingOscillator(AbstractModel):
+    # Effective parameter groups
     g1: jax.Array
     g2: jax.Array
     g3: jax.Array
+
+    # Physical parameters
+    Q: jax.Array
+    omega_0: jax.Array
+    gamma: jax.Array
 
     def f(self, t, state, args):
         x, dx_dt   = jnp.split(state, 2)
@@ -75,4 +81,4 @@ class BaseDuffingOscillator(AbstractModel):
         g2 = omega_0**2
         g3 = gamma
         
-        return cls(g1=g1, g2=g2, g3=g3)
+        return cls(g1=g1, g2=g2, g3=g3, Q=Q, omega_0=omega_0, gamma=gamma)

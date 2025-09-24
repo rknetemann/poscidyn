@@ -6,7 +6,7 @@ from typing import Tuple, Dict
 import numpy as np
 
 from oscidyn.simulation.models import AbstractModel
-from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStateSolver, FixedTimeSolver
+from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStateSolver, FixedTimeSolver, ShootingSolver
 from oscidyn.simulation.constants import SweepDirection, Precision
 from oscidyn.simulation.results import FrequencySweepResult
 import time
@@ -108,22 +108,16 @@ def _explore_branches(
 
     if isinstance(solver, SteadyStateSolver):
         # SteadyStateSolver only returns the last window (which is the steady state part)
-        ts, ys = sol
-
-        disp = ys[..., :model.n_modes] # (n_sim, n_windows, n_steps, n_modes)
-        vel  = ys[..., model.n_modes:] # (n_sim, n_windows, n_steps, n_modes)
-
-        sample_mask = jnp.any(jnp.abs(ys) > 0, axis=-1) # (n_sim, n_windows, n_steps)
-        sample_mask = sample_mask[..., None] # broadcast over modes
-
         # TO DO: Implement it for SteadyStateSolver
         raise NotImplementedError("SteadyStateSolver is not yet implemented for frequency sweep.")
+    
     elif isinstance(solver, FixedTimeSolver):
         # FixedTimeSolver returns the entire time response, not just the steady state part
         # TO DO: Implement it for FixedTimeSolver
         raise NotImplementedError("FixedTimeSolver is not yet implemented for frequency sweep.")
-    elif isinstance(solver, FixedTimeSteadyStateSolver):
-        # FixedTimeSteadyStateSolver only returns the steady state part
+    
+    elif isinstance(solver, (FixedTimeSteadyStateSolver)):
+        # FixedTimeSteadyStateSolver and ShootingSolver only return the steady state part
         ts, ys = sol
 
         ss_time_flat = ts # (n_sim, n_time_steps)
@@ -141,6 +135,26 @@ def _explore_branches(
         q_max_vel = jnp.abs(jnp.take_along_axis(ss_disp_flat, idx_max_vel[:, None, :], axis=1).squeeze(1))  # (n_sim, n_modes)
         v_max_vel = jnp.abs(jnp.take_along_axis(ss_vel_flat, idx_max_vel[:, None, :], axis=1).squeeze(1))  # (n_sim, n_modes)
         y_max_vel = jnp.concatenate([q_max_vel, v_max_vel], axis=-1) # (n_sim, n_modes * 2)
+
+    elif isinstance(solver, ShootingSolver):
+        ts, ys = sol
+
+        ss_time_flat = ts # (n_sim, n_time_steps)
+        ss_disp_flat = ys[..., :model.n_modes] # (n_sim, n_time_steps, n_modes)
+        ss_vel_flat = ys[..., model.n_modes:] # (n_sim, n_time_steps, n_modes)
+
+        idx_max_disp = jnp.argmax(jnp.abs(ss_disp_flat), axis=1) # (n_sim, n_modes)
+        t_max_disp = jnp.take_along_axis(ss_time_flat[:, :, None], idx_max_disp[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
+        q_max_disp = jnp.abs(jnp.take_along_axis(ss_disp_flat, idx_max_disp[:, None, :], axis=1).squeeze(1)) # (n_sim, n_modes)
+        v_max_disp = jnp.abs(jnp.take_along_axis(ss_vel_flat, idx_max_disp[:, None, :], axis=1).squeeze(1)) # (n_sim, n_modes)
+        y_max_disp = jnp.concatenate([q_max_disp, v_max_disp], axis=-1) # (n_sim, n_modes * 2)
+
+        idx_max_vel = jnp.argmax(jnp.abs(ss_vel_flat), axis=1) # (n_sim, n_modes)
+        t_max_vel = jnp.take_along_axis(ss_time_flat[:, :, None], idx_max_vel[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
+        q_max_vel = jnp.abs(jnp.take_along_axis(ss_disp_flat, idx_max_vel[:, None, :], axis=1).squeeze(1))  # (n_sim, n_modes)
+        v_max_vel = jnp.abs(jnp.take_along_axis(ss_vel_flat, idx_max_vel[:, None, :], axis=1).squeeze(1))  # (n_sim, n_modes)
+        y_max_vel = jnp.concatenate([q_max_vel, v_max_vel], axis=-1) # (n_sim, n_modes * 2)
+
 
     t_max_disp = t_max_disp.reshape(
         const.N_COARSE_DRIVING_FREQUENCIES, 
@@ -179,7 +193,7 @@ def _explore_branches(
     # sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
     # print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
 
-    #plt.plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
+    plt.plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
 
     return t_max_disp, y_max_disp, t_max_vel, y_max_vel
 
@@ -314,6 +328,8 @@ def frequency_sweep(
         
         n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int) # Number of time steps to cover one period with the given sampling frequency
         solver.n_time_steps = n_time_steps
+
+    solver.frequency_sweep(model, driving_frequencies, driving_amplitudes)
         
 
     # We start by exploring the branches of the system
@@ -324,6 +340,7 @@ def frequency_sweep(
         solver=solver,
         sweep_direction=sweep_direction,
     )
+    print('test')
     # t: # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
     # y: # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
     
