@@ -8,6 +8,7 @@ from ..solvers.abstract_solver import AbstractSolver
 from ..solvers.fixed_time_solver import FixedTimeSolver
 from ..solvers.steady_state_window_solver import SteadyStateSolver
 from ..solvers.fixed_time_steady_state_solver import FixedTimeSteadyStateSolver
+from ..solvers.shooting_solver import ShootingSolver
 
 from ..constants import SweepDirection, Precision
 from .. import constants as const
