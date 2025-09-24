@@ -4,8 +4,8 @@ from scipy.integrate import solve_ivp
 
 # Parameters
 w0   = 1.0      # natural frequency
-Q    = 10000.0    # quality factor (weak damping -> large Q)
-gamma= 0.2      # cubic stiffness
+Q    = 200.0    # quality factor (weak damping -> large Q)
+gamma= 1.0      # cubic stiffness
 F    = 0.12     # forcing amplitude
 w    = 1.0     # forcing frequency
 T    = 2*np.pi/w
@@ -108,7 +108,7 @@ def newton_shooting(x0=None, maxit=15, tol=1e-10):
     raise RuntimeError("Newton did not converge; try a different seed/params.")
 
 # --- run it ---
-x0, yT, XT, mu, iters = newton_shooting()
+x0, yT, XT, mu, iters = newton_shooting(np.array([1.0, 0.0]))
 print("Converged in", iters, "Newton steps.")
 print("Periodic initial state x0* =", x0)
 print("Residual ||Phi_T(x0*)-x0*|| =", norm(yT - x0))

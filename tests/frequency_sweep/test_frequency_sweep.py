@@ -2,16 +2,13 @@ from jax import numpy as jnp
 import time
 import oscidyn
 
-Q, omega_0, gamma = 200.0, 1.0, 0.1
+Q, omega_0, gamma = 200000.0, 1.0, 0.0
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.5, 1.5, 200)
 DRIVING_AMPLITUDE = jnp.linspace(1*1/Q, 10*1/Q, 10)
-#DRIVING_AMPLITUDE = jnp.array([0.12])
-#DRIVING_AMPLITUDE = jnp.linspace(1.0e-2, 1.0e-1, 10)
-#SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*200, rtol=1e-4, atol=1e-7, progress_bar=True)
-SOLVER = oscidyn.ShootingSolver(max_steps=4_096*3, rtol=1e-4, atol=1e-7)
-PRECISION = oscidyn.Precision.SINGLE
+SOLVER = oscidyn.ShootingSolver(max_steps=10000, rtol=1e-4, atol=1e-7)
+PRECISION = oscidyn.Precision.DOUBLE
 
 start_time = time.time()
 

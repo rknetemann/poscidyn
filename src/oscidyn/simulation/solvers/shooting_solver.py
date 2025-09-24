@@ -23,7 +23,28 @@ class ShootingSolver(AbstractSolver):
                  init_guess: jax.Array,   # shape (2,) for single-mode Duffing)
                 ):
                 
-        ts, ys = self._calculate_period_solution(model, drive_freq, drive_amp, init_guess)
+        y0 = self._calculate_period_solution(model, drive_freq, drive_amp, init_guess)
+
+        def _solve_one_period(y0):
+            T = const.MAXIMUM_ORDER_SUBHARMONICS * 2.0 * jnp.pi / drive_freq  # Period of oscillation including subharmonics
+            t0 = 0.0
+            t1 = T
+            ts = jnp.linspace(0.0, T, self.n_time_steps)
+        
+            @jax.jit
+            def rhs(t, y, args):
+                return model.f(t, y, args)
+
+            sol = self._solve(rhs, t0, t1, ts, y0, drive_freq, drive_amp)
+            return sol.ts, sol.ys
+
+        ts, ys = jax.lax.cond(
+            jnp.isnan(y0).any(),
+            lambda: (jnp.zeros((self.n_time_steps,)),
+                     jnp.zeros((self.n_time_steps, model.n_modes * 2))),
+            lambda: _solve_one_period(y0)
+        )
+
         return ts, ys
     
     def frequency_sweep(self,
@@ -54,8 +75,41 @@ class ShootingSolver(AbstractSolver):
 
             return self._calculate_period_solution(model, drive_freq, drive_amp, init_cond)
 
-        sol = jax.vmap(solve_case)(coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat)
-        ts, ys = sol
+        ys = jax.vmap(solve_case)(coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat)
+        
+        import matplotlib.pyplot as plt
+
+        # Plot initial conditions (y1 and y2) vs driving frequency
+        freqs_np = jnp.asarray(coarse_drive_freq_flat).ravel()
+        ys_np = jnp.asarray(ys)
+
+        mask = jnp.isfinite(freqs_np) & jnp.isfinite(ys_np).all(axis=1)
+
+        plt.figure()
+        plt.scatter(freqs_np[mask], jnp.abs(ys_np[mask, 0]), s=6, alpha=0.6, label="y1", c="tab:blue")
+        plt.scatter(freqs_np[mask], jnp.abs(ys_np[mask, 1]), s=6, alpha=0.6, label="y2", c="tab:orange")
+        plt.xlabel("drive frequency")
+        plt.ylabel("initial condition value")
+        plt.title("Initial conditions vs frequency (n={})".format(ys_np.shape[0]))
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+        ys_np = jnp.asarray(ys)
+        mask = jnp.isfinite(ys_np).all(axis=1)
+
+        plt.figure()
+        plt.scatter(ys_np[mask, 0], ys_np[mask, 1], s=6, alpha=0.6, label="finite")
+        if jnp.any(~mask):
+            plt.scatter(ys_np[~mask, 0], ys_np[~mask, 1], s=6, alpha=0.6, c="r", label="non-finite")
+        plt.xlabel("y[0]")
+        plt.ylabel("y[1]")
+        plt.title("ys scatter (n= {}, dim=2)".format(ys_np.shape[0]))
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+        print(jax.debug.print("Shooting solver returned ys with shape: {}", ys.shape))
 
         ss_time_flat = ts # (n_sim, n_time_steps)
         ss_disp_flat = ys[..., :model.n_modes] # (n_sim, n_time_steps, n_modes)
@@ -126,15 +180,25 @@ class ShootingSolver(AbstractSolver):
         t0 = 0.0
         t1 = T
         ts = jnp.linspace(0.0, T, self.n_time_steps)
-                
-        TOL = 1e-4
-
+            
         @jax.jit
         def _newton_shooting(y0):
             X0 = jnp.eye(2, dtype=initial_condition.dtype).reshape(-1)
             y0_aug = jnp.hstack([y0, X0])
 
-            ys_aug = self._solve(model, t0, t1, ts, y0_aug, driving_frequency, driving_amplitude).ys
+            @jax.jit
+            def aug_rhs(t, y_aug, args):
+                y  = y_aug[:2]
+                X  = y_aug[2:].reshape(2, 2)
+
+                f = model.f(t, y, args)      
+                f_y  = model.f_y(t, y, args)
+
+                dydt = f
+                dXdt = f_y @ X
+                return jnp.hstack([dydt, dXdt.reshape(-1)])
+
+            ys_aug = self._solve(aug_rhs, t0, t1, None, y0_aug, driving_frequency, driving_amplitude).ys
             ys = ys_aug[:, :2]
             yT = ys_aug[-1, :2]
             XT = ys_aug[-1, 2:].reshape(2, 2)
@@ -146,30 +210,30 @@ class ShootingSolver(AbstractSolver):
             
             mu = jnp.linalg.eigvals(XT)
 
-            return y0, yT, ys, F, J, mu, r
+            return y0, yT, F, J, mu, r
 
         @jax.jit
         def _shooting_converged_cond(carry):
-            k, done, y0, yT, ys, mu, r = carry
+            k, done, y0, yT, mu, r = carry
             return jnp.logical_and(~done, k < const.MAX_SHOOTING_ITERATIONS)
 
         @jax.jit
         def _shooting_iteration(carry):
-            k, done, y0, yT, ys, mu, r = carry
+            k, done, y0, yT, mu, r = carry
 
-            y0, yT, ys, F, J, mu, r = _newton_shooting(y0)
+            y0, yT, F, J, mu, r = _newton_shooting(y0)
                       
             dy0 = jnp.linalg.solve(J, -F)
             
             def _line_search_cond(carry):
-                i, lam, done, y0, yT, ys, mu, r = carry
+                i, lam, done, y0, yT, mu, r = carry
                 return jnp.logical_and(~done, i < 8)
 
             def _line_search_iteration(carry):
-                i, lam, ls_done, y0, yT, ys, mu, r = carry
+                i, lam, ls_done, y0, yT, mu, r = carry
 
                 y0_try = y0 + lam * dy0
-                y0_try, yT_try, ys_try, F_try, J_try, mu_try, r_try = _newton_shooting(y0_try)
+                y0_try, yT_try, F_try, J_try, mu_try, r_try = _newton_shooting(y0_try)
 
                 success = r_try < 0.7 * r
 
@@ -180,13 +244,12 @@ class ShootingSolver(AbstractSolver):
 
                 y0 = jnp.where(success, y0_try, y0)
                 yT = jnp.where(success, yT_try, yT)
-                ys = jnp.where(success, ys_try, ys)
                 mu = jnp.where(success, mu_try, mu)
                 r = jnp.where(success, r_try, r)
 
                 i += 1
 
-                return (i, lam, ls_done, y0, yT, ys, mu, r)          
+                return (i, lam, ls_done, y0, yT, mu, r)          
             
             init_carry = (
                 jnp.array(0, dtype=jnp.int32),           # i
@@ -194,42 +257,40 @@ class ShootingSolver(AbstractSolver):
                 jnp.array(False),                        # ls_done
                 y0,                                      # y0
                 yT,                                      # yT
-                ys,                                      # ys
                 mu,                                      # mu
                 r,                                       # r
             )
 
-            i, lam, ls_done, y0_after_ls, yT, ys, mu, r = jax.lax.while_loop(
+            i, lam, ls_done, y0_after_ls, yT, mu, r = jax.lax.while_loop(
                 _line_search_cond, _line_search_iteration, init_carry
             )
 
             # for-else fallback: if never succeeded, use last resort y0 + dy0
             y0 = jnp.where(ls_done, y0_after_ls, y0 + dy0)  
 
-            sh_done = r < TOL
+            sh_done = r < const.SHOOTING_TOLERANCE
             k += 1
                         
-            return k, sh_done, y0, yT, ys, mu, r
+            return k, sh_done, y0, yT, mu, r
         
         init_carry = (
             jnp.array(0, dtype=jnp.int32), # k
             jnp.array(False), # done
             initial_condition, # y0: (2,)
             jnp.full((2,), jnp.inf, dtype=initial_condition.dtype), # yT: (2,)
-            jnp.zeros((self.n_time_steps, 2), dtype=initial_condition.dtype), # ys: (N,6)
             jnp.zeros((2,), dtype=jnp.result_type(initial_condition.dtype, jnp.complex64)), # mu: (2,), complex
             jnp.array(jnp.inf, dtype=initial_condition.dtype), # r: scalar float
         )
 
-        k, ls_done, y0, yT, ys, mu, r = jax.lax.while_loop(_shooting_converged_cond, _shooting_iteration, init_carry)
+        k, ls_done, y0, yT, mu, r = jax.lax.while_loop(_shooting_converged_cond, _shooting_iteration, init_carry)
 
-        ys = jnp.where(ls_done, ys, jnp.nan) 
+        y0 = jnp.where(ls_done, y0, jnp.nan) 
         #jax.debug.print("Converged: {}", ls_done)
 
-        return ts, ys  # Return time and state (displacement and velocity)
+        return y0  # Return time and state (displacement and velocity)
 
     def _solve(self,
-               model: AbstractModel,
+               rhs: callable,
                t0: float,
                t1: float,
                ts: jax.Array,
@@ -237,20 +298,8 @@ class ShootingSolver(AbstractSolver):
                driving_frequency: float,
                driving_amplitude: jax.Array) -> diffrax.Solution:
 
-        @jax.jit
-        def aug_rhs(t, y_aug, args):
-            y  = y_aug[:2]
-            X  = y_aug[2:].reshape(2, 2)
-
-            f = model.f(t, y, args)      
-            f_y  = model.f_y(t, y, args)
-
-            dydt = f
-            dXdt = f_y @ X
-            return jnp.hstack([dydt, dXdt.reshape(-1)])
-
         sol = diffrax.diffeqsolve(
-            terms=diffrax.ODETerm(aug_rhs),
+            terms=diffrax.ODETerm(rhs),
             solver=diffrax.Tsit5(),
             adjoint=diffrax.RecursiveCheckpointAdjoint(),
             t0=t0,
@@ -258,11 +307,11 @@ class ShootingSolver(AbstractSolver):
             dt0=None,
             max_steps=self.max_steps,
             y0=y0,
-            saveat=diffrax.SaveAt(ts=ts),
+            saveat=diffrax.SaveAt(ts=ts) if ts is not None else diffrax.SaveAt(t1=True),
             throw=False,
             progress_meter=diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(
-                rtol=self.rtol, atol=self.atol, pcoeff=0.0, icoeff=1.0, dcoeff=0.0
+                rtol=self.rtol, atol=self.atol, dtmax= (t1 - t0) / const.DT_MAX_FACTOR
             ),
             args=(driving_amplitude, driving_frequency),
         )

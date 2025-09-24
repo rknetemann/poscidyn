@@ -10,7 +10,6 @@ from ..solvers.steady_state_window_solver import SteadyStateSolver
 from ..solvers.fixed_time_steady_state_solver import FixedTimeSteadyStateSolver
 from ..solvers.shooting_solver import ShootingSolver
 
-from ..constants import SweepDirection, Precision
 from .. import constants as const
 from ..utils import plotting as plt
 
@@ -300,16 +299,18 @@ def _fine_sweep(
 
 def frequency_sweep(
     model: AbstractModel,
-    sweep_direction: SweepDirection,
+    sweep_direction: const.SweepDirection,
     driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
     driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
     solver: AbstractSolver,
-    precision: Precision = Precision.DOUBLE,
+    precision: const.Precision = const.Precision.DOUBLE,
 ) -> Dict[str, jax.Array]:
             
-    if precision == Precision.DOUBLE:
+    if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)
-    elif precision == Precision.SINGLE:
+        driving_frequencies = driving_frequencies.astype(jnp.float64)
+        driving_amplitudes = driving_amplitudes.astype(jnp.float64)
+    elif precision == const.Precision.SINGLE:
         jax.config.update("jax_enable_x64", False)
 
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):

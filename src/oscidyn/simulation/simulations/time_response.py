@@ -11,6 +11,7 @@ from ..solvers.abstract_solver import AbstractSolver
 from ..solvers.steady_state_window_solver import SteadyStateSolver
 from .. import constants as const
 
+
 def time_response(
     model: AbstractModel,
     driving_frequency: jax.Array, # Shape: (1,)
@@ -18,7 +19,13 @@ def time_response(
     initial_displacement: jax.Array, # Shape: (n_modes,)
     initial_velocity: jax.Array, # Shape: (n_modes,)
     solver: AbstractSolver,
+    precision: const.Precision = const.Precision.DOUBLE,
 ) -> tuple:
+    
+    if precision == const.Precision.DOUBLE:
+        jax.config.update("jax_enable_x64", True)
+    elif precision == const.Precision.SINGLE:
+        jax.config.update("jax_enable_x64", False)
     
     if model.n_modes != initial_displacement.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial displacement has shape {initial_displacement.shape}. It should have shape ({model.n_modes},).")
@@ -42,13 +49,7 @@ def time_response(
 
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-    ts, ys = solver(
-        model=model,
-        driving_frequency=driving_frequency,
-        driving_amplitude=driving_amplitude,
-        initial_condition=initial_condition,
-        response=const.ResponseType.TimeResponse
-    )
+    ts, ys = solver.time_response(model, driving_frequency, driving_amplitude, initial_condition)
 
     if isinstance(solver, SteadyStateSolver):
         time = ts.flatten()
