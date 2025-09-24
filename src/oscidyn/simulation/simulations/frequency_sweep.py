@@ -1,18 +1,17 @@
-# frequency_sweep.py
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from typing import Tuple, Dict
-import numpy as np
 
-from oscidyn.simulation.models import AbstractModel
-from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver, FixedTimeSteadyStateSolver, FixedTimeSolver, ShootingSolver
-from oscidyn.simulation.constants import SweepDirection, Precision
-from oscidyn.simulation.results import FrequencySweepResult
-import time
-from mpl_toolkits.mplot3d import Axes3D
-import oscidyn.simulation.constants as const
-import oscidyn.simulation.utils.plotting as plt
+from ..models.abstract_model import AbstractModel
+from ..solvers.abstract_solver import AbstractSolver
+from ..solvers.fixed_time_solver import FixedTimeSolver
+from ..solvers.steady_state_window_solver import SteadyStateSolver
+from ..solvers.fixed_time_steady_state_solver import FixedTimeSteadyStateSolver
+
+from ..constants import SweepDirection, Precision
+from .. import constants as const
+from ..utils import plotting as plt
 
 # TO DO: Improve steady state amplitude calculation
 # ASSUMPTION: The steady state is already reached in the time response

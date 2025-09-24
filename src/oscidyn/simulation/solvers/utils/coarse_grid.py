@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from ... import constants as const
-from ...models import AbstractModel
+from ...models.abstract_model import AbstractModel
 
 def gen_coarse_grid(model: AbstractModel,
                     drive_freq: jax.Array,
@@ -20,6 +20,8 @@ def gen_coarse_grid(model: AbstractModel,
         # For each combination of coarse driving frequency and amplitude, estimate the linear response amplitude
         denom = jnp.sqrt((model.omega_0**2 - coarse_drive_freq**2)**2 + (model.omega_0 * coarse_drive_freq / model.Q)**2)
         linear_response_amplitude = coarse_drive_amp[:, None] / denom[None, :]
+
+        jax.debug.print("Max linear response amplitude: {}", jnp.max(linear_response_amplitude))
 
         factor = const.N_COARSE_INITIAL_CONDITIONS_OFFSET_FACTOR
         init_disp_grid = jnp.linspace(-factor*linear_response_amplitude, factor*linear_response_amplitude, const.N_COARSE_INITIAL_DISPLACEMENTS, axis=-1)
@@ -47,10 +49,4 @@ def gen_coarse_grid(model: AbstractModel,
             init_vel_FA[:, :, None, :], (F, A, ND, NV)
         )
 
-        # 3) Flatten if you still want 1D lists of scenarios
-        coarse_drive_freq_flat = coarse_drive_freq_mesh.ravel()
-        coarse_drive_amp_flat  = coarse_drive_amp_mesh.ravel()
-        coarse_init_disp_flat  = coarse_init_disp_mesh.ravel()
-        coarse_init_vel_flat   = coarse_init_vel_mesh.ravel()
-
-        return (coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat)
+        return (coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh)

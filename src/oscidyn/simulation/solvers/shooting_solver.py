@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import diffrax
 
 from .abstract_solver import AbstractSolver
-from ..models import AbstractModel
+from ..models.abstract_model import AbstractModel
 from ..utils.plotting import plot_branch_exploration
 from .utils.coarse_grid import gen_coarse_grid
 from .. import constants as const 
@@ -31,10 +31,19 @@ class ShootingSolver(AbstractSolver):
                  drive_amp: jax.Array,   # (n_modes,)
                 ):
     
-        coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat = gen_coarse_grid(
+        # Generate combinations of coarse driving frequencies, amplitudes, and initial conditions
+        # where the intiial conditions are based on the linear response amplitude for the given driving frequency and amplitude ranges
+        coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = gen_coarse_grid(
             model, drive_freq, drive_amp
         )
+
+        # Flatten everything to 1D arrays for vmap
+        coarse_drive_freq_flat = coarse_drive_freq_mesh.ravel()
+        coarse_drive_amp_flat  = coarse_drive_amp_mesh.ravel()
+        coarse_init_disp_flat  = coarse_init_disp_mesh.ravel()
+        coarse_init_vel_flat   = coarse_init_vel_mesh.ravel()
         
+        # Define a jitted function to solve each combination of parameters
         @jax.jit
         def solve_case(drive_freq, drive_amp, init_disp, init_vel):
             init_disp = jnp.full((model.n_modes,), init_disp)
@@ -44,7 +53,6 @@ class ShootingSolver(AbstractSolver):
             return self._calculate_period_solution(model, drive_freq, drive_amp, init_cond)
 
         sol = jax.vmap(solve_case)(coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat)
-        
         ts, ys = sol
 
         ss_time_flat = ts # (n_sim, n_time_steps)

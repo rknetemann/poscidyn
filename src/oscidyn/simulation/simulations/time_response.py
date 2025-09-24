@@ -6,11 +6,10 @@ from typing import Tuple
 import numpy as np
 import time
 
-from oscidyn.simulation.models import AbstractModel
-from oscidyn.simulation.solver import AbstractSolver,SteadyStateSolver
-from oscidyn.simulation.constants import SweepDirection
-from oscidyn.simulation.results import FrequencySweepResult
-import oscidyn.simulation.constants as const
+from ..models.abstract_model import AbstractModel
+from ..solvers.abstract_solver import AbstractSolver
+from ..solvers.steady_state_window_solver import SteadyStateSolver
+from .. import constants as const
 
 def time_response(
     model: AbstractModel,
