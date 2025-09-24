@@ -5,6 +5,7 @@ import diffrax
 from .abstract_solver import AbstractSolver
 from ..models import AbstractModel
 from ..utils.plotting import plot_branch_exploration
+from .utils.coarse_grid import gen_coarse_grid
 from .. import constants as const 
 
 class ShootingSolver(AbstractSolver):
@@ -29,34 +30,10 @@ class ShootingSolver(AbstractSolver):
                  drive_freq: jax.Array,   # (1,) or scalar
                  drive_amp: jax.Array,   # (n_modes,)
                 ):
-        
-        coarse_drive_freq = jnp.linspace(
-            jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES
-        ) # (N_COARSE_DRIVING_FREQUENCIES,)
-
-        coarse_drive_amp = jnp.linspace(
-            jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
-        ) # (N_COARSE_DRIVING_AMPLITUDES,)
-
-        max_abs_displacement = 10.0 # TO DO: Determine the max amplitude based on the model or a fixed value
-        coarse_init_disp = jnp.linspace(
-            -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
-        ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
-        
-        max_abs_velocity = 10.0 # TO DO: Determine the max velocity based on the model or a fixed value
-        coarse_init_vel = jnp.linspace(
-            -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
-        ) # (N_COARSE_INITIAL_VELOCITIES,)
-
-        coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
-            coarse_drive_freq, coarse_drive_amp, coarse_init_disp, coarse_init_vel, indexing="ij"
-        ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES)
-
-        coarse_drive_freq_flat = coarse_drive_freq_mesh.ravel()
-        coarse_drive_amp_flat = coarse_drive_amp_mesh.ravel()
-        coarse_init_disp_flat = coarse_init_disp_mesh.ravel()
-        coarse_init_vel_flat = coarse_init_vel_mesh.ravel()
-        # (N_COARSE_DRIVING_FREQUENCIES * N_COARSE_DRIVING_AMPLITUDES * N_COARSE_INITIAL_DISPLACEMENTS)
+    
+        coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat = gen_coarse_grid(
+            model, drive_freq, drive_amp
+        )
         
         @jax.jit
         def solve_case(drive_freq, drive_amp, init_disp, init_vel):
