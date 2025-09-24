@@ -4,8 +4,9 @@ import diffrax
 
 from .abstract_solver import AbstractSolver
 from ..models.abstract_model import AbstractModel
-from ..utils.plotting import plot_branch_exploration
+from ..utils.plotting import plot_branch_exploration, plot_branch_selection
 from .utils.coarse_grid import gen_coarse_grid
+from .utils.branch_selection import select_branches
 from .. import constants as const 
 
 class ShootingSolver(AbstractSolver):
@@ -29,6 +30,7 @@ class ShootingSolver(AbstractSolver):
                  model: AbstractModel,
                  drive_freq: jax.Array,   # (1,) or scalar
                  drive_amp: jax.Array,   # (n_modes,)
+                 sweep_direction: const.SweepDirection,
                 ):
     
         # Generate combinations of coarse driving frequencies, amplitudes, and initial conditions
@@ -104,6 +106,11 @@ class ShootingSolver(AbstractSolver):
         ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
         
         plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
+
+        t_max_disp_sel, y_max_disp_sel = select_branches(t_max_disp, y_max_disp, sweep_direction.value)
+        ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
+
+        plot_branch_selection(drive_freq, drive_amp, ss_disp_amp)
 
         return drive_freq, y_max_disp
 

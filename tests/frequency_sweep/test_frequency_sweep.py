@@ -2,7 +2,7 @@ from jax import numpy as jnp
 import time
 import oscidyn
 
-Q, omega_0, gamma = 200.0, 1.0, -0.1
+Q, omega_0, gamma = 200.0, 1.0, 0.1
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.5, 1.5, 200)
