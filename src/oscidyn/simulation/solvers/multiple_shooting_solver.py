@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
 import diffrax
+from functools import partial
+from equinox import filter_jit
 
 from .abstract_solver import AbstractSolver
 from ..models.abstract_model import AbstractModel
@@ -11,49 +13,40 @@ from .. import constants as const
 
 class MultipleShootingSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
-                 rtol: float = 1e-6, atol: float = 1e-6, progress_bar: bool = False):
+                 max_shooting_iterations: int = 20, shooting_tolerance: float = 1e-10,
+                 m_segments: int = 5,
+                 rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False):
         super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
+
         self.n_time_steps = n_time_steps
+        self.max_shooting_iterations = max_shooting_iterations
+        self.shooting_tolerance = shooting_tolerance
+        self.m_segments = m_segments
         self.progress_bar = progress_bar
-    
+        self.model: AbstractModel = None
+   
     def time_response(self,
-                 model: AbstractModel,
                  drive_freq: jax.Array,  
                  drive_amp: jax.Array, 
                  init_guess: jax.Array,  
                 ):
-        
-        T = 2.0 * jnp.pi / drive_freq # Period of oscillation including subharmonics
-        t0 = 0.0
-        t1 = T
-        ts = jnp.linspace(0.0, T, self.n_time_steps)
-                
-        y0 = self._calculate_period_solution(model, drive_freq, drive_amp, init_guess)
-
-        @jax.jit
-        def rhs(tau, y, args):
-            drive_amp, drive_freq  = args
-
-            t = tau / drive_freq
-            dydt = model.f(t, y, args) / drive_freq
-
-            return dydt
+                       
+        y0 = self._calculate_period_solution(drive_freq, drive_amp, init_guess)
 
         def _solve_one_period(y0):               
-            sol = self._solve(rhs, t0, t1, ts, y0, drive_freq, drive_amp)
+            sol = self._solve(self._rhs, True, y0, drive_freq, drive_amp)
             return sol.ts, sol.ys
 
         ts, ys = jax.lax.cond(
             jnp.isnan(y0).any(),
             lambda: (jnp.zeros((self.n_time_steps,)),
-                     jnp.zeros((self.n_time_steps, model.n_modes * 2))),
+                     jnp.zeros((self.n_time_steps, self.model.n_modes * 2))),
             lambda: _solve_one_period(y0)
         )
 
         return ts, ys
     
     def frequency_sweep(self,
-                 model: AbstractModel,
                  drive_freq: jax.Array,   # (1,) or scalar
                  drive_amp: jax.Array,   # (n_modes,)
                  sweep_direction: const.SweepDirection,
@@ -62,7 +55,7 @@ class MultipleShootingSolver(AbstractSolver):
         # Generate combinations of coarse driving frequencies, amplitudes, and initial conditions
         # where the intiial conditions are based on the linear response amplitude for the given driving frequency and amplitude ranges
         coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = gen_coarse_grid(
-            model, drive_freq, drive_amp
+            self.model, drive_freq, drive_amp
         )
 
         # Flatten everything to 1D arrays for vmap
@@ -74,43 +67,30 @@ class MultipleShootingSolver(AbstractSolver):
         # Define a jitted function to solve each combination of parameters
         @jax.jit
         def shooting_case(drive_freq, drive_amp, init_disp, init_vel):
-            init_disp = jnp.full((model.n_modes,), init_disp)
-            init_vel = jnp.full((model.n_modes,), init_vel)
+            init_disp = jnp.full((self.model.n_modes,), init_disp)
+            init_vel = jnp.full((self.model.n_modes,), init_vel)
             init_cond = jnp.concatenate([init_disp, init_vel])
 
-            return self._calculate_period_solution(model, drive_freq, drive_amp, init_cond)
+            return self._calculate_period_solution(drive_freq, drive_amp, init_cond)
 
         y0 = jax.vmap(shooting_case)(coarse_drive_freq_flat, coarse_drive_amp_flat, coarse_init_disp_flat, coarse_init_vel_flat)
 
-        T = 2.0 * jnp.pi
-        t0 = 0.0
-        t1 = T
-        ts = jnp.linspace(0.0, T, self.n_time_steps)
-
         @jax.jit
-        def rhs(tau, y, args):
-            drive_amp, drive_freq  = args
-
-            t = tau / drive_freq
-            dydt = model.f(t, y, args) / drive_freq
-
-            return dydt
-
         def _solve_one_period(y0_single, freq_single, amp_single):
             def do_integrate(y_init):
-                sol = self._solve(rhs, t0, t1, ts, y_init, freq_single, amp_single)
+                sol = self._solve(self._rhs, True, y_init, freq_single, amp_single)
                 return sol.ts, sol.ys
             return jax.lax.cond(
                 jnp.isnan(y0_single).any(),
-                lambda: (ts, jnp.zeros((ts.size, y0_single.size), dtype=y0_single.dtype)),
+                lambda: (jnp.zeros((self.n_time_steps,)), jnp.zeros((self.n_time_steps, y0_single.size), dtype=y0_single.dtype)),
                 lambda: do_integrate(y0_single)
             )
 
         ts, ys = jax.vmap(_solve_one_period)(y0, coarse_drive_freq_flat, coarse_drive_amp_flat) # (n_sim, n_time_steps), (n_sim, n_time_steps, n_modes*2)
 
         ss_time_flat = ts # (n_sim, n_time_steps)
-        ss_disp_flat = ys[..., :model.n_modes] # (n_sim, n_time_steps, n_modes)
-        ss_vel_flat = ys[..., model.n_modes:] # (n_sim, n_time_steps, n_modes)
+        ss_disp_flat = ys[..., :self.model.n_modes] # (n_sim, n_time_steps, n_modes)
+        ss_vel_flat = ys[..., self.model.n_modes:] # (n_sim, n_time_steps, n_modes)
 
         idx_max_disp = jnp.argmax(jnp.abs(ss_disp_flat), axis=1) # (n_sim, n_modes)
         t_max_disp = jnp.take_along_axis(ss_time_flat[:, :, None], idx_max_disp[:, None, :], axis=1).squeeze(1) # (n_sim, n_modes)
@@ -129,7 +109,7 @@ class MultipleShootingSolver(AbstractSolver):
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             const.N_COARSE_INITIAL_VELOCITIES,
-            model.n_modes
+            self.model.n_modes
         ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)
 
         y_max_disp = y_max_disp.reshape(
@@ -137,7 +117,7 @@ class MultipleShootingSolver(AbstractSolver):
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             const.N_COARSE_INITIAL_VELOCITIES,
-            model.n_modes * 2
+            self.model.n_modes * 2
         ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
 
         t_max_vel = t_max_vel.reshape(
@@ -145,7 +125,7 @@ class MultipleShootingSolver(AbstractSolver):
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             const.N_COARSE_INITIAL_VELOCITIES,
-            model.n_modes
+            self.model.n_modes
         ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes)  
 
         y_max_vel = y_max_vel.reshape(
@@ -153,64 +133,76 @@ class MultipleShootingSolver(AbstractSolver):
             const.N_COARSE_DRIVING_AMPLITUDES, 
             const.N_COARSE_INITIAL_DISPLACEMENTS, 
             const.N_COARSE_INITIAL_VELOCITIES,
-            model.n_modes * 2
+            self.model.n_modes * 2
         ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES, n_modes * 2)
         
         plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp)
 
         t_max_disp_sel, y_max_disp_sel = select_branches(t_max_disp, y_max_disp, sweep_direction.value)
-        ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
+        ss_disp_amp = jnp.abs(y_max_disp_sel[..., :self.model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
 
         plot_branch_selection(drive_freq, drive_amp, ss_disp_amp)
 
         return drive_freq, y_max_disp
+    
+    @filter_jit
+    def _rhs(self, tau, y, args):
+        _drive_amp, drive_freq  = args
 
+        t = tau / drive_freq
+        dydt = self.model.f(t, y, args) / drive_freq
+
+        return dydt
+    
+    @filter_jit
+    def _aug_rhs(self, tau, y_aug, args):
+        _drive_amp, drive_freq  = args
+
+        y  = y_aug[:2]
+        X  = y_aug[2:].reshape(2, 2)
+
+        t = tau/ drive_freq
+        f = self.model.f(t, y, args)      
+        f_y  = self.model.f_y(t, y, args)
+
+        dydt = f / drive_freq
+        dXdt = f_y @ X / drive_freq
+        return jnp.hstack([dydt, dXdt.reshape(-1)])
 
     def _calculate_period_solution(self,
-                 model: AbstractModel,
                  driving_frequency: jax.Array, 
                  driving_amplitude: jax.Array,  
                  initial_condition: jax.Array, 
-                ):        
-        
+                ):     
+
+        m = self.m_segments
+        n = self.model.n_modes * 2
+
         T = 2.0 * jnp.pi
-        t0 = 0.0
-        t1 = T
-        ts = jnp.linspace(0.0, T, self.n_time_steps)
+        
+        ts = jnp.linspace(0.0, T, m + 1)
+        s0 = jnp.tile(initial_condition, (m, 1))  # (m, n)
+
+        eye_N = jnp.eye(n, dtype=initial_condition.dtype)
             
-        @jax.jit
-        def _newton_shooting(y0):
-            X0 = jnp.eye(2, dtype=initial_condition.dtype).reshape(-1)
-            y0_aug = jnp.hstack([y0, X0], dtype=initial_condition.dtype)  # Augmented state: [y; vec(X)]
+        @filter_jit
+        def _newton_shooting(sk, t0k, t1k):
+            X0 = eye_N.reshape(-1)
+            sk_aug = jnp.hstack([sk, X0], dtype=initial_condition.dtype)  # Augmented state: [y; vec(X)]
 
-            @jax.jit
-            def aug_rhs(tau, y_aug, args):
-                drive_amp, drive_freq  = args
+            sk_aug = self._solve(self._aug_rhs, False, t0k, t1k, sk_aug, driving_frequency, driving_amplitude).ys
 
-                y  = y_aug[:2]
-                X  = y_aug[2:].reshape(2, 2)
+            ys = sk_aug[:, :self.model.n_modes * 2]
+            yT = sk_aug[-1, :self.model.n_modes * 2] 
+            XT = sk_aug[-1, self.model.n_modes * 2:].reshape(2, 2)
 
-                t = tau/ drive_freq
-                f = model.f(t, y, args)      
-                f_y  = model.f_y(t, y, args)
-
-                dydt = f / drive_freq
-                dXdt = f_y @ X / drive_freq
-                return jnp.hstack([dydt, dXdt.reshape(-1)], dtype=initial_condition.dtype)
-
-            ys_aug = self._solve(aug_rhs, t0, t1, None, y0_aug, driving_frequency, driving_amplitude).ys
-            ys = ys_aug[:, :2]
-            yT = ys_aug[-1, :2]
-            XT = ys_aug[-1, 2:].reshape(2, 2)
-            
-            F = yT - y0
-            J = XT - jnp.eye(2, dtype=initial_condition.dtype)
+            F = yT - sk
+            J = XT - eye_N
             
             r = jnp.linalg.norm(F, ord=jnp.inf)
 
-            return y0, yT, F, J, XT, r
+            return sk, yT, F, J, XT, r
         
-        @jax.jit
         def newton_step(J, F):
             # Condition proxy: determinant for 2x2 or cond if you prefer
             det = J[0,0]*J[1,1] - J[0,1]*J[1,0]
@@ -226,16 +218,24 @@ class MultipleShootingSolver(AbstractSolver):
 
             return jax.lax.cond(near_sing, reg, direct)
 
-        @jax.jit
         def _shooting_converged_cond(carry):
             k, done, y0, yT, XT, r = carry
-            return jnp.logical_and(~done, k < const.MAX_SHOOTING_ITERATIONS)
+            return jnp.logical_and(~done, k < self.max_shooting_iterations)
 
-        @jax.jit
         def _shooting_iteration(carry):
-            k, done, y0, yT, XT, r = carry
+            k, done, s, yT, XT, r = carry
+            
+            @filter_jit
+            def _newton_shooting_segment(sk, t0_k, t1_k):
+                return _newton_shooting(sk, t0_k, t1_k)
 
-            y0, yT, F, J, XT, r = _newton_shooting(y0)
+            t0s = ts[:-1] # (m,)
+            t1s = ts[1:] # (m,)
+
+            y0_seg, yT_seg, F_seg, J_seg, XT_seg, r_seg = jax.vmap(
+                _newton_shooting_segment,
+                in_axes=(0, 0, 0),
+            )(s, t0s, t1s)
                       
             dy0 = newton_step(J, F)
             
@@ -282,7 +282,7 @@ class MultipleShootingSolver(AbstractSolver):
             # for-else fallback: if never succeeded, use last resort y0 + dy0
             y0 = jnp.where(ls_done, y0_after_ls, y0 + dy0)  
 
-            sh_done = r < const.SHOOTING_TOLERANCE
+            sh_done = r < self.shooting_tolerance
             k += 1
                         
             return k, sh_done, y0, yT, XT, r
@@ -290,7 +290,7 @@ class MultipleShootingSolver(AbstractSolver):
         init_carry = (
             jnp.array(0, dtype=jnp.int32), # k
             jnp.array(False), # done
-            initial_condition, # y0: (2,)
+            s0, # s0: (m,n)
             jnp.full((2,), jnp.inf, dtype=initial_condition.dtype), # yT: (2,)
             jnp.eye(2, dtype=initial_condition.dtype), # XT: (2,2)
             jnp.array(jnp.inf, dtype=initial_condition.dtype), # r: scalar float
@@ -306,37 +306,34 @@ class MultipleShootingSolver(AbstractSolver):
 
     def _solve(self,
                rhs: callable,
+               wf: bool,
                t0: float,
                t1: float,
-               ts: jax.Array,
                y0: jax.Array,
                driving_frequency: float,
                driving_amplitude: jax.Array) -> diffrax.Solution:
         
-        T = t1 - t0
-        dtmax = T / const.DT_MAX_FACTOR
+        ts = jnp.linspace(t0, t1, self.n_time_steps)
+
+        T = 2.0 * jnp.pi
+        dtmax = T / const.DT_MAX_FACTOR / self.m_segments
         dtmin = T / const.DT_MIN_FACTOR
         max_steps = self.max_steps
-
-        def saveat_fn(t, y, args):
-            return True
-
+        
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(rhs),
             solver=diffrax.Tsit5(),
-            #adjoint=diffrax.RecursiveCheckpointAdjoint(),
             t0=t0,
             t1=t1,
             dt0=None,
             max_steps=max_steps,
             y0=y0,
-            saveat=diffrax.SaveAt(ts=ts) if ts is not None else diffrax.SaveAt(t1=True),
+            saveat=diffrax.SaveAt(ts=ts) if wf else diffrax.SaveAt(t1=True),
             throw=False,
             progress_meter=diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(
                 rtol=self.rtol, atol=self.atol, dtmax=dtmax, dtmin=dtmin
             ),
-            #stepsize_controller=diffrax.ConstantStepSize(),
             args=(driving_amplitude, driving_frequency),
         )
         return sol

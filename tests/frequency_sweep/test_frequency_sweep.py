@@ -8,7 +8,8 @@ SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.9, 1.1, 200)
 #DRIVING_AMPLITUDE = jnp.linspace(1*1/Q, 10*1/Q, 10)
 DRIVING_AMPLITUDE = jnp.array([0.12])
-SOLVER = oscidyn.SingleShootingSolver(max_steps=5000, rtol=1e-9, atol=1e-12)
+#SOLVER = oscidyn.SingleShootingSolver(max_steps=5000, rtol=1e-9, atol=1e-12)
+SOLVER = oscidyn.MultipleShootingSolver(max_steps=5000, rtol=1e-9, atol=1e-12)
 PRECISION = oscidyn.Precision.DOUBLE
 
 start_time = time.time()

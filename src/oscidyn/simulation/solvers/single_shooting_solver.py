@@ -13,10 +13,14 @@ from .. import constants as const
 
 class SingleShootingSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
+                 max_shooting_iterations: int = 20,
+                 shooting_tolerance: float = 1e-10,
                  rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False):
         super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
 
         self.n_time_steps = n_time_steps
+        self.max_shooting_iterations = max_shooting_iterations
+        self.shooting_tolerance = shooting_tolerance
         self.progress_bar = progress_bar
         self.model: AbstractModel = None
    
@@ -169,12 +173,7 @@ class SingleShootingSolver(AbstractSolver):
                  driving_amplitude: jax.Array,  
                  initial_condition: jax.Array, 
                 ):        
-        
-        T = 2.0 * jnp.pi
-        t0 = 0.0
-        t1 = T
-        ts = jnp.linspace(0.0, T, self.n_time_steps)
-            
+
         @filter_jit
         def _newton_shooting(y0):
             X0 = jnp.eye(2, dtype=initial_condition.dtype).reshape(-1)
@@ -209,7 +208,7 @@ class SingleShootingSolver(AbstractSolver):
 
         def _shooting_converged_cond(carry):
             k, done, y0, yT, XT, r = carry
-            return jnp.logical_and(~done, k < const.MAX_SHOOTING_ITERATIONS)
+            return jnp.logical_and(~done, k < self.max_shooting_iterations)
 
         def _shooting_iteration(carry):
             k, done, y0, yT, XT, r = carry
@@ -261,7 +260,7 @@ class SingleShootingSolver(AbstractSolver):
             # for-else fallback: if never succeeded, use last resort y0 + dy0
             y0 = jnp.where(ls_done, y0_after_ls, y0 + dy0)  
 
-            sh_done = r < const.SHOOTING_TOLERANCE
+            sh_done = r < self.shooting_tolerance
             k += 1
                         
             return k, sh_done, y0, yT, XT, r
