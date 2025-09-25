@@ -57,9 +57,11 @@ def time_response(
 
         print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
 
+    solver.model = model
+
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-    ts, ys = solver.time_response(model, driving_frequency, driving_amplitude, initial_condition)
+    ts, ys = solver.time_response(driving_frequency, driving_amplitude, initial_condition)
 
     if isinstance(solver, SteadyStateSolver):
         time = ts.flatten()
