@@ -2,6 +2,7 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
+from functools import partial
 
 from .. import constants as const
 from .abstract_model import AbstractModel, oscimodel

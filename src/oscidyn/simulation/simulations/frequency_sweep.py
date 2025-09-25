@@ -308,10 +308,16 @@ def frequency_sweep(
             
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)
-        driving_frequencies = driving_frequencies.astype(jnp.float64)
-        driving_amplitudes = driving_amplitudes.astype(jnp.float64)
+        dtype = jnp.float64
     elif precision == const.Precision.SINGLE:
         jax.config.update("jax_enable_x64", False)
+        dtype = jnp.float32
+    else:
+        raise ValueError(f"Unsupported precision: {precision}")
+
+    # Ensure inputs are jax arrays (handles Python floats, lists, numpy arrays) before dtype enforcement
+    driving_frequencies = jnp.asarray(driving_frequencies, dtype=dtype)
+    driving_amplitudes = jnp.asarray(driving_amplitudes, dtype=dtype)
 
     if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
         raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")

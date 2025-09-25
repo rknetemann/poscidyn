@@ -7,7 +7,7 @@ w0   = 1.0      # natural frequency
 Q    = 200.0    # quality factor (weak damping -> large Q)
 gamma= 1.0      # cubic stiffness
 F    = 0.12     # forcing amplitude
-w    = 1.0     # forcing frequency
+w    = 0.1     # forcing frequency
 T    = 2*np.pi/w
 
 def f(t, y):

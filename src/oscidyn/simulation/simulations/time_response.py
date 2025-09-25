@@ -24,8 +24,18 @@ def time_response(
     
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)
+        dtype = jnp.float64
     elif precision == const.Precision.SINGLE:
         jax.config.update("jax_enable_x64", False)
+        dtype = jnp.float32
+    else:
+        raise ValueError(f"Unsupported precision: {precision}")
+
+    # Ensure inputs are jax arrays (handles Python floats, lists, numpy arrays) before dtype enforcement
+    driving_frequency = jnp.asarray(driving_frequency, dtype=dtype)
+    driving_amplitude = jnp.asarray(driving_amplitude, dtype=dtype)
+    initial_displacement = jnp.asarray(initial_displacement, dtype=dtype)
+    initial_velocity = jnp.asarray(initial_velocity, dtype=dtype)
     
     if model.n_modes != initial_displacement.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial displacement has shape {initial_displacement.shape}. It should have shape ({model.n_modes},).")
