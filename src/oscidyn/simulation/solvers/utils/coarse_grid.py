@@ -51,31 +51,24 @@ def gen_coarse_grid_1(model: AbstractModel,
 
     return (coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh)
 
-def gen_coarse_grid_2(model: AbstractModel,
+def gen_grid_2(model: AbstractModel,
                     drive_freq: jax.Array,
                     drive_amp: jax.Array,
                     ):
-        
-    coarse_drive_freq = jnp.linspace(
-        jnp.min(drive_freq), jnp.max(drive_freq), const.N_COARSE_DRIVING_FREQUENCIES
-    ) # (N_COARSE_DRIVING_FREQUENCIES,)
+    
+    max_abs_displacement = float((jnp.max(drive_amp) * jnp.abs(model.Q)).item())
+    max_abs_velocity = max_abs_displacement 
 
-    coarse_drive_amp = jnp.linspace(
-        jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
-    ) # (N_COARSE_DRIVING_AMPLITUDES,)
-
-    max_abs_displacement = float((jnp.max(drive_amp) * jnp.abs(model.Q)).item()) # Convert to a Python float
-    coarse_init_disp = jnp.linspace(
+    init_disp_grid = jnp.linspace(
         -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
     ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
-
-    max_abs_velocity = max_abs_displacement # TO DO: Determine the max velocity based on the model or a fixed value
-    coarse_init_vel = jnp.linspace(
+    
+    init_vel_grid = jnp.linspace(
         -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
     ) # (N_COARSE_INITIAL_VELOCITIES,)
 
-    coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
-        coarse_drive_freq, coarse_drive_amp, coarse_init_disp, coarse_init_vel, indexing="ij"
+    drive_freq_mesh, drive_amp_mesh, init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
+        drive_freq, drive_amp, init_disp_grid, init_vel_grid, indexing="ij"
     ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES)
 
-    return (coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh)
+    return (drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh)
