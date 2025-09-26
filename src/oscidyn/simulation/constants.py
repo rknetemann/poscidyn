@@ -14,7 +14,7 @@ class ResponseType(Enum):
     FrequencyResponse = auto()
     TimeResponse      = auto()
 
-N_COARSE_DRIVING_FREQUENCIES = 51 # Odd number to include middle frequency
+N_COARSE_DRIVING_FREQUENCIES = 30 # Odd number to include middle frequency
 N_COARSE_DRIVING_AMPLITUDES = 5
 N_COARSE_INITIAL_DISPLACEMENTS= 6
 N_COARSE_INITIAL_VELOCITIES = 6

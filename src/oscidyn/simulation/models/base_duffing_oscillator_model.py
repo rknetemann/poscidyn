@@ -74,3 +74,8 @@ class BaseDuffingOscillator(AbstractModel):
         g3 = gamma
         
         return cls(g1=g1, g2=g2, g3=g3, Q=Q, omega_0=omega_0, gamma=gamma)
+    
+    def __repr__(self):
+        return (f"BaseDuffingOscillator(n_modes={self.n_modes}, "
+                f"Q={self.Q}, omega_0={self.omega_0}, gamma={self.gamma}, "
+                f"g1={self.g1}, g2={self.g2}, g3={self.g3})")
