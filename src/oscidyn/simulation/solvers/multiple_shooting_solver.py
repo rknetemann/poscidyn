@@ -14,7 +14,7 @@ from .. import constants as const
 class MultipleShootingSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
                  max_shooting_iterations: int = 20, shooting_tolerance: float = 1e-10,
-                 m_segments: int = 5,
+                 m_segments: int = 20,
                  rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False):
         super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
 
@@ -24,17 +24,29 @@ class MultipleShootingSolver(AbstractSolver):
         self.m_segments = m_segments
         self.progress_bar = progress_bar
         self.model: AbstractModel = None
+
+        self.n = None
+        self.m = None
+
+        self.T = 2.0 * jnp.pi
+        self.dtmax = self.T / const.DT_MAX_FACTOR / self.m_segments
+        self.dtmin = self.T / const.DT_MIN_FACTOR
+        self.t0 = 0.0
+        self.t1 = self.T
    
     def time_response(self,
                  drive_freq: jax.Array,  
                  drive_amp: jax.Array, 
                  init_guess: jax.Array,  
                 ):
+        
+        self.n = self.model.n_modes * 2
+        self.m = self.m_segments
                        
         y0 = self._calculate_period_solution(drive_freq, drive_amp, init_guess)
 
         def _solve_one_period(y0):               
-            sol = self._solve(self._rhs, True, y0, drive_freq, drive_amp)
+            sol = self._solve(self._rhs, True, self.t0, self.t1, y0, drive_freq, drive_amp)
             return sol.ts, sol.ys
 
         ts, ys = jax.lax.cond(
@@ -51,6 +63,9 @@ class MultipleShootingSolver(AbstractSolver):
                  drive_amp: jax.Array,   # (n_modes,)
                  sweep_direction: const.SweepDirection,
                 ):
+        
+        self.n = self.model.n_modes * 2
+        self.m = self.m_segments
     
         # Generate combinations of coarse driving frequencies, amplitudes, and initial conditions
         # where the intiial conditions are based on the linear response amplitude for the given driving frequency and amplitude ranges
@@ -78,7 +93,7 @@ class MultipleShootingSolver(AbstractSolver):
         @jax.jit
         def _solve_one_period(y0_single, freq_single, amp_single):
             def do_integrate(y_init):
-                sol = self._solve(self._rhs, True, y_init, freq_single, amp_single)
+                sol = self._solve(self._rhs, True, self.t0, self.t1, y_init, freq_single, amp_single)
                 return sol.ts, sol.ys
             return jax.lax.cond(
                 jnp.isnan(y0_single).any(),
@@ -156,17 +171,17 @@ class MultipleShootingSolver(AbstractSolver):
     
     @filter_jit
     def _aug_rhs(self, tau, y_aug, args):
-        _drive_amp, drive_freq  = args
+        _drive_amp, drive_freq = args
+        
+        y  = y_aug[:self.n]
+        X  = y_aug[self.n:].reshape(self.n, self.n)
 
-        y  = y_aug[:2]
-        X  = y_aug[2:].reshape(2, 2)
+        t   = tau / drive_freq
+        f   = self.model.f(t, y, args)
+        f_y = self.model.f_y(t, y, args)
 
-        t = tau/ drive_freq
-        f = self.model.f(t, y, args)      
-        f_y  = self.model.f_y(t, y, args)
-
-        dydt = f / drive_freq
-        dXdt = f_y @ X / drive_freq
+        dydt  = f / drive_freq
+        dXdt  = (f_y @ X) / drive_freq
         return jnp.hstack([dydt, dXdt.reshape(-1)])
 
     def _calculate_period_solution(self,
@@ -175,33 +190,23 @@ class MultipleShootingSolver(AbstractSolver):
                  initial_condition: jax.Array, 
                 ):     
 
-        m = self.m_segments
-        n = self.model.n_modes * 2
-
         T = 2.0 * jnp.pi
-        
-        ts = jnp.linspace(0.0, T, m + 1)
-        s0 = jnp.tile(initial_condition, (m, 1))  # (m, n)
+        ts = jnp.linspace(0.0, T, self.m + 1)
+        s0 = jnp.tile(initial_condition, (self.m, 1))  # (m, n)
 
-        eye_N = jnp.eye(n, dtype=initial_condition.dtype)
+        eye_N = jnp.eye(self.n, dtype=initial_condition.dtype)
             
         @filter_jit
-        def _newton_shooting(sk, t0k, t1k):
+        def _integrate_segment(sk, t0k, t1k):
             X0 = eye_N.reshape(-1)
-            sk_aug = jnp.hstack([sk, X0], dtype=initial_condition.dtype)  # Augmented state: [y; vec(X)]
+            sk0_aug = jnp.hstack([sk, X0], dtype=initial_condition.dtype)  # Augmented state: [y; vec(X)]
+            sk_aug = self._solve(self._aug_rhs, False, t0k, t1k, sk0_aug, driving_frequency, driving_amplitude).ys
+            sk_end = sk_aug[-1, :self.n] 
 
-            sk_aug = self._solve(self._aug_rhs, False, t0k, t1k, sk_aug, driving_frequency, driving_amplitude).ys
+            XTk = sk_aug[-1, self.n:].reshape(self.n, self.n)
+            Gk = XTk
 
-            ys = sk_aug[:, :self.model.n_modes * 2]
-            yT = sk_aug[-1, :self.model.n_modes * 2] 
-            XT = sk_aug[-1, self.model.n_modes * 2:].reshape(2, 2)
-
-            F = yT - sk
-            J = XT - eye_N
-            
-            r = jnp.linalg.norm(F, ord=jnp.inf)
-
-            return sk, yT, F, J, XT, r
+            return sk, sk_end, XTk, Gk
         
         def newton_step(J, F):
             # Condition proxy: determinant for 2x2 or cond if you prefer
@@ -224,83 +229,98 @@ class MultipleShootingSolver(AbstractSolver):
 
         def _shooting_iteration(carry):
             k, done, s, yT, XT, r = carry
-            
-            @filter_jit
-            def _newton_shooting_segment(sk, t0_k, t1_k):
-                return _newton_shooting(sk, t0_k, t1_k)
 
             t0s = ts[:-1] # (m,)
             t1s = ts[1:] # (m,)
 
-            y0_seg, yT_seg, F_seg, J_seg, XT_seg, r_seg = jax.vmap(
-                _newton_shooting_segment,
-                in_axes=(0, 0, 0),
-            )(s, t0s, t1s)
-                      
-            dy0 = newton_step(J, F)
-            
-            def _line_search_cond(carry):
-                i, lam, done, y0, yT, XT, r = carry
-                return jnp.logical_and(~done, i < 8)
+            sk, sk_end, XTk, Gk = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0s, t1s)
+            # s: (m,n), s_end: (m,n), XTk: (m,2,2) TO DO: Generalize to n>1 DOF
 
-            def _line_search_iteration(carry):
-                i, lam, ls_done, y0, yT, mu, r = carry
+            # Continuity defects F_j = y_{j+1} - s_{j+1}, j=0..m-2 (7.3.5.3):
+            F_cont = sk_end[:-1] - s[1:] # (m-1, n)
+            # Periodicity defect F_m = y_1^T(s_m) - s_1 (7.3.5.3):
+            F_last = sk_end[-1] - s[0] # (n,)
 
-                y0_try = y0 + lam * dy0
-                y0_try, yT_try, F_try, J_try, mu_try, r_try = _newton_shooting(y0_try)
+            # Jacobian DF(s) has block-bidiagonal structure (7.3.5.5):
+            #  [ G1  -I  0   ... ]
+            #  [ 0   G2 -I   ... ]
+            #  ...
+            # We only need the condensed form (7.3.5.10):
+            # (A + B G_{m-1} ... G1) Δs1 = w
+            #
+            # In periodic case, r(s1, sm) = s1 - sm
+            A = -eye_N
+            B = Gk[-1]
 
-                success = r_try < 0.7 * r
+            # P = G_{m-2} ... G_0  (propagate Δs0 to Δs_{m-1})
+            P = eye_N
+            for i in range(self.m-1):          # i = 0..m-2
+                P = Gk[i] @ P
 
-                # Accept step if successful; otherwise halve step size and continue
-               
-                lam = jnp.where(success, lam, lam * 0.5)
-                ls_done = jnp.logical_or(ls_done, success)
+            # S = Σ_{j=0}^{m-2} (G_{m-2} ... G_{j+1}) F_j   (suffix products)
+            # build suffix products Q_j = Π_{i=j+1}^{m-2} G_i
+            Q = jnp.zeros((self.m-1, self.n, self.n), dtype=initial_condition.dtype)
+            Q = Q.at[self.m-2].set(eye_N)      # Q_{m-2} = I (empty product)
 
-                y0 = jnp.where(success, y0_try, y0)
-                yT = jnp.where(success, yT_try, yT)
-                mu = jnp.where(success, mu_try, mu)
-                r = jnp.where(success, r_try, r)
+            def fill_suffix(i, Qacc):
+                # i = 0..(m-3) -> j = (m-3 - i) runs downwards
+                j = (self.m - 3) - i
+                Qacc = Qacc.at[j].set(Gk[j+1] @ Qacc[j+1])
+                return Qacc
 
-                i += 1
+            Q = jax.lax.fori_loop(0, self.m-2, fill_suffix, Q) if self.m > 2 else Q
 
-                return (i, lam, ls_done, y0, yT, XT, r)          
-            
-            init_carry = (
-                jnp.array(0, dtype=jnp.int32),           # i
-                jnp.array(1.0, dtype=y0.dtype),          # lam
-                jnp.array(False),                        # ls_done
-                y0,                                      # y0
-                yT,                                      # yT
-                jnp.eye(2, dtype=y0.dtype),              # XT
-                r,                                       # r
-            )
+            # sum_j Q_j @ F_cont[j]
+            S_terms = jax.vmap(lambda Qj, Fj: Qj @ Fj)(Q, F_cont)  # (m-1, n)
+            S       = jnp.sum(S_terms, axis=0)                    # (n,)
 
-            i, lam, ls_done, y0_after_ls, yT, XT, r = jax.lax.while_loop(
-                _line_search_cond, _line_search_iteration, init_carry
-            )
+            # Condensed system:
+            # (A + B P) Δs0 = -F_last - B S
+            Jc = A + B @ P
+            rhs = -(F_last + B @ S)
 
-            # for-else fallback: if never succeeded, use last resort y0 + dy0
-            y0 = jnp.where(ls_done, y0_after_ls, y0 + dy0)  
+            # Solve for Δs0
+            Δs0 = jnp.linalg.solve(Jc, rhs)
 
-            sh_done = r < self.shooting_tolerance
+            # Propagate corrections:
+            # Δs_{j+1} = G_j Δs_j + F_j, j=0..m-2
+            Δs = jnp.zeros_like(s)            # (m, n)
+            Δs = Δs.at[0].set(Δs0)
+
+            def prop(i, ds):
+                ds = ds.at[i+1].set(Gk[i] @ ds[i] + F_cont[i])
+                return ds
+
+            Δs = jax.lax.fori_loop(0, self.m-1, prop, Δs) if self.m > 1 else Δs
+
+            # Update all segment starts
+            s_new = s + Δs
+
+            # Residual norm (max over segments)
+            defects = jnp.concatenate([F_cont, F_last[None, :]], axis=0)  # (m, n)
+            r_new   = jnp.max(jnp.linalg.norm(defects, axis=1))
+
+            sh_done = r_new < self.shooting_tolerance
             k += 1
-                        
-            return k, sh_done, y0, yT, XT, r
+
+            # keep yT, XT shapes consistent with init; they are not used downstream
+            return k, sh_done, s_new, sk_end[-1], XT, r_new          
         
         init_carry = (
             jnp.array(0, dtype=jnp.int32), # k
             jnp.array(False), # done
             s0, # s0: (m,n)
-            jnp.full((2,), jnp.inf, dtype=initial_condition.dtype), # yT: (2,)
-            jnp.eye(2, dtype=initial_condition.dtype), # XT: (2,2)
+            jnp.full((self.n,), jnp.inf, dtype=initial_condition.dtype), # yT: (n,)
+            jnp.eye(self.n, dtype=initial_condition.dtype), # XT: (n,n)
             jnp.array(jnp.inf, dtype=initial_condition.dtype), # r: scalar float
         )
 
-        k, ls_done, y0, yT, XT, r = jax.lax.while_loop(_shooting_converged_cond, _shooting_iteration, init_carry)
+        k, ls_done, s_final, yT, XT, r = jax.lax.while_loop(
+            _shooting_converged_cond, _shooting_iteration, init_carry
+        )
 
-        y0 = jnp.where(ls_done, y0, jnp.nan) 
-        #mu = jnp.linalg.eigvals(XT)
-        #jax.debug.print("Converged: {}", ls_done)
+        y0 = s_final[0]                              # (n,)
+        y0 = jnp.where(ls_done, y0, jnp.nan * y0)   # keep shape
 
         return y0  # Return time and state (displacement and velocity)
 
@@ -332,7 +352,7 @@ class MultipleShootingSolver(AbstractSolver):
             throw=False,
             progress_meter=diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(
-                rtol=self.rtol, atol=self.atol, dtmax=dtmax, dtmin=dtmin
+                rtol=self.rtol, atol=self.atol
             ),
             args=(driving_amplitude, driving_frequency),
         )

@@ -289,23 +289,18 @@ class SingleShootingSolver(AbstractSolver):
                driving_frequency: float,
                driving_amplitude: jax.Array) -> diffrax.Solution:
         
-        T = 2.0 * jnp.pi
-        t0 = 0.0
-        t1 = T
-        ts = jnp.linspace(0.0, T, self.n_time_steps)
-        dtmax = T / const.DT_MAX_FACTOR
-        dtmin = T / const.DT_MIN_FACTOR
-        max_steps = self.max_steps
+        dtmax = self.T / const.DT_MAX_FACTOR
+        dtmin = self.T / const.DT_MIN_FACTOR
         
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(rhs),
             solver=diffrax.Tsit5(),
-            t0=t0,
-            t1=t1,
+            t0=self.t0,
+            t1=self.t1,
             dt0=None,
-            max_steps=max_steps,
+            max_steps=self.max_steps,
             y0=y0,
-            saveat=diffrax.SaveAt(ts=ts) if wf else diffrax.SaveAt(t1=True),
+            saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, self.T, self.n_time_steps)) if wf else diffrax.SaveAt(t1=True),
             throw=False,
             progress_meter=diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(
