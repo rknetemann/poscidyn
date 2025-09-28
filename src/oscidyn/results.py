@@ -4,10 +4,10 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
-from oscidyn.simulation.model import AbstractModel
-from oscidyn.simulation.solver import AbstractSolver
-from oscidyn.simulation.constants import SweepDirection
-import oscidyn.simulation.constants as const
+from .model.abstract_model import AbstractModel
+from .solver.abstract_solver import AbstractSolver
+from .constants import SweepDirection
+from . import constants as const
 
 @jax.tree_util.register_pytree_node_class
 @dataclass
