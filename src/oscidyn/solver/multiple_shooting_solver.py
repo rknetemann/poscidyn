@@ -6,6 +6,7 @@ from equinox import filter_jit
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
+from .multistart.abstract_multistart import AbstractMultistart
 from ..utils.plotting import plot_branch_exploration, plot_branch_selection
 from .utils.coarse_grid import gen_coarse_grid_1, gen_grid_2
 from .utils.branch_selection import select_branches
@@ -18,18 +19,21 @@ import matplotlib.pyplot as _plt
 class MultipleShootingSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
                  max_shooting_iterations: int = 20, shooting_tolerance: float = 1e-10,
-                 m_segments: int = 20, max_branches: int = 5,
+                 m_segments: int = 20, max_branches: int = 5, multistart: AbstractMultistart = None,
                  rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False):
-        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
 
         self.n_time_steps = n_time_steps
+        self.max_steps = max_steps
         self.max_shooting_iterations = max_shooting_iterations
         self.shooting_tolerance = shooting_tolerance
         self.m_segments = m_segments
         self.max_branches = max_branches
         self.progress_bar = progress_bar
-        self.model: AbstractModel = None
+        self.multistart = multistart
+        self.rtol = rtol
+        self.atol = atol
 
+        self.model: AbstractModel = None
         self.n = None
         self.m = None
 

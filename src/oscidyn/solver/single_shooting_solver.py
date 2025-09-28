@@ -16,7 +16,6 @@ class SingleShootingSolver(AbstractSolver):
                  max_shooting_iterations: int = 20,
                  shooting_tolerance: float = 1e-10,
                  rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False):
-        super().__init__(rtol=rtol, atol=atol, max_steps=max_steps)
 
         self.n_time_steps = n_time_steps
         self.max_shooting_iterations = max_shooting_iterations
