@@ -1,4 +1,4 @@
-# models.py
+# model.py
 from __future__ import annotations
 import jax
 import jax.numpy as jnp

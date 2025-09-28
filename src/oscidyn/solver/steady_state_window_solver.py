@@ -4,7 +4,7 @@ import diffrax
 from functools import partial
 
 from .abstract_solver import AbstractSolver
-from ..models.abstract_model import AbstractModel
+from ..model.abstract_model import AbstractModel
 from .. import constants as const 
 
 class SteadyStateSolver(AbstractSolver):

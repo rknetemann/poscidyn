@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from ... import constants as const
-from ...models.abstract_model import AbstractModel
+from ...model.abstract_model import AbstractModel
 
 def gen_coarse_grid_1(model: AbstractModel,
                     drive_freq: jax.Array,

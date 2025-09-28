@@ -1,7 +1,7 @@
 import jax
 import diffrax
 
-from ..models.abstract_model import AbstractModel
+from ..model.abstract_model import AbstractModel
 
 class AbstractSolver:
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-6, max_steps: int = 4096, progress_bar: bool = True):

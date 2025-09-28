@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
-from oscidyn.simulation.models import AbstractModel
+from oscidyn.simulation.model import AbstractModel
 from oscidyn.simulation.solver import AbstractSolver
 from oscidyn.simulation.constants import SweepDirection
 import oscidyn.simulation.constants as const

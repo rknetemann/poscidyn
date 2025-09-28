@@ -1,10 +1,10 @@
 from .constants import *
-from .solvers.abstract_solver import *
-from .solvers.single_shooting_solver import *
-from .solvers.multiple_shooting_solver import *
+from .solver.abstract_solver import *
+from .solver.single_shooting_solver import *
+from .solver.multiple_shooting_solver import *
 
-from .models.abstract_model import *
-from .models.base_duffing_oscillator_model import *
+from .model.abstract_model import *
+from .model.base_duffing_oscillator_model import *
 
 from .frequency_sweep import frequency_sweep
 from .time_response import time_response

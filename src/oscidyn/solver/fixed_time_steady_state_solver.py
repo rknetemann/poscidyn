@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import diffrax
 
 from .abstract_solver import AbstractSolver
-from ..models.abstract_model import AbstractModel
+from ..model.abstract_model import AbstractModel
 from .. import constants as const 
 
 class FixedTimeSteadyStateSolver(AbstractSolver):
