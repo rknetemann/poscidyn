@@ -61,7 +61,7 @@ def time_response(
 
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
 
-    ts, ys = solver.time_response(driving_frequency, driving_amplitude, initial_condition)
+    ts, ys = solver.time_response(driving_frequency, driving_amplitude, initial_displacement, initial_velocity)
 
     if isinstance(solver, SteadyStateSolver):
         time = ts.flatten()

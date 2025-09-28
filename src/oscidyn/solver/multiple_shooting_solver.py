@@ -53,10 +53,23 @@ class MultipleShootingSolver(AbstractSolver):
         self.n = self.model.n_modes * 2
         self.m = self.m_segments
                        
-        y0 = self._calc_periodic_solution(drive_freq, drive_amp, init_disp, init_vel)
+        y0, y_max_displacement = self._calc_periodic_solution(drive_freq, drive_amp, init_disp, init_vel)
 
         def _solve_one_period(y0):               
-            sol = self._solve(self._rhs, True, self.t0, self.t1, y0, drive_freq, drive_amp)
+            sol = diffrax.diffeqsolve(
+                terms=diffrax.ODETerm(self._rhs),
+                solver=diffrax.Tsit5(),
+                t0=0.0,
+                t1=self.T,
+                dt0=None,
+                max_steps=self.max_steps,
+                y0=y0,
+                saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, self.T, self.n_time_steps)),
+                throw=False,
+                progress_meter=diffrax.NoProgressMeter(),
+                stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+                args=(drive_amp, drive_freq),
+            )
             return sol.ts, sol.ys
 
         ts, ys = jax.lax.cond(
@@ -84,6 +97,8 @@ class MultipleShootingSolver(AbstractSolver):
         drive_amp_mesh_flat  = drive_amp_mesh.ravel()                        # (n_sim,)
         init_disp_mesh_flat  = init_disp_mesh.ravel()                        # (n_sim,)
         init_vel_mesh_flat   = init_vel_mesh.ravel()                         # (n_sim,)
+
+
 
         # Solve shooting for each coarse combination to get y0
 
@@ -128,11 +143,24 @@ class MultipleShootingSolver(AbstractSolver):
                  initial_velocity: jax.Array
                 ):     
 
-        T = 2.0 * jnp.pi
-        ts = jnp.linspace(0.0, T, self.m + 1)
+        ts=jnp.linspace(0.0, self.T, self.m + 1)
 
         initial_condition = jnp.array([initial_displacement, initial_velocity])
-        s0 = jnp.tile(initial_condition, (self.m, 1))  # (m, n)
+
+        sol = diffrax.diffeqsolve(
+            terms=diffrax.ODETerm(self._rhs),
+            solver=diffrax.Tsit5(),
+            t0=0.0, t1=self.T, dt0=None,
+            max_steps=self.max_steps,
+            y0=initial_condition,
+            saveat=diffrax.SaveAt(ts=ts),
+            throw=False,
+            progress_meter=diffrax.NoProgressMeter(),
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+            args=(driving_amplitude, driving_frequency),
+        )
+
+        s0 = sol.ys[:-1]
 
         eye_N = jnp.eye(self.n, dtype=initial_condition.dtype)
             
@@ -141,7 +169,21 @@ class MultipleShootingSolver(AbstractSolver):
             X0 = eye_N.reshape(-1)
             y_max0 = sk
             sk0_aug = jnp.hstack([sk, y_max0, X0], dtype=initial_condition.dtype)  # Augmented state: [y; vec(X)]
-            sk_aug = self._solve(self._aug_rhs, False, t0k, t1k, sk0_aug, driving_frequency, driving_amplitude).ys
+
+            sol = diffrax.diffeqsolve(
+                terms=diffrax.ODETerm(self._aug_rhs),
+                solver=diffrax.Tsit5(),
+                t0=t0k, t1=t1k, dt0=None,
+                max_steps=self.max_steps,
+                y0=sk0_aug,
+                saveat=diffrax.SaveAt(t1=True),
+                throw=False,
+                progress_meter=diffrax.NoProgressMeter(),
+                stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+                args=(driving_amplitude, driving_frequency),
+            )
+
+            sk_aug = sol.ys
 
             yk = sk_aug[-1, :self.n]
             y_max = sk_aug[-1, self.n:self.n * 2]
