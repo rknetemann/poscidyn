@@ -67,7 +67,7 @@ def gen_grid_2(model: AbstractModel,
         -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
     ) # (N_COARSE_INITIAL_VELOCITIES,)
 
-    drive_freq_mesh, drive_amp_mesh, init_disp_mesh, coarse_init_vel_mesh = jnp.meshgrid(
+    drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = jnp.meshgrid(
         drive_freq, drive_amp, init_disp_grid, init_vel_grid, indexing="ij"
     ) # (N_COARSE_DRIVING_FREQUENCIES, N_COARSE_DRIVING_AMPLITUDES, N_COARSE_INITIAL_DISPLACEMENTS, N_COARSE_INITIAL_VELOCITIES)
 

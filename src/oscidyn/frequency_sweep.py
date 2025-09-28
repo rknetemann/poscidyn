@@ -3,16 +3,16 @@ import jax
 import jax.numpy as jnp
 from typing import Tuple, Dict
 
-from ..models.abstract_model import AbstractModel
-from ..solvers.abstract_solver import AbstractSolver
-from ..solvers.fixed_time_solver import FixedTimeSolver
-from ..solvers.steady_state_window_solver import SteadyStateSolver
-from ..solvers.fixed_time_steady_state_solver import FixedTimeSteadyStateSolver
-from ..solvers.single_shooting_solver import SingleShootingSolver
-from ..solvers.multiple_shooting_solver import MultipleShootingSolver
+from .models.abstract_model import AbstractModel
+from .solvers.abstract_solver import AbstractSolver
+from .solvers.fixed_time_solver import FixedTimeSolver
+from .solvers.steady_state_window_solver import SteadyStateSolver
+from .solvers.fixed_time_steady_state_solver import FixedTimeSteadyStateSolver
+from .solvers.single_shooting_solver import SingleShootingSolver
+from .solvers.multiple_shooting_solver import MultipleShootingSolver
 
-from .. import constants as const
-from ..utils import plotting as plt
+from . import constants as const
+from .utils import plotting as plt
 
 def frequency_sweep(
     model: AbstractModel,

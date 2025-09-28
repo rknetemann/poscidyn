@@ -6,10 +6,10 @@ from typing import Tuple
 import numpy as np
 import time
 
-from ..models.abstract_model import AbstractModel
-from ..solvers.abstract_solver import AbstractSolver
-from ..solvers.steady_state_window_solver import SteadyStateSolver
-from .. import constants as const
+from .models.abstract_model import AbstractModel
+from .solvers.abstract_solver import AbstractSolver
+from .solvers.steady_state_window_solver import SteadyStateSolver
+from . import constants as const
 
 
 def time_response(
