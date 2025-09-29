@@ -18,20 +18,22 @@ import matplotlib.pyplot as _plt
 
 class MultipleShootingSolver(AbstractSolver):
     def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
-                 max_shooting_iterations: int = 20, shooting_tolerance: float = 1e-10,
+                 max_shooting_iterations: int = 20,
                  m_segments: int = 20, max_branches: int = 5, multistart: AbstractMultistart = None,
-                 rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False):
+                 rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False,
+                 feas_tol: float = 1e-2, step_tol: float = 1e-3):
 
         self.n_time_steps = n_time_steps
         self.max_steps = max_steps
         self.max_shooting_iterations = max_shooting_iterations
-        self.shooting_tolerance = shooting_tolerance
         self.m_segments = m_segments
         self.max_branches = max_branches
         self.progress_bar = progress_bar
         self.multistart = multistart
         self.rtol = rtol
         self.atol = atol
+        self.feas_tol = feas_tol         # <<< NEW
+        self.step_tol = step_tol         # <<< NEW
 
         self.model: AbstractModel = None
         self.n = None
@@ -212,15 +214,15 @@ class MultipleShootingSolver(AbstractSolver):
             t0s, t1s = ts[:-1], ts[1:]
             yk, yMax, Gk = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0s, t1s)
 
+            # Residuals for current iterate s
             F_cont = yk[:-1] - s[1:]   # (m-1, n)
             F_last = yk[-1]  - s[0]    # (n,)
 
-            # P = G_{m-2}...G_0
+            # Build condensed linear system for Newton step Δs
             def _prod_step(P, Gi):
                 return Gi @ P, None
             P, _ = jax.lax.scan(_prod_step, eye_N, Gk[:-1])
 
-            # S = Σ_{j=0}^{m-2} (G_{m-2}...G_{j+1}) F_j
             G_next = Gk[1:][::-1]
             F_rev  = F_cont[::-1]
             def _suffix_step(acc, gf):
@@ -237,15 +239,21 @@ class MultipleShootingSolver(AbstractSolver):
                 ds_next = Gi @ ds_prev + Fi
                 return ds_next, ds_next
             _, ds_tail = jax.lax.scan(_prop_step, delta_s0, (Gk[:-1], F_cont))
-            delta_s = jnp.vstack((delta_s0, ds_tail))
+            delta_s = jnp.vstack((delta_s0, ds_tail))   # (m, n)
 
             s_new = s + delta_s
 
-            defects = jnp.vstack((F_cont, F_last[None, :]))
-            errors = jnp.linalg.norm(defects, axis=1)
-            done_new = jnp.all(errors <= (self.atol + self.rtol * jnp.abs(s_new).max()))
+            # ---------- Convergence check (∞-norm), NEW ----------
+            resid_inf = jnp.maximum(jnp.max(jnp.abs(F_cont)), jnp.max(jnp.abs(F_last)))
+            step_inf  = jnp.max(jnp.abs(delta_s))
 
-            return (k + 1, done_new, s_new, yMax, Gk)
+            new_done = (resid_inf <= self.feas_tol) & (step_inf <= self.step_tol)
+
+            # If converged, keep s (don’t apply the update); otherwise accept s_new
+            s_out = jax.lax.select(new_done, s, s_new)
+            # -----------------------------------------------------
+
+            return (k + 1, new_done, s_out, yMax, Gk)
 
         init = (
             jnp.array(0, jnp.int32),

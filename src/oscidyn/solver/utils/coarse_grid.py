@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from ... import constants as const
 from ...model.abstract_model import AbstractModel
 
+# TO DO: Randomize initial conditions within the grid cells
+
 def gen_coarse_grid_1(model: AbstractModel,
                     drive_freq: jax.Array,
                     drive_amp: jax.Array,
