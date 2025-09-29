@@ -101,13 +101,12 @@ class MultipleShootingSolver(AbstractSolver):
 
 
         # Solve shooting for each coarse combination to get y0
-
-        y0, y_max = jax.vmap(self._calc_periodic_solution)(
+        y0, y_max, mu = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, init_disp_mesh_flat, init_vel_mesh_flat
         )  # y0: (n_sim, n)  y_max: (n_sim, n_modes)
 
         # Plot the results
-        plot_branch_exploration(drive_freq_mesh, drive_amp_mesh, y_max)
+        plot_branch_exploration(drive_freq_mesh, drive_amp_mesh, y_max, mu)
 
         return None
 
@@ -123,7 +122,7 @@ class MultipleShootingSolver(AbstractSolver):
     @filter_jit
     def _aug_rhs(self, tau, y_aug, args):
         _drive_amp, drive_freq = args
-        
+
         y  = y_aug[:self.n]
         y_max = y_aug[self.n:self.n * 2]
         X  = y_aug[self.n * 2:].reshape(self.n, self.n)
@@ -136,204 +135,138 @@ class MultipleShootingSolver(AbstractSolver):
         dXdt  = ((f_y @ X) / drive_freq).reshape(-1)
         return jnp.hstack([dydt, y_max, dXdt])
 
+
+    @filter_jit
+    def _max_save_fn(self, t, y_aug, args):
+        n = self.n
+        y     = y_aug[:n]
+        y_max = y_aug[n:2*n]
+        y_max = jnp.maximum(y_max, y)
+        return y_aug.at[n:2*n].set(y_max)
+
+
+    @filter_jit
     def _calc_periodic_solution(self,
-                 driving_frequency: jax.Array, 
-                 driving_amplitude: jax.Array,  
-                 initial_displacement: jax.Array,
-                 initial_velocity: jax.Array
-                ):     
+                                driving_frequency: jax.Array,
+                                driving_amplitude: jax.Array,
+                                initial_displacement: jax.Array,
+                                initial_velocity: jax.Array):
 
-        ts=jnp.linspace(0.0, self.T, self.m + 1)
+        n = self.model.n_modes * 2
+        m = self.m_segments
+        T = self.T
+        ts = jnp.linspace(0.0, T, m + 1)
 
-        initial_condition = jnp.array([initial_displacement, initial_velocity])
+        y0_init = jnp.array([initial_displacement, initial_velocity])
+        term = diffrax.ODETerm(self._rhs)
+        solver = diffrax.Tsit5()
 
-        sol = diffrax.diffeqsolve(
-            terms=diffrax.ODETerm(self._rhs),
-            solver=diffrax.Tsit5(),
-            t0=0.0, t1=self.T, dt0=None,
-            max_steps=self.max_steps,
-            y0=initial_condition,
+        sol0 = diffrax.diffeqsolve(
+            term, solver,
+            t0=0.0, t1=T, dt0=None,
+            y0=y0_init,
             saveat=diffrax.SaveAt(ts=ts),
             throw=False,
+            max_steps=self.max_steps,
             progress_meter=diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_amplitude, driving_frequency),
         )
+        s = sol0.ys[:-1]  # (m, n)
 
-        s0 = sol.ys[:-1]
+        eye_N = jnp.eye(n, dtype=y0_init.dtype)
 
-        eye_N = jnp.eye(self.n, dtype=initial_condition.dtype)
-            
         @filter_jit
         def _integrate_segment(sk, t0k, t1k):
             X0 = eye_N.reshape(-1)
-            y_max0 = sk
-            sk0_aug = jnp.hstack([sk, y_max0, X0], dtype=initial_condition.dtype)  # Augmented state: [y; vec(X)]
+            y_aug0 = jnp.hstack([sk, sk, X0]).astype(y0_init.dtype)  # [y, y_max, vec(X)]
 
-            sol = diffrax.diffeqsolve(
-                terms=diffrax.ODETerm(self._aug_rhs),
-                solver=diffrax.Tsit5(),
+            solk = diffrax.diffeqsolve(
+                diffrax.ODETerm(self._aug_rhs),
+                solver,
                 t0=t0k, t1=t1k, dt0=None,
-                max_steps=self.max_steps,
-                y0=sk0_aug,
-                saveat=diffrax.SaveAt(t1=True),
+                y0=y_aug0,
+                saveat=diffrax.SaveAt(t1=True, fn=self._max_save_fn),
                 throw=False,
+                max_steps=self.max_steps,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args=(driving_amplitude, driving_frequency),
+                args=(driving_amplitude, driving_frequency),  # exactly two items
             )
 
-            sk_aug = sol.ys
+            sk_aug = jnp.atleast_2d(solk.ys)   # (n_saved, 2n+n^2), usually (1, ...)
+            last   = sk_aug[-1]                # (2n+n^2,)
 
-            yk = sk_aug[-1, :self.n]
-            y_max = sk_aug[-1, self.n:self.n * 2]
-            XTk = sk_aug[-1, 2 * self.n:].reshape(self.n, self.n)
-            Gk = XTk
+            yk   = last[:n]
+            yMax = last[n:2*n]
+            Gk   = last[2*n:].reshape(n, n)
+            return yk, yMax, Gk
 
-            return sk, yk, y_max, XTk, Gk
+        def _continue(carry):
+            k, done, *_ = carry
+            return (~done) & (k < self.max_shooting_iterations)
 
-        def _shooting_converged_cond(carry):
-            k, done, y0, yT, y_max, XT, r = carry
-            return jnp.logical_and(~done, k < self.max_shooting_iterations)
+        def _one_iter(carry):
+            k, done, s, _, _ = carry
 
-        def _shooting_iteration(carry):
-            k, done, s, yT, y_max, XT, r = carry
+            t0s, t1s = ts[:-1], ts[1:]
+            yk, yMax, Gk = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0s, t1s)
 
-            t0s = ts[:-1] # (m,)
-            t1s = ts[1:] # (m,)
+            F_cont = yk[:-1] - s[1:]   # (m-1, n)
+            F_last = yk[-1]  - s[0]    # (n,)
 
-            sk, yk, y_max, XTk, Gk = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0s, t1s)
-            # s: (m,n), s_end: (m,n), XTk: (m,2,2) TO DO: Generalize to n>1 DOF
+            # P = G_{m-2}...G_0
+            def _prod_step(P, Gi):
+                return Gi @ P, None
+            P, _ = jax.lax.scan(_prod_step, eye_N, Gk[:-1])
 
-            # Continuity defects F_j = y_{j+1} - s_{j+1}, j=0..m-2 (7.3.5.3):
-            F_cont = yk[:-1] - s[1:] # (m-1, n)
-            # Periodicity defect F_m = y_1^T(s_m) - s_1 (7.3.5.3):
-            F_last = yk[-1] - s[0] # (n,)
+            # S = Σ_{j=0}^{m-2} (G_{m-2}...G_{j+1}) F_j
+            G_next = Gk[1:][::-1]
+            F_rev  = F_cont[::-1]
+            def _suffix_step(acc, gf):
+                Gnx, Fj = gf
+                return Gnx @ acc + Fj, None
+            S, _ = jax.lax.scan(_suffix_step, jnp.zeros((n,), dtype=s.dtype), (G_next, F_rev))
 
-            # Jacobian DF(s) has block-bidiagonal structure (7.3.5.5):
-            #  [ G1  -I  0   ... ]
-            #  [ 0   G2 -I   ... ]
-            #  ...
-            # We only need the condensed form (7.3.5.10):
-            # (A + B G_{m-1} ... G1) Δs1 = w
-            #
-            # In periodic case, r(s1, sm) = s1 - sm
-            A = -eye_N
-            B = Gk[-1]
+            Jc  = (-eye_N) + (Gk[-1] @ P)
+            rhs = -(F_last + Gk[-1] @ S)
+            delta_s0 = jnp.linalg.solve(Jc, rhs)
 
-            # P = G_{m-2} ... G_0  (propagate Δs0 to Δs_{m-1})
-            P = eye_N
-            for i in range(self.m-1):          # i = 0..m-2
-                P = Gk[i] @ P
+            def _prop_step(ds_prev, gf):
+                Gi, Fi = gf
+                ds_next = Gi @ ds_prev + Fi
+                return ds_next, ds_next
+            _, ds_tail = jax.lax.scan(_prop_step, delta_s0, (Gk[:-1], F_cont))
+            delta_s = jnp.vstack((delta_s0, ds_tail))
 
-            # S = Σ_{j=0}^{m-2} (G_{m-2} ... G_{j+1}) F_j   (suffix products)
-            # build suffix products Q_j = Π_{i=j+1}^{m-2} G_i
-            Q = jnp.zeros((self.m-1, self.n, self.n), dtype=initial_condition.dtype)
-            Q = Q.at[self.m-2].set(eye_N)      # Q_{m-2} = I (empty product)
+            s_new = s + delta_s
 
-            def fill_suffix(i, Qacc):
-                # i = 0..(m-3) -> j = (m-3 - i) runs downwards
-                j = (self.m - 3) - i
-                Qacc = Qacc.at[j].set(Gk[j+1] @ Qacc[j+1])
-                return Qacc
+            defects = jnp.vstack((F_cont, F_last[None, :]))
+            errors = jnp.linalg.norm(defects, axis=1)
+            done_new = jnp.all(errors <= (self.atol + self.rtol * jnp.abs(s_new).max()))
 
-            Q = jax.lax.fori_loop(0, self.m-2, fill_suffix, Q) if self.m > 2 else Q
+            return (k + 1, done_new, s_new, yMax, Gk)
 
-            # sum_j Q_j @ F_cont[j]
-            S_terms = jax.vmap(lambda Qj, Fj: Qj @ Fj)(Q, F_cont)  # (m-1, n)
-            S       = jnp.sum(S_terms, axis=0)                    # (n,)
-
-            # Condensed system:
-            # (A + B P) Δs0 = -F_last - B S
-            Jc = A + B @ P
-            rhs = -(F_last + B @ S)
-
-            # Solve for Δs0
-            Δs0 = jnp.linalg.solve(Jc, rhs)
-
-            # Propagate corrections:
-            # Δs_{j+1} = G_j Δs_j + F_j, j=0..m-2
-            Δs = jnp.zeros_like(s)            # (m, n)
-            Δs = Δs.at[0].set(Δs0)
-
-            def prop(i, ds):
-                ds = ds.at[i+1].set(Gk[i] @ ds[i] + F_cont[i])
-                return ds
-
-            Δs = jax.lax.fori_loop(0, self.m-1, prop, Δs) if self.m > 1 else Δs
-
-            # Update all segment starts
-            s_new = s + Δs
-
-            # Residual norm (max over segments)
-            defects = jnp.concatenate([F_cont, F_last[None, :]], axis=0)  # (m, n)
-            r_new   = jnp.max(jnp.linalg.norm(defects, axis=1))
-
-            sh_done = r_new < self.shooting_tolerance
-            k += 1
-
-            # keep yT, XT shapes consistent with init; they are not used downstream
-            return k, sh_done, s_new, yk[-1], y_max, XT, r_new          
-        
-        init_carry = (
-            jnp.array(0, dtype=jnp.int32), # k
-            jnp.array(False), # done
-            s0, # s0: (m,n)
-            jnp.full((self.n,), jnp.inf, dtype=initial_condition.dtype), # yT: (n,)
-            s0, # y_max: (n,n)
-            jnp.eye(self.n, dtype=initial_condition.dtype), # XT: (n,n)
-            jnp.array(jnp.inf, dtype=initial_condition.dtype), # r: scalar float
+        init = (
+            jnp.array(0, jnp.int32),
+            jnp.array(False),
+            s,
+            jnp.zeros_like(s),                   # yMax
+            jnp.tile(eye_N[None, ...], (m, 1, 1))# Gk
         )
+        k, converged, s_final, yMax, Gk = jax.lax.while_loop(_continue, _one_iter, init)
 
-        k, ls_done, s_final, yT, y_max, XT, r = jax.lax.while_loop(
-            _shooting_converged_cond, _shooting_iteration, init_carry
-        )
-        max_displacement = jnp.max(jnp.abs(y_max[:, :self.model.n_modes]), axis=0)  # (n_modes,)
+        y_max_all = yMax
+        max_displacement = jnp.max(jnp.abs(y_max_all[:, :self.model.n_modes]), axis=0)
+        max_displacement = jnp.where(converged, max_displacement, jnp.nan * max_displacement)
 
-        y0 = s_final[0]                              # (n,)
-        y0 = jnp.where(ls_done, y0, jnp.nan * y0)   # keep shape
-        max_displacement = jnp.where(ls_done, max_displacement, jnp.nan * max_displacement)
+        y0 = s_final[0]
+        y0 = jnp.where(converged, y0, jnp.nan * y0)
 
-        return y0, max_displacement  # Return time and state (displacement and velocity)
+        # Monodromy M = G_{m-1} ... G_0
+        def _prod_all(P, Gi):
+            return Gi @ P, None
+        M, _ = jax.lax.scan(_prod_all, jnp.eye(n, dtype=y0.dtype), Gk)
+        mu = jnp.linalg.eigvals(M)
 
-    def _solve(self,
-               rhs: callable,
-               wf: bool,
-               t0: float,
-               t1: float,
-               y0: jax.Array,
-               driving_frequency: float,
-               driving_amplitude: jax.Array) -> diffrax.Solution:
-        
-        ts = jnp.linspace(t0, t1, self.n_time_steps)
-
-        T = 2.0 * jnp.pi
-        dtmax = T / const.DT_MAX_FACTOR / self.m_segments
-        dtmin = T / const.DT_MIN_FACTOR
-        max_steps = self.max_steps
-
-        def _saveat_fn(t, y_aug, args):
-            y_current = y_aug[:self.n]
-            y_max = y_aug[self.n:self.n * 2]
-            y_max = jnp.maximum(y_max, y_current)
-
-            return y_aug.at[self.n:self.n * 2].set(y_max)
-        
-        sol = diffrax.diffeqsolve(
-            terms=diffrax.ODETerm(rhs),
-            solver=diffrax.Tsit5(),
-            t0=t0,
-            t1=t1,
-            dt0=None,
-            max_steps=max_steps,
-            y0=y0,
-            saveat=diffrax.SaveAt(ts=ts) if wf else diffrax.SaveAt(t1=True),
-            throw=False,
-            progress_meter=diffrax.TqdmProgressMeter() if self.progress_bar else diffrax.NoProgressMeter(),
-            stepsize_controller=diffrax.PIDController(
-                rtol=self.rtol, atol=self.atol
-            ),
-            args=(driving_amplitude, driving_frequency),
-        )
-        return sol
-
+        return y0, max_displacement, mu

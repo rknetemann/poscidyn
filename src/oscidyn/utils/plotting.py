@@ -3,11 +3,12 @@ import jax.numpy as jnp
 
 from .. import constants as const
 
-def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp):
+def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max_disp, mu):
     # flatten the coarse‐grid for plotting
     freq_vals = coarse_drive_freq_mesh.ravel()
     amp_vals  = coarse_drive_amp_mesh.ravel()
     disp_vals = jnp.abs(y_max_disp[..., 0]).ravel()
+    mu_vals   = mu.ravel()
 
     fig, ax = plt.subplots(figsize=(8, 6))
     # background scatter in gray

@@ -56,11 +56,10 @@ def gen_grid_2(model: AbstractModel,
                     drive_amp: jax.Array,
                     ):
     
-    max_abs_displacement = float((jnp.max(drive_amp) * jnp.abs(model.Q)).item())
-    max_abs_velocity = max_abs_displacement 
+    max_abs_displacement = float((jnp.max(drive_amp) * jnp.abs(model.Q)).item()) * 1.5
 
     init_disp_grid = jnp.linspace(
-        -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
+        0.0, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
     ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
     
     init_vel_grid = jnp.array([0.0])
