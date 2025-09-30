@@ -21,7 +21,8 @@ class MultipleShootingSolver(AbstractSolver):
                  max_shooting_iterations: int = 20,
                  m_segments: int = 20, max_branches: int = 5, multistart: AbstractMultistart = None,
                  rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False,
-                 feas_tol: float = 1e-2, step_tol: float = 1e-3):
+                 feas_tol: float = 1e-5, step_tol: float = 1e-6,
+                 ls_beta: float = 0.5, ls_c: float = 1e-4, ls_max_iters: int = 8):
 
         self.n_time_steps = n_time_steps
         self.max_steps = max_steps
@@ -34,6 +35,9 @@ class MultipleShootingSolver(AbstractSolver):
         self.atol = atol
         self.feas_tol = feas_tol         # <<< NEW
         self.step_tol = step_tol         # <<< NEW
+        self.ls_beta = ls_beta
+        self.ls_c = ls_c
+        self.ls_max_iters = ls_max_iters
 
         self.model: AbstractModel = None
         self.n = None
@@ -206,19 +210,51 @@ class MultipleShootingSolver(AbstractSolver):
             k, done, *_ = carry
             return (~done) & (k < self.max_shooting_iterations)
 
+        @filter_jit
+        def _integrate_segment_endpoint(sk, t0k, t1k):
+            # Integrate only the base ODE from t0k to t1k and return y(t1k)
+            solk = diffrax.diffeqsolve(
+                diffrax.ODETerm(self._rhs),
+                solver,
+                t0=t0k, t1=t1k, dt0=None,
+                y0=sk,
+                saveat=diffrax.SaveAt(t1=True),
+                throw=False,
+                max_steps=self.max_steps,
+                progress_meter=diffrax.NoProgressMeter(),
+                stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+                args=(driving_amplitude, driving_frequency),
+            )
+            # (n,) end-state
+            return jnp.atleast_1d(solk.ys)[-1]
+
+        def _residuals_from_s(s_current):
+            """Compute F_cont, F_last and phi(s) without sensitivities (cheap)."""
+            t0s, t1s = ts[:-1], ts[1:]
+            yk_end = jax.vmap(_integrate_segment_endpoint, in_axes=(0, 0, 0))(s_current, t0s, t1s)  # (m, n)
+            F_cont = yk_end[:-1] - s_current[1:]                     # (m-1, n)
+            F_last = yk_end[-1]  - s_current[0]                      # (n,)
+            # merit function: 0.5 * ||F||^2
+            phi = 0.5 * (jnp.sum(F_cont**2) + jnp.sum(F_last**2))
+            # norms (∞-norm) for feasibility reporting
+            resid_inf = jnp.maximum(jnp.max(jnp.abs(F_cont)), jnp.max(jnp.abs(F_last)))
+            return F_cont, F_last, phi, resid_inf
+
+        def _continue(carry):
+            k, done, *_ = carry
+            return (~done) & (k < self.max_shooting_iterations)
+
         def _one_iter(carry):
             k, done, s, _, _ = carry
 
+            # --- Full augmented pass for Jacobian & y_max at current s ---
             t0s, t1s = ts[:-1], ts[1:]
             yk, yMax, Gk = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0s, t1s)
-
-            # Residuals for current iterate s
-            F_cont = yk[:-1] - s[1:]   # (m-1, n)
-            F_last = yk[-1]  - s[0]    # (n,)
-
-            # Build condensed linear system for Newton step Δs
-            def _prod_step(P, Gi):
-                return Gi @ P, None
+            F_cont = yk[:-1] - s[1:]          # (m-1, n)
+            F_last = yk[-1]  - s[0]           # (n,)
+            # Forward / backward products to form condensed Newton system
+            eye_N = jnp.eye(n, dtype=s.dtype)
+            def _prod_step(P, Gi): return Gi @ P, None
             P, _ = jax.lax.scan(_prod_step, eye_N, Gk[:-1])
 
             G_next = Gk[1:][::-1]
@@ -239,17 +275,44 @@ class MultipleShootingSolver(AbstractSolver):
             _, ds_tail = jax.lax.scan(_prop_step, delta_s0, (Gk[:-1], F_cont))
             delta_s = jnp.vstack((delta_s0, ds_tail))   # (m, n)
 
-            s_new = s + delta_s
+            # --- Current merit value (cheap; uses base ODE endpoints only) ---
+            _, _, phi0, resid_inf0 = _residuals_from_s(s)
 
-            # ---------- Convergence check (∞-norm), NEW ----------
-            resid_inf = jnp.maximum(jnp.max(jnp.abs(F_cont)), jnp.max(jnp.abs(F_last)))
-            step_inf  = jnp.max(jnp.abs(delta_s))
+            # --- Backtracking line search on phi(s) ---
+            def _ls_cond(state):
+                alpha, iters, accepted, s_trial, phi_trial = state
+                keep_going = (~accepted) & (iters < self.ls_max_iters)
+                return keep_going
 
-            new_done = (resid_inf <= self.feas_tol) & (step_inf <= self.step_tol)
+            def _ls_body(state):
+                alpha, iters, accepted, s_trial, _ = state
+                s_trial = s + alpha * delta_s
+                # recompute residual and phi at trial using cheap endpoints
+                _, _, phi_trial, _ = _residuals_from_s(s_trial)
+                # Armijo: phi(s+αΔ) <= (1 - c α) phi(s)
+                accepted = phi_trial <= (1.0 - self.ls_c * alpha) * phi0
+                # if not accepted, shrink alpha
+                alpha_next = jax.lax.select(accepted, alpha, alpha * self.ls_beta)
+                iters_next = iters + jnp.int32(~accepted)
+                return (alpha_next, iters_next, accepted, s_trial, phi_trial)
 
-            # If converged, keep s (don’t apply the update); otherwise accept s_new
+            # init alpha=1
+            ls_init = (jnp.array(1.0, s.dtype),
+                       jnp.array(0, jnp.int32),
+                       jnp.array(False),
+                       s,      # placeholder
+                       phi0)   # placeholder
+            alpha, _, accepted, s_trial, _ = jax.lax.while_loop(_ls_cond, _ls_body, ls_init)
+
+            # choose update
+            s_new = jax.lax.select(accepted, s_trial, s + alpha * delta_s)
+
+            # --- Convergence check using current (pre-update) residual norm and step size ---
+            step_inf  = jnp.max(jnp.abs(alpha * delta_s))
+            new_done = (resid_inf0 <= self.feas_tol) & (step_inf <= self.step_tol)
+
+            # if converged, keep s; else accept damped update
             s_out = jax.lax.select(new_done, s, s_new)
-            # -----------------------------------------------------
 
             return (k + 1, new_done, s_out, yMax, Gk)
 
