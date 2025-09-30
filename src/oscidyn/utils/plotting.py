@@ -26,6 +26,7 @@ def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, y_max
     ax.set_title('Branch Exploration')
     ax.grid(const.PLOT_GRID)
     plt.tight_layout()
+    plt.savefig("branch_exploration.png", dpi=300)
     plt.show()
 
 def plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp):

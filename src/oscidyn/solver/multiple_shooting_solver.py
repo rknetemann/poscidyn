@@ -100,17 +100,15 @@ class MultipleShootingSolver(AbstractSolver):
         init_disp_mesh_flat  = init_disp_mesh.ravel()                        # (n_sim,)
         init_vel_mesh_flat   = init_vel_mesh.ravel()                         # (n_sim,)
 
-
-
         # Solve shooting for each coarse combination to get y0
         y0, y_max, mu = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, init_disp_mesh_flat, init_vel_mesh_flat
-        )  # y0: (n_sim, n)  y_max: (n_sim, n_modes)
+        )  # y0: (n_sim, n_modes)  y_max: (n_sim, n_modes)
 
         # Plot the results
-        plot_branch_exploration(drive_freq_mesh, drive_amp_mesh, y_max, mu)
+        #plot_branch_exploration(drive_freq_mesh, drive_amp_mesh, y_max, mu)
 
-        return None
+        return y0, y_max, mu
 
     @filter_jit
     def _rhs(self, tau, y, args):

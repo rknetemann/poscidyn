@@ -55,6 +55,4 @@ def frequency_sweep(
 
     solver.model = model
 
-    solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)
-        
-    return
+    return solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)

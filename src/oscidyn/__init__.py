@@ -11,6 +11,8 @@ from .time_response import time_response
 
 from .utils.plotting import *
 
+from .solver.utils.coarse_grid import gen_coarse_grid_1, gen_grid_2
+
 """
 A Python toolkit for simulating and visualizing nonlinear oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.
 """
