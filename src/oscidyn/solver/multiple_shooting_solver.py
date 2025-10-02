@@ -23,8 +23,11 @@ class MultipleShootingSolver(AbstractSolver):
         self.multistart = multistart
         self.rtol = rtol
         self.atol = atol
+        self.verbose = verbose
 
         self.model: AbstractModel = None
+
+        self.multistart.verbose = self.verbose
 
         self.T = 2.0 * jnp.pi
         self.t0 = 0.0
@@ -96,10 +99,10 @@ class MultipleShootingSolver(AbstractSolver):
 
     @filter_jit
     def _calc_periodic_solution(self,
-                                driving_frequency: jax.Array,
-                                driving_amplitude: jax.Array,
-                                y0_guess: jax.Array):
-
+            driving_frequency: jax.Array,
+            driving_amplitude: jax.Array,
+            y0_guess: jax.Array):
+    
         s0 = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
             t0=self.t0, t1=self.t1, dt0=None,
@@ -141,7 +144,7 @@ class MultipleShootingSolver(AbstractSolver):
             _, Rs = jax.lax.scan(_one, None, jnp.arange(self.m_segments))  # Rs: (m_segments, n_modes * 2)
             return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
 
-        solver = optx.LevenbergMarquardt(rtol=1e-7, atol=1e-10) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
+        solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
         sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations, throw=False) 
         max_norm = optx.max_norm(_residual(sol.value))
 

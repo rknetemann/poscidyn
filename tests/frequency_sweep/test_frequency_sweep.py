@@ -12,8 +12,8 @@ MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gam
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace((1.0-10*full_width_half_max), (1.0+10*full_width_half_max), 21) 
 DRIVING_AMPLITUDE = jnp.linspace(0.1* omega_0**2/Q, 1.0*omega_0**2/Q, 2)
-MULTISTART = oscidyn.LinearResponseMultistart(n_initial_conditions=11, linear_response_factor=1.5)
-SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=5, max_shooting_iterations=500, rtol=1e-9, atol=1e-12, verbose=True)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(11, 8), linear_response_factor=1.5)
+SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=5, max_shooting_iterations=500, rtol=1e-9, atol=1e-12, multistart=MULTISTART, verbose=True)
 PRECISION = oscidyn.Precision.DOUBLE
 
 print("Frequency sweeping: ", MODEL)
@@ -35,7 +35,7 @@ x_max = frequency_sweep
 # ys: (n_driving_frequencies, n_driving_amplitudes, n_initial_displacements, n_initial_velocities, n_modes*2)
 # x_max: (n_driving_frequencies, n_driving_amplitudes, n_initial_displacements, n_initial_velocities, n_modes)
 
-drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = oscidyn.gen_grid_2(
+drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = MULTISTART.generate_simulation_grid(
     MODEL, DRIVING_FREQUENCY, DRIVING_AMPLITUDE
 )
 
