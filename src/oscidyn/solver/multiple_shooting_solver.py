@@ -1,22 +1,14 @@
 import jax
 import jax.numpy as jnp
 import diffrax
-from functools import partial
 from equinox import filter_jit
 import optimistix as optx
-
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
 from .multistart.abstract_multistart import AbstractMultistart
-from ..utils.plotting import plot_branch_exploration, plot_branch_selection
 from .utils.coarse_grid import gen_coarse_grid_1, gen_grid_2
-from .utils.branch_selection import select_branches
-from .utils.uique_solutions import get_unique_solutions
 from .. import constants as const 
-
-import numpy as _np
-import matplotlib.pyplot as _plt
 
 class MultipleShootingSolver(AbstractSolver):
     def __init__(self,  max_shooting_iterations: int = 20, m_segments: int = 20, multistart: AbstractMultistart = None,
@@ -71,8 +63,8 @@ class MultipleShootingSolver(AbstractSolver):
         return ts, ys
     
     def frequency_sweep(self,
-             drive_freq: jax.Array,   # (1,) or scalar
-             drive_amp: jax.Array,    # (n_modes,)
+             drive_freq: jax.Array,
+             drive_amp: jax.Array, 
              sweep_direction: const.SweepDirection,
             ):
 
@@ -86,7 +78,7 @@ class MultipleShootingSolver(AbstractSolver):
 
         y0_guess = jnp.array([init_disp_mesh_flat, init_vel_mesh_flat]).reshape((-1, self.model.n_modes * 2))  # (n_sim, n_modes*2) 
 
-        y0, x_max = jax.vmap(self._calc_periodic_solution)(
+        _, x_max = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes)
 
