@@ -9,7 +9,6 @@ from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
 from .multistart.abstract_multistart import AbstractMultistart
 from .multistart.linear_response_multistart import LinearResponseMultistart
-from .utils.coarse_grid import gen_coarse_grid_1, gen_grid_2
 from .. import constants as const 
 
 class MultipleShootingSolver(AbstractSolver):
@@ -42,7 +41,7 @@ class MultipleShootingSolver(AbstractSolver):
 
         y0_guess = jnp.array([init_disp, init_vel]).flatten()
 
-        y0, x_max = self._calc_periodic_solution(drive_freq, drive_amp, y0_guess)
+        y0, _, _ = self._calc_periodic_solution(drive_freq, drive_amp, y0_guess)
 
         def _solve_one_period(y0):               
             sol = diffrax.diffeqsolve(
@@ -82,20 +81,11 @@ class MultipleShootingSolver(AbstractSolver):
         y0_guess = jnp.stack([init_disp_mesh, init_vel_mesh], axis=-1)  # (F, A, D, V, 2)
         y0_guess = y0_guess.reshape(-1, 2)                              # (n_sim, 2) for 1 mode
 
-        _, x_max = jax.vmap(self._calc_periodic_solution)(
+        periodic_solutions = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes)
 
-        return x_max
-    
-    @filter_jit
-    def _rhs(self, tau, y, args):
-        _drive_amp, drive_freq  = args
-
-        t = tau / drive_freq
-        dydt = self.model.f(t, y, args) / drive_freq
-
-        return dydt
+        return periodic_solutions
 
     @filter_jit
     def _calc_periodic_solution(self,
@@ -146,14 +136,16 @@ class MultipleShootingSolver(AbstractSolver):
 
         solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
         sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations, throw=False) 
-        max_norm = optx.max_norm(_residual(sol.value))
 
         # This again is probably very sensitive to the initial conditions again, have to think about that
-        def _integrate_periodic_solution(y0):
-            sol = diffrax.diffeqsolve(
+        def _postprocess_success(s_star):
+            y0_periodic = s_star[0]
+
+            # fine trajectory to get x_max
+            sol_traj = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
                 t0=self.t0, t1=self.t1, dt0=None,
-                y0=y0,
+                y0=y0_periodic,
                 saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.n_time_steps)),
                 throw=False,
                 max_steps=self.max_steps,
@@ -161,17 +153,116 @@ class MultipleShootingSolver(AbstractSolver):
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
                 args=(driving_amplitude, driving_frequency),
             )
+            xs  = sol_traj.ys[:, :self.model.n_modes]
+            x_max = jnp.max(jnp.abs(xs))
 
-            xs  = sol.ys[:, :self.model.n_modes]  
-            x_max_per_mode = jnp.max(jnp.abs(xs), axis=0)
-            x_max = jnp.max(x_max_per_mode)           
-            return y0, x_max
+            # Floquet multipliers from monodromy (via jacobian of flow)
+            mu = self._compute_floquet_multipliers(y0_periodic, driving_amplitude, driving_frequency)
+
+            # classify
+            stable, bif_code, rho_max = self._classify_multipliers(mu)
+
+            return {
+                "y0": y0_periodic,                 # (2*n_modes,)
+                "x_max": x_max,                    # scalar
+                "mu": mu,                          # (2*n_modes,) complex
+                "rho_max": rho_max,                # scalar
+                "stable": stable,                  # bool
+                "bifurcation": bif_code,           # int32
+            }
+            
+        def _postprocess_fail(_):
+            return {
+                "y0": jnp.full((self.model.n_modes*2,), jnp.nan),
+                "x_max": jnp.nan,
+                "mu": jnp.full((self.model.n_modes*2,), jnp.nan + 0j),
+                "rho_max": jnp.nan,
+                "stable": False,
+                "bifurcation": jnp.array(0, dtype=jnp.int32),
+            }
         
-        y0, x_max = jax.lax.cond(
+        out = jax.lax.cond(
             sol.result == optx.RESULTS.successful,
-            lambda: _integrate_periodic_solution(sol.value[0]),
-            lambda: (jnp.full((self.model.n_modes*2,), jnp.nan),
-                     jnp.full((), jnp.nan))            
+            lambda: _postprocess_success(sol.value),
+            lambda: _postprocess_fail(None)
         )
 
-        return y0, x_max
+        return out
+
+    @filter_jit
+    def _compute_floquet_multipliers(self, y0, driving_amplitude, driving_frequency):
+        """
+        Compute Floquet multipliers using automatic differentiation.
+        
+        The monodromy matrix M is the Jacobian of the flow map Φ(T, y0) with respect to y0.
+        The Floquet multipliers are the eigenvalues of M.
+        """
+        
+        # Define the flow map for one period
+        def flow_map(y):
+            sol = diffrax.diffeqsolve(
+                terms=diffrax.ODETerm(self._rhs),
+                solver=diffrax.Tsit5(),
+                t0=self.t0, t1=self.t1, dt0=None,
+                adjoint=diffrax.ForwardMode(),
+                y0=y,
+                saveat=diffrax.SaveAt(t1=True),
+                throw=False,
+                max_steps=self.max_steps,
+                progress_meter=diffrax.NoProgressMeter(),
+                stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+                args=(driving_amplitude, driving_frequency),
+            )
+            return sol.ys.squeeze(0)
+        
+        # Compute the monodromy matrix using JAX's automatic differentiation
+        monodromy_matrix = jax.jacfwd(flow_map)(y0)
+        
+        # Compute eigenvalues (Floquet multipliers)
+        # Note: For real systems, eigenvalues might be complex
+        eigenvalues, _ = jnp.linalg.eig(monodromy_matrix)
+        
+        return eigenvalues
+    
+    def _classify_multipliers(self, mu,
+                            tol_inside=1e-4,   # margin inside unit circle for "stable"
+                            tol_sn=1e-3,       # |mu - 1| small
+                            tol_pd=1e-3,       # |mu + 1| small
+                            tol_ns_r=1e-3,     # ||mu|-1| small
+                            tol_ns_ang=0.2):   # angle not near 0 or pi
+        # mu: (n,) complex
+        rho = jnp.abs(mu)
+        rho_max = jnp.max(rho)
+
+        # stable if strictly inside by a little margin
+        stable = rho_max <= (1.0 - tol_inside)
+
+        # saddle-node: multiplier near +1
+        sn = jnp.any(jnp.abs(mu - (1.0 + 0j)) < tol_sn)
+
+        # period doubling: multiplier near -1
+        pd = jnp.any(jnp.abs(mu + (1.0 + 0j)) < tol_pd)
+
+        # Neimark–Sacker: complex pair near unit circle with nontrivial angle
+        ang = jnp.angle(mu)
+        complex_mask = (jnp.abs(jnp.imag(mu)) > 1e-9)
+        near_circle  = jnp.abs(rho - 1.0) < tol_ns_r
+        ang_nontrivial = (jnp.abs(jnp.mod(ang, jnp.pi)) > tol_ns_ang)
+        ns = jnp.any(complex_mask & near_circle & ang_nontrivial)
+
+        # 0:none/unknown  1:SN  2:PD  3:NS
+        bif_code = jnp.where(sn, 1,
+                    jnp.where(pd, 2,
+                        jnp.where(ns, 3, 0))).astype(jnp.int32)
+
+        return stable, bif_code, rho_max
+    
+    @filter_jit
+    def _rhs(self, tau, y, args):
+        _drive_amp, drive_freq  = args
+
+        t = tau / drive_freq
+        dydt = self.model.f(t, y, args) / drive_freq
+
+        return dydt
+

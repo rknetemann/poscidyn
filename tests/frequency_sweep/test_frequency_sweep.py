@@ -31,7 +31,6 @@ frequency_sweep = oscidyn.frequency_sweep(
 
 print("Frequency sweep completed in {:.2f} seconds".format(time.time() - start_time))
 
-x_max = frequency_sweep
 # ys: (n_driving_frequencies, n_driving_amplitudes, n_initial_displacements, n_initial_velocities, n_modes*2)
 # x_max: (n_driving_frequencies, n_driving_amplitudes, n_initial_displacements, n_initial_velocities, n_modes)
 
@@ -40,7 +39,7 @@ drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = MULTISTART.gene
 )
 
 oscidyn.plot_branch_exploration(
-    drive_freq_mesh, drive_amp_mesh, x_max
+    drive_freq_mesh, drive_amp_mesh, frequency_sweep, tol_inside=1e-2
 )
 
 # 1. Doe een simulatie met Q=1e6, bepaal hoeveel frequency steps nodig zijn voor een goede resolutie (half width bandwidth)

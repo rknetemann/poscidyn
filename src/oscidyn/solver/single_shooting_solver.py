@@ -6,7 +6,7 @@ from equinox import filter_jit
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
-from ..utils.plotting import plot_branch_exploration, plot_branch_selection
+from ..utils.plotting import plot_branch_exploration
 from .utils.coarse_grid import gen_coarse_grid_1
 from .utils.branch_selection import select_branches
 from .. import constants as const 

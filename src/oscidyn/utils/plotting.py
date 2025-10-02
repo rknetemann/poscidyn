@@ -1,98 +1,124 @@
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
+import numpy as np
+from matplotlib import cm, colors
 
 from .. import constants as const
 
-def plot_branch_exploration(coarse_drive_freq_mesh, coarse_drive_amp_mesh, x_max):
-    # flatten the coarse‐grid for plotting
-    freq_vals = coarse_drive_freq_mesh.ravel()
-    amp_vals  = coarse_drive_amp_mesh.ravel()
-    disp_vals = x_max.ravel()
+BIF_LABELS = {0: "none", 1: "SN", 2: "PD", 3: "NS"}
 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    # background scatter in gray
-    sc = ax.scatter(
-        freq_vals,
-        disp_vals,
-        c=amp_vals,
-        cmap='Greys',
-        vmin=amp_vals.min(),
-        vmax=amp_vals.max()
+def _truncate_cmap(name="Greys", lo=0.3, hi=1.0, N=256):
+    base = cm.get_cmap(name, N)
+    return colors.LinearSegmentedColormap.from_list(
+        f"{name}_trunc", base(np.linspace(lo, hi, N))
     )
-    fig.colorbar(sc, ax=ax, label='Driving amplitude')
-    ax.set_xlabel('Driving frequency')
-    ax.set_ylabel('Steady-state displacement amplitude')
-    ax.set_title('Branch Exploration')
-    ax.grid(const.PLOT_GRID)
-    plt.tight_layout()
-    plt.savefig("branch_exploration.png", dpi=300)
-    plt.show()
 
-def plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp):
-    coarse_drive_freq = jnp.linspace(jnp.min(driving_frequencies), jnp.max(driving_frequencies), ss_disp_amp.shape[0]) # (n_coarse_freq,)
-    coarse_drive_amp = jnp.linspace(jnp.min(driving_amplitudes), jnp.max(driving_amplitudes), ss_disp_amp.shape[1]) # (n_coarse_amp,)
+def plot_branch_exploration(
+    coarse_drive_freq_mesh,
+    coarse_drive_amp_mesh,
+    results,
+    *,
+    stable_size=60,
+    unstable_size=16,
+    tol_inside=1e-4,
+    annotate_bifurcations=True,
+    cmap_lo=0.15,     # <- raise this if you want darker minimum
+    cmap_hi=0.90,
+):
+    # flatten grids
+    freq_vals = jnp.asarray(coarse_drive_freq_mesh).ravel()
+    amp_vals  = jnp.asarray(coarse_drive_amp_mesh).ravel()
+    n_sim     = int(freq_vals.size)
 
-    # number of coarse amplitudes
-    n_a = coarse_drive_amp.shape[0]
+    # helpers
+    def _flat(name, default=None):
+        if name in results and results[name] is not None:
+            return jnp.asarray(results[name]).reshape(-1)
+        return default
 
-    # generate a reversed gray‐scale palette from light to dark
-    gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_a))[::-1]
+    x_max = _flat("x_max", default=jnp.full((n_sim,), jnp.nan))
+
+    if "stable" in results:
+        stable = _flat("stable")
+    elif "rho_max" in results:
+        rho_max = _flat("rho_max")
+        stable = jnp.isfinite(rho_max) & (rho_max <= (1.0 - tol_inside))
+    elif "mu" in results:
+        mu = jnp.asarray(results["mu"]).reshape(n_sim, -1)
+        rho = jnp.nanmax(jnp.abs(mu), axis=1)
+        stable = jnp.isfinite(rho) & (rho <= (1.0 - tol_inside))
+    else:
+        stable = jnp.zeros((n_sim,), dtype=bool)
+
+    sizes = jnp.where(stable, stable_size, unstable_size)
+    bif = _flat("bifurcation", default=jnp.zeros((n_sim,), dtype=jnp.int32))
+
+    # truncated grayscale so lowest value is NOT white
+    cmap = _truncate_cmap("Greys", cmap_lo, cmap_hi)
+
+    # ensure vmin < vmax (e.g., if only one amplitude)
+    vmin = float(amp_vals.min())
+    vmax = float(amp_vals.max())
+    if not np.isfinite(vmin) or not np.isfinite(vmax):
+        vmin, vmax = 0.0, 1.0
+    if vmin == vmax:
+        eps = 1e-12
+        vmin -= eps
+        vmax += eps
 
     fig, ax = plt.subplots(figsize=(8, 6))
-    for ia, amp in enumerate(coarse_drive_amp):
-        color = gray_colors[ia]
-        # steady‐state displacement amplitude for mode 0 at this amplitude
-        disp_curve = ss_disp_amp[:, ia, 0]
-        ax.plot(coarse_drive_freq, disp_curve, color=color, label=f"A={amp:.2f}")
+    sc = ax.scatter(
+        np.asarray(freq_vals),
+        np.asarray(x_max),
+        c=np.asarray(amp_vals),
+        s=np.asarray(sizes),
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        edgecolors="none",
+        alpha=0.9,
+    )
+    fig.colorbar(sc, ax=ax, label="Driving amplitude")
+
+    # stability legend
+    stable_dot   = ax.scatter([], [], s=stable_size,   c="k", alpha=0.9, label="stable")
+    unstable_dot = ax.scatter([], [], s=unstable_size, c="k", alpha=0.9, label="unstable")
+    legend_handles = [stable_dot, unstable_dot]
+
+    # optional bifurcation overlays
+    if annotate_bifurcations:
+        sn_mask = np.asarray(bif == 1)
+        pd_mask = np.asarray(bif == 2)
+        ns_mask = np.asarray(bif == 3)
+
+        if sn_mask.any():
+            h_sn = ax.scatter(
+                np.asarray(freq_vals)[sn_mask],
+                np.asarray(x_max)[sn_mask],
+                marker="o", facecolors="none", edgecolors="C3", s=80, linewidths=1.5, label="SN",
+            ); legend_handles.append(h_sn)
+
+        if pd_mask.any():
+            h_pd = ax.scatter(
+                np.asarray(freq_vals)[pd_mask],
+                np.asarray(x_max)[pd_mask],
+                marker="s", facecolors="none", edgecolors="C0", s=80, linewidths=1.5, label="PD",
+            ); legend_handles.append(h_pd)
+
+        if ns_mask.any():
+            h_ns = ax.scatter(
+                np.asarray(freq_vals)[ns_mask],
+                np.asarray(x_max)[ns_mask],
+                marker="^", facecolors="none", edgecolors="C2", s=80, linewidths=1.5, label="NS",
+            ); legend_handles.append(h_ns)
+
+    if legend_handles:
+        ax.legend(handles=legend_handles, title="Floquet")
 
     ax.set_xlabel("Driving frequency")
     ax.set_ylabel("Steady-state displacement amplitude")
-    ax.set_title("Branch Selection")
+    ax.set_title("Branch Exploration")
     ax.grid(const.PLOT_GRID)
     plt.tight_layout()
-    plt.show()
-
-def plot_interpolated_sweep(driving_frequencies, driving_amplitudes, disp_init):
-    # plot initial displacement from y_init_fine for each amplitude
-    n_amp = driving_amplitudes.shape[0]
-
-    # y_init_fine has shape (n_freq, n_amp, n_state), first n_modes entries are displacements
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    
-    # generate grayscale colors and reverse the sequence - same as other functions
-    gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_amp))[::-1]
-    
-    for j, c in enumerate(gray_colors):
-        # plot mode 0 displacement as an example; change index if you want other modes
-        ax.plot(driving_frequencies, disp_init[:, j, 0], color=c, 
-                label=f"amp={driving_amplitudes[j]:.2f}")
-    ax.set_xlabel("Driving Frequency")
-    ax.set_ylabel("Initial Displacement (mode 0)")
-    ax.set_title("Interpolated Results")
-    ax.grid(const.PLOT_GRID)
-    plt.tight_layout()
-    plt.show()
-
-def plot_frequency_sweep(frequency_sweep):
-    print(frequency_sweep)
-    n_f = frequency_sweep.driving_frequencies.shape[0]
-    n_a = frequency_sweep.driving_amplitudes.shape[0]
-    amps = frequency_sweep.total_steady_state_displacement_amplitude.reshape(n_f, n_a)
-
-    # 2D Line plots in reversed grayscale
-    fig, ax = plt.subplots(figsize=(8, 6))
-    
-    # generate grayscale colors and reverse the sequence
-    gray_colors = plt.cm.gray(jnp.linspace(0.1, 0.9, n_a))[::-1]
-    
-    for j, c in enumerate(gray_colors):
-        ax.plot(frequency_sweep.driving_frequencies, amps[:, j], color=c, 
-                label=f"A={frequency_sweep.driving_amplitudes[j]:.2g}")
-                
-    ax.set_xlabel("Driving frequency")
-    ax.set_ylabel("Total steady-state displacement amplitude")
-    #ax.legend(title="Drive amplitude")  # Keeping this commented as in original
-    ax.grid(const.PLOT_GRID)
-    plt.tight_layout()
+    plt.savefig("branch_exploration.png", dpi=300)
     plt.show()
