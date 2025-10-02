@@ -19,35 +19,20 @@ import numpy as _np
 import matplotlib.pyplot as _plt
 
 class MultipleShootingSolver(AbstractSolver):
-    def __init__(self, n_time_steps: int = None, max_steps: int = 4096,
-                 max_shooting_iterations: int = 20,
-                 m_segments: int = 20, max_branches: int = 5, multistart: AbstractMultistart = None,
-                 rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False,
-                 feas_tol: float = 1e-5, step_tol: float = 1e-6,
-                 ls_beta: float = 0.5, ls_c: float = 1e-4, ls_max_iters: int = 8):
+    def __init__(self,  max_shooting_iterations: int = 20, m_segments: int = 20, multistart: AbstractMultistart = None,
+                 rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, verbose: bool = False):
 
         self.n_time_steps = n_time_steps
         self.max_steps = max_steps
         self.max_shooting_iterations = max_shooting_iterations
         self.m_segments = m_segments
-        self.max_branches = max_branches
-        self.progress_bar = progress_bar
         self.multistart = multistart
         self.rtol = rtol
         self.atol = atol
-        self.feas_tol = feas_tol         # <<< NEW
-        self.step_tol = step_tol         # <<< NEW
-        self.ls_beta = ls_beta
-        self.ls_c = ls_c
-        self.ls_max_iters = ls_max_iters
 
         self.model: AbstractModel = None
-        self.n = None
-        self.m = None
 
         self.T = 2.0 * jnp.pi
-        self.dtmax = self.T / const.DT_MAX_FACTOR / self.m_segments
-        self.dtmin = self.T / const.DT_MIN_FACTOR
         self.t0 = 0.0
         self.t1 = self.T
    
@@ -57,9 +42,6 @@ class MultipleShootingSolver(AbstractSolver):
                  init_disp: jax.Array,  
                  init_vel: jax.Array
                 ):
-        
-        self.n = self.model.n_modes * 2
-        self.m = self.m_segments
 
         y0_guess = jnp.array([init_disp, init_vel]).flatten()
 
@@ -69,12 +51,9 @@ class MultipleShootingSolver(AbstractSolver):
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
-                t0=0.0,
-                t1=self.T,
-                dt0=None,
-                max_steps=self.max_steps,
+                t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
-                saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, self.T, self.n_time_steps)),
+                saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.n_time_steps)),
                 throw=False,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
@@ -96,9 +75,6 @@ class MultipleShootingSolver(AbstractSolver):
              drive_amp: jax.Array,    # (n_modes,)
              sweep_direction: const.SweepDirection,
             ):
-    
-        self.n = self.model.n_modes * 2
-        self.m = self.m_segments
 
         drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = gen_grid_2(
             self.model, drive_freq, drive_amp
@@ -110,13 +86,9 @@ class MultipleShootingSolver(AbstractSolver):
 
         y0_guess = jnp.array([init_disp_mesh_flat, init_vel_mesh_flat]).reshape((-1, self.model.n_modes * 2))  # (n_sim, n_modes*2) 
 
-        # Solve shooting for each coarse combination to get y0
         y0, x_max = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes)
-
-        # Plot the results
-        #plot_branch_exploration(drive_freq_mesh, drive_amp_mesh, y_max, mu)
 
         return x_max
     
@@ -135,22 +107,17 @@ class MultipleShootingSolver(AbstractSolver):
                                 driving_amplitude: jax.Array,
                                 y0_guess: jax.Array):
 
-        m_segments = self.m_segments
-        T = self.T
-        ts = jnp.linspace(0.0, T, m_segments + 1)  # (n_modes * 2,)
-
-        sol0 = diffrax.diffeqsolve(
+        s0 = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
-            t0=0.0, t1=T, dt0=None,
+            t0=self.t0, t1=self.t1, dt0=None,
             y0=y0_guess,
-            saveat=diffrax.SaveAt(ts=ts),
+            saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.m_segments + 1)),
             throw=False,
             max_steps=self.max_steps,
             progress_meter=diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_amplitude, driving_frequency),
-        )
-        s0 = sol0.ys[:-1]  # (m_segments, n_modes * 2)
+        ).ys[:-1]  # (m_segments, n_modes * 2)
 
         @filter_jit
         def _integrate_segment(sk, t0k, t1k):
@@ -170,17 +137,18 @@ class MultipleShootingSolver(AbstractSolver):
             return solk.ys.squeeze(0)   # (n_modes * 2,)
 
         def _residual(s, _args=None):               # s: (m_segments, n_modes * 2)
+            ts = jnp.linspace(self.t0, self.t1, self.m_segments + 1)
             def _one(carry, i):
                 sk  = s[i]
-                sk1 = s[(i + 1) % m_segments]    # wrap for periodicity
+                sk1 = s[(i + 1) % self.m_segments]    # wrap for periodicity
                 Phi = _integrate_segment(sk, ts[i], ts[i + 1])  # (n_modes * 2,)
                 r = Phi - sk1
                 return carry, r
 
-            _, Rs = jax.lax.scan(_one, None, jnp.arange(m_segments))  # Rs: (m_segments, n_modes * 2)
+            _, Rs = jax.lax.scan(_one, None, jnp.arange(self.m_segments))  # Rs: (m_segments, n_modes * 2)
             return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
 
-        solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
+        solver = optx.LevenbergMarquardt(rtol=1e-7, atol=1e-10) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
         sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations, throw=False) 
         max_norm = optx.max_norm(_residual(sol.value))
 
@@ -188,9 +156,9 @@ class MultipleShootingSolver(AbstractSolver):
         def _integrate_periodic_solution(y0):
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
-                t0=0.0, t1=T, dt0=None,
+                t0=self.t0, t1=self.t1, dt0=None,
                 y0=y0,
-                saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, T, self.n_time_steps)),
+                saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.n_time_steps)),
                 throw=False,
                 max_steps=self.max_steps,
                 progress_meter=diffrax.NoProgressMeter(),
