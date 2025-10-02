@@ -3,6 +3,8 @@ import jax.numpy as jnp
 import diffrax
 from functools import partial
 from equinox import filter_jit
+import optimistix as optx
+
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
@@ -17,7 +19,7 @@ import numpy as _np
 import matplotlib.pyplot as _plt
 
 class MultipleShootingSolver(AbstractSolver):
-    def __init__(self, n_time_steps: int = 2000, max_steps: int = 4096,
+    def __init__(self, n_time_steps: int = None, max_steps: int = 4096,
                  max_shooting_iterations: int = 20,
                  m_segments: int = 20, max_branches: int = 5, multistart: AbstractMultistart = None,
                  rtol: float = 1e-4, atol: float = 1e-7, progress_bar: bool = False,
@@ -58,8 +60,10 @@ class MultipleShootingSolver(AbstractSolver):
         
         self.n = self.model.n_modes * 2
         self.m = self.m_segments
-                       
-        y0, y_max_displacement = self._calc_periodic_solution(drive_freq, drive_amp, init_disp, init_vel)
+
+        y0_guess = jnp.array([init_disp, init_vel]).flatten()
+
+        y0, x_max = self._calc_periodic_solution(drive_freq, drive_amp, y0_guess)
 
         def _solve_one_period(y0):               
             sol = diffrax.diffeqsolve(
@@ -104,16 +108,18 @@ class MultipleShootingSolver(AbstractSolver):
         init_disp_mesh_flat  = init_disp_mesh.ravel()                        # (n_sim,)
         init_vel_mesh_flat   = init_vel_mesh.ravel()                         # (n_sim,)
 
+        y0_guess = jnp.array([init_disp_mesh_flat, init_vel_mesh_flat]).reshape((-1, self.model.n_modes * 2))  # (n_sim, n_modes*2) 
+
         # Solve shooting for each coarse combination to get y0
-        y0, y_max, mu = jax.vmap(self._calc_periodic_solution)(
-            drive_freq_mesh_flat, drive_amp_mesh_flat, init_disp_mesh_flat, init_vel_mesh_flat
-        )  # y0: (n_sim, n_modes)  y_max: (n_sim, n_modes)
+        y0, x_max = jax.vmap(self._calc_periodic_solution)(
+            drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess
+        )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes)
 
         # Plot the results
         #plot_branch_exploration(drive_freq_mesh, drive_amp_mesh, y_max, mu)
 
-        return y0, y_max, mu
-
+        return x_max
+    
     @filter_jit
     def _rhs(self, tau, y, args):
         _drive_amp, drive_freq  = args
@@ -122,53 +128,21 @@ class MultipleShootingSolver(AbstractSolver):
         dydt = self.model.f(t, y, args) / drive_freq
 
         return dydt
-    
-    @filter_jit
-    def _aug_rhs(self, tau, y_aug, args):
-        _drive_amp, drive_freq = args
-
-        y  = y_aug[:self.n]
-        y_max = y_aug[self.n:self.n * 2]
-        X  = y_aug[self.n * 2:].reshape(self.n, self.n)
-
-        t   = tau / drive_freq
-        f   = self.model.f(t, y, args)
-        f_y = self.model.f_y(t, y, args)
-
-        dydt  = f / drive_freq
-        dXdt  = ((f_y @ X) / drive_freq).reshape(-1)
-        return jnp.hstack([dydt, y_max, dXdt])
-
-
-    @filter_jit
-    def _max_save_fn(self, t, y_aug, args):
-        n = self.n
-        y     = y_aug[:n]
-        y_max = y_aug[n:2*n]
-        y_max = jnp.maximum(y_max, y)
-        return y_aug.at[n:2*n].set(y_max)
-
 
     @filter_jit
     def _calc_periodic_solution(self,
                                 driving_frequency: jax.Array,
                                 driving_amplitude: jax.Array,
-                                initial_displacement: jax.Array,
-                                initial_velocity: jax.Array):
+                                y0_guess: jax.Array):
 
-        n = self.model.n_modes * 2
-        m = self.m_segments
+        m_segments = self.m_segments
         T = self.T
-        ts = jnp.linspace(0.0, T, m + 1)
-
-        y0_init = jnp.array([initial_displacement, initial_velocity])
-        term = diffrax.ODETerm(self._rhs)
-        solver = diffrax.Tsit5()
+        ts = jnp.linspace(0.0, T, m_segments + 1)  # (n_modes * 2,)
 
         sol0 = diffrax.diffeqsolve(
-            term, solver,
+            terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
             t0=0.0, t1=T, dt0=None,
-            y0=y0_init,
+            y0=y0_guess,
             saveat=diffrax.SaveAt(ts=ts),
             throw=False,
             max_steps=self.max_steps,
@@ -176,48 +150,16 @@ class MultipleShootingSolver(AbstractSolver):
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=(driving_amplitude, driving_frequency),
         )
-        s = sol0.ys[:-1]  # (m, n)
-
-        eye_N = jnp.eye(n, dtype=y0_init.dtype)
+        s0 = sol0.ys[:-1]  # (m_segments, n_modes * 2)
 
         @filter_jit
         def _integrate_segment(sk, t0k, t1k):
-            X0 = eye_N.reshape(-1)
-            y_aug0 = jnp.hstack([sk, sk, X0]).astype(y0_init.dtype)  # [y, y_max, vec(X)]
-
             solk = diffrax.diffeqsolve(
-                diffrax.ODETerm(self._aug_rhs),
-                solver,
-                t0=t0k, t1=t1k, dt0=None,
-                y0=y_aug0,
-                saveat=diffrax.SaveAt(t1=True, fn=self._max_save_fn),
-                throw=False,
-                max_steps=self.max_steps,
-                progress_meter=diffrax.NoProgressMeter(),
-                stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args=(driving_amplitude, driving_frequency),  # exactly two items
-            )
-
-            sk_aug = jnp.atleast_2d(solk.ys)   # (n_saved, 2n+n^2), usually (1, ...)
-            last   = sk_aug[-1]                # (2n+n^2,)
-
-            yk   = last[:n]
-            yMax = last[n:2*n]
-            Gk   = last[2*n:].reshape(n, n)
-            return yk, yMax, Gk
-
-        def _continue(carry):
-            k, done, *_ = carry
-            return (~done) & (k < self.max_shooting_iterations)
-
-        @filter_jit
-        def _integrate_segment_endpoint(sk, t0k, t1k):
-            # Integrate only the base ODE from t0k to t1k and return y(t1k)
-            solk = diffrax.diffeqsolve(
-                diffrax.ODETerm(self._rhs),
-                solver,
+                terms=diffrax.ODETerm(self._rhs),
+                solver=diffrax.Tsit5(),
                 t0=t0k, t1=t1k, dt0=None,
                 y0=sk,
+                adjoint=diffrax.RecursiveCheckpointAdjoint(),
                 saveat=diffrax.SaveAt(t1=True),
                 throw=False,
                 max_steps=self.max_steps,
@@ -225,117 +167,47 @@ class MultipleShootingSolver(AbstractSolver):
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
                 args=(driving_amplitude, driving_frequency),
             )
-            # (n,) end-state
-            return jnp.atleast_1d(solk.ys)[-1]
+            return solk.ys.squeeze(0)   # (n_modes * 2,)
 
-        def _residuals_from_s(s_current):
-            """Compute F_cont, F_last and phi(s) without sensitivities (cheap)."""
-            t0s, t1s = ts[:-1], ts[1:]
-            yk_end = jax.vmap(_integrate_segment_endpoint, in_axes=(0, 0, 0))(s_current, t0s, t1s)  # (m, n)
-            F_cont = yk_end[:-1] - s_current[1:]                     # (m-1, n)
-            F_last = yk_end[-1]  - s_current[0]                      # (n,)
-            # merit function: 0.5 * ||F||^2
-            phi = 0.5 * (jnp.sum(F_cont**2) + jnp.sum(F_last**2))
-            # norms (∞-norm) for feasibility reporting
-            resid_inf = jnp.maximum(jnp.max(jnp.abs(F_cont)), jnp.max(jnp.abs(F_last)))
-            return F_cont, F_last, phi, resid_inf
+        def _residual(s, _args=None):               # s: (m_segments, n_modes * 2)
+            def _one(carry, i):
+                sk  = s[i]
+                sk1 = s[(i + 1) % m_segments]    # wrap for periodicity
+                Phi = _integrate_segment(sk, ts[i], ts[i + 1])  # (n_modes * 2,)
+                r = Phi - sk1
+                return carry, r
 
-        def _continue(carry):
-            k, done, *_ = carry
-            return (~done) & (k < self.max_shooting_iterations)
+            _, Rs = jax.lax.scan(_one, None, jnp.arange(m_segments))  # Rs: (m_segments, n_modes * 2)
+            return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
 
-        def _one_iter(carry):
-            k, done, s, _, _ = carry
+        solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
+        sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations) 
+        max_norm = optx.max_norm(_residual(sol.value))
 
-            # --- Full augmented pass for Jacobian & y_max at current s ---
-            t0s, t1s = ts[:-1], ts[1:]
-            yk, yMax, Gk = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0s, t1s)
-            F_cont = yk[:-1] - s[1:]          # (m-1, n)
-            F_last = yk[-1]  - s[0]           # (n,)
-            # Forward / backward products to form condensed Newton system
-            eye_N = jnp.eye(n, dtype=s.dtype)
-            def _prod_step(P, Gi): return Gi @ P, None
-            P, _ = jax.lax.scan(_prod_step, eye_N, Gk[:-1])
+        # This again is probably very sensitive to the initial conditions again, have to think about that
+        def _integrate_periodic_solution(y0):
+            sol = diffrax.diffeqsolve(
+                terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
+                t0=0.0, t1=T, dt0=None,
+                y0=y0,
+                saveat=diffrax.SaveAt(ts=jnp.linspace(0.0, T, self.n_time_steps)),
+                throw=False,
+                max_steps=self.max_steps,
+                progress_meter=diffrax.NoProgressMeter(),
+                stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+                args=(driving_amplitude, driving_frequency),
+            )
 
-            G_next = Gk[1:][::-1]
-            F_rev  = F_cont[::-1]
-            def _suffix_step(acc, gf):
-                Gnx, Fj = gf
-                return Gnx @ acc + Fj, None
-            S, _ = jax.lax.scan(_suffix_step, jnp.zeros((n,), dtype=s.dtype), (G_next, F_rev))
-
-            Jc  = (-eye_N) + (Gk[-1] @ P)
-            rhs = -(F_last + Gk[-1] @ S)
-            delta_s0 = jnp.linalg.solve(Jc, rhs)
-
-            def _prop_step(ds_prev, gf):
-                Gi, Fi = gf
-                ds_next = Gi @ ds_prev + Fi
-                return ds_next, ds_next
-            _, ds_tail = jax.lax.scan(_prop_step, delta_s0, (Gk[:-1], F_cont))
-            delta_s = jnp.vstack((delta_s0, ds_tail))   # (m, n)
-
-            # --- Current merit value (cheap; uses base ODE endpoints only) ---
-            _, _, phi0, resid_inf0 = _residuals_from_s(s)
-
-            # --- Backtracking line search on phi(s) ---
-            def _ls_cond(state):
-                alpha, iters, accepted, s_trial, phi_trial = state
-                keep_going = (~accepted) & (iters < self.ls_max_iters)
-                return keep_going
-
-            def _ls_body(state):
-                alpha, iters, accepted, s_trial, _ = state
-                s_trial = s + alpha * delta_s
-                # recompute residual and phi at trial using cheap endpoints
-                _, _, phi_trial, _ = _residuals_from_s(s_trial)
-                # Armijo: phi(s+αΔ) <= (1 - c α) phi(s)
-                accepted = phi_trial <= (1.0 - self.ls_c * alpha) * phi0
-                # if not accepted, shrink alpha
-                alpha_next = jax.lax.select(accepted, alpha, alpha * self.ls_beta)
-                iters_next = iters + jnp.int32(~accepted)
-                return (alpha_next, iters_next, accepted, s_trial, phi_trial)
-
-            # init alpha=1
-            ls_init = (jnp.array(1.0, s.dtype),
-                       jnp.array(0, jnp.int32),
-                       jnp.array(False),
-                       s,      # placeholder
-                       phi0)   # placeholder
-            alpha, _, accepted, s_trial, _ = jax.lax.while_loop(_ls_cond, _ls_body, ls_init)
-
-            # choose update
-            s_new = jax.lax.select(accepted, s_trial, s + alpha * delta_s)
-
-            # --- Convergence check using current (pre-update) residual norm and step size ---
-            step_inf  = jnp.max(jnp.abs(alpha * delta_s))
-            new_done = (resid_inf0 <= self.feas_tol) & (step_inf <= self.step_tol)
-
-            # if converged, keep s; else accept damped update
-            s_out = jax.lax.select(new_done, s, s_new)
-
-            return (k + 1, new_done, s_out, yMax, Gk)
-
-        init = (
-            jnp.array(0, jnp.int32),
-            jnp.array(False),
-            s,
-            jnp.zeros_like(s),                   # yMax
-            jnp.tile(eye_N[None, ...], (m, 1, 1))# Gk
+            xs  = sol.ys[:, :self.model.n_modes]  
+            x_max_per_mode = jnp.max(jnp.abs(xs), axis=0)
+            x_max = jnp.max(x_max_per_mode)           
+            return y0, x_max
+        
+        y0, x_max = jax.lax.cond(
+            sol.result == optx.RESULTS.successful,
+            lambda: _integrate_periodic_solution(sol.value[0]),
+            lambda: (jnp.zeros((self.model.n_modes*2,)),
+                     jnp.zeros(()))            
         )
-        k, converged, s_final, yMax, Gk = jax.lax.while_loop(_continue, _one_iter, init)
 
-        y_max_all = yMax
-        max_displacement = jnp.max(jnp.abs(y_max_all[:, :self.model.n_modes]), axis=0)
-        max_displacement = jnp.where(converged, max_displacement, jnp.nan * max_displacement)
-
-        y0 = s_final[0]
-        y0 = jnp.where(converged, y0, jnp.nan * y0)
-
-        # Monodromy M = G_{m-1} ... G_0
-        def _prod_all(P, Gi):
-            return Gi @ P, None
-        M, _ = jax.lax.scan(_prod_all, jnp.eye(n, dtype=y0.dtype), Gk)
-        mu = jnp.linalg.eigvals(M)
-
-        return y0, max_displacement, mu
+        return y0, x_max
