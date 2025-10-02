@@ -73,10 +73,9 @@ class MultipleShootingSolver(AbstractSolver):
         )
         drive_freq_mesh_flat = drive_freq_mesh.ravel()                       # (n_sim,)
         drive_amp_mesh_flat  = drive_amp_mesh.ravel()                        # (n_sim,)
-        init_disp_mesh_flat  = init_disp_mesh.ravel()                        # (n_sim,)
-        init_vel_mesh_flat   = init_vel_mesh.ravel()                         # (n_sim,)
 
-        y0_guess = jnp.array([init_disp_mesh_flat, init_vel_mesh_flat]).reshape((-1, self.model.n_modes * 2))  # (n_sim, n_modes*2) 
+        y0_guess = jnp.stack([init_disp_mesh, init_vel_mesh], axis=-1)  # (F, A, D, V, 2)
+        y0_guess = y0_guess.reshape(-1, 2)                              # (n_sim, 2) for 1 mode
 
         _, x_max = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess

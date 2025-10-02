@@ -1,14 +1,17 @@
+import os
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.95"  # Use 95% of GPU memory
+
 from jax import numpy as jnp
 import oscidyn
 import time
 
-Q, omega_0, gamma = 10000.0, 1.0, 0.0005
+Q, omega_0, gamma = 10000.0, 1.0, 0.0002
 full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = jnp.linspace((1.0-10*full_width_half_max), (1.0+10*full_width_half_max), 201) 
-DRIVING_AMPLITUDE = jnp.linspace(0.1* omega_0**2/Q, 1.0*omega_0**2/Q, 10)
+DRIVING_FREQUENCY = jnp.linspace((1.0-10*full_width_half_max), (1.0+10*full_width_half_max), 51) 
+DRIVING_AMPLITUDE = jnp.linspace(0.1* omega_0**2/Q, 1.0*omega_0**2/Q, 2)
 SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=5, max_shooting_iterations=500, rtol=1e-9, atol=1e-12, verbose=True)
 PRECISION = oscidyn.Precision.DOUBLE
 
