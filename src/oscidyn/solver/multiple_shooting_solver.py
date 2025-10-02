@@ -181,7 +181,7 @@ class MultipleShootingSolver(AbstractSolver):
             return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
 
         solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
-        sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations) 
+        sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations, throw=False) 
         max_norm = optx.max_norm(_residual(sol.value))
 
         # This again is probably very sensitive to the initial conditions again, have to think about that
@@ -206,8 +206,8 @@ class MultipleShootingSolver(AbstractSolver):
         y0, x_max = jax.lax.cond(
             sol.result == optx.RESULTS.successful,
             lambda: _integrate_periodic_solution(sol.value[0]),
-            lambda: (jnp.zeros((self.model.n_modes*2,)),
-                     jnp.zeros(()))            
+            lambda: (jnp.full((self.model.n_modes*2,), jnp.nan),
+                     jnp.full((), jnp.nan))            
         )
 
         return y0, x_max
