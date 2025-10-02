@@ -3,15 +3,17 @@ import jax.numpy as jnp
 import diffrax
 from equinox import filter_jit
 import optimistix as optx
+import lineax as lx
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
 from .multistart.abstract_multistart import AbstractMultistart
+from .multistart.linear_response_multistart import LinearResponseMultistart
 from .utils.coarse_grid import gen_coarse_grid_1, gen_grid_2
 from .. import constants as const 
 
 class MultipleShootingSolver(AbstractSolver):
-    def __init__(self,  max_shooting_iterations: int = 20, m_segments: int = 20, multistart: AbstractMultistart = None,
+    def __init__(self,  max_shooting_iterations: int = 20, m_segments: int = 20, multistart: AbstractMultistart = LinearResponseMultistart(),
                  rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, verbose: bool = False):
 
         self.n_time_steps = n_time_steps
@@ -68,7 +70,7 @@ class MultipleShootingSolver(AbstractSolver):
              sweep_direction: const.SweepDirection,
             ):
 
-        drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = gen_grid_2(
+        drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = self.multistart.generate_simulation_grid(
             self.model, drive_freq, drive_amp
         )
         drive_freq_mesh_flat = drive_freq_mesh.ravel()                       # (n_sim,)
