@@ -10,7 +10,7 @@ SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace((1.0-10*full_width_half_max), (1.0+10*full_width_half_max), 201) 
 DRIVING_AMPLITUDE = jnp.linspace(0.1* omega_0**2/Q, 1.0*omega_0**2/Q, 4)
 # DRIVING_AMPLITUDE = jnp.array([1.0*omega_0**2/Q])
-SOLVER = oscidyn.MultipleShootingSolver(max_steps=50, m_segments=10, max_shooting_iterations=50, rtol=1e-6, atol=1e-7)
+SOLVER = oscidyn.MultipleShootingSolver(max_steps=50, m_segments=10, max_shooting_iterations=50, rtol=1e-6, atol=1e-7, feas_tol=1e-5, step_tol=1e-6)
 PRECISION = oscidyn.Precision.SINGLE
 
 print("Frequency sweeping: ", MODEL)
