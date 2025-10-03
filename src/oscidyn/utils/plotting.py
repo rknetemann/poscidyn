@@ -21,9 +21,13 @@ def plot_branch_exploration(
     stable_size=60,
     unstable_size=16,
     tol_inside=1e-4,
-    annotate_bifurcations=True,
+    annotate_bifurcations=False,
     cmap_lo=0.15,     # <- raise this if you want darker minimum
     cmap_hi=0.90,
+    backbone=None,            # dict like {"f0": <Hz>, "beta": <nonlinear coeff>}
+    backbone_n=300,           # number of points on the curve
+    backbone_kwargs=None,     # e.g. {"lw": 2, "ls": "--", "label": "Backbone"},
+    title="Branch Exploration",
 ):
     # flatten grids
     freq_vals = jnp.asarray(coarse_drive_freq_mesh).ravel()
@@ -84,6 +88,31 @@ def plot_branch_exploration(
     stable_dot   = ax.scatter([], [], s=stable_size,   c="k", alpha=0.9, label="stable")
     unstable_dot = ax.scatter([], [], s=unstable_size, c="k", alpha=0.9, label="unstable")
     legend_handles = [stable_dot, unstable_dot]
+    
+    if backbone is not None:
+        f0   = float(backbone["f0"])
+        beta = float(backbone["beta"])
+        # amplitude range from your data (ensure finite, start at 0)
+        A_min = float(np.nanmin(np.asarray(x_max)))
+        A_max = float(np.nanmax(np.asarray(x_max)))
+        if not np.isfinite(A_min) or not np.isfinite(A_max):
+            A_min, A_max = 0.0, 1.0
+        A_min = max(0.0, A_min)
+
+        A_grid = np.linspace(A_min, A_max, backbone_n)
+        #k = 3/(16*np.pi**2)  # if your x-axis is in Hz
+        k = 3/4            # if your x-axis is in rad/s
+        inside = f0**2 + k * beta * A_grid**2   # or use ω0, ω if in rad/s
+
+
+        mask = inside > 0.0                    # keep only real frequencies
+        f_grid = np.sqrt(inside[mask])
+        A_plot = A_grid[mask]
+
+        default_style = {"lw": 2, "label": "Backbone"}
+        default_style.update(backbone_kwargs or {})
+        (h_bb,) = ax.plot(f_grid, A_plot, **default_style)
+        legend_handles.append(h_bb)
 
     # optional bifurcation overlays
     if annotate_bifurcations:
@@ -117,7 +146,7 @@ def plot_branch_exploration(
 
     ax.set_xlabel("Driving frequency")
     ax.set_ylabel("Steady-state displacement amplitude")
-    ax.set_title("Branch Exploration")
+    ax.set_title(title)
     ax.grid(const.PLOT_GRID)
     plt.tight_layout()
     plt.savefig("branch_exploration.png", dpi=300)
