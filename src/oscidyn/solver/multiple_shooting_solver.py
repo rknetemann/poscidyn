@@ -225,7 +225,7 @@ class MultipleShootingSolver(AbstractSolver):
         return eigenvalues
     
     def _classify_multipliers(self, mu,
-                            tol_inside=1e-4,   # margin inside unit circle for "stable"
+                            tol_inside=1e-6,   # margin inside unit circle for "stable"
                             tol_sn=1e-3,       # |mu - 1| small
                             tol_pd=1e-3,       # |mu + 1| small
                             tol_ns_r=1e-3,     # ||mu|-1| small

@@ -1,18 +1,29 @@
 import os
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.95"  # Use 95% of GPU memory
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"  # Use 95% of GPU memory
 
 from jax import numpy as jnp
 import oscidyn
 import time
 
-Q, omega_0, gamma = 10000.0, 1.0, 0.0008
+x_ref = 1e-8
+omega_ref = 207.65e3 * 2 * jnp.pi 
+f = 13 
+gamma = 3e22
+
+f_hat = f / (omega_ref**2 * x_ref)
+gamma_hat = gamma * (x_ref**2 / omega_ref**2)
+
+Q, omega_0, gamma = 70000.0, 1.0, gamma_hat
 full_width_half_max = omega_0 / Q
+
 
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = jnp.linspace((1.0-10*full_width_half_max), (1.0+10*full_width_half_max), 101) 
-DRIVING_AMPLITUDE = jnp.linspace(0.1* omega_0**2/Q, 1.0*omega_0**2/Q, 4)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(11, 8), linear_response_factor=1.5)
+DRIVING_FREQUENCY = jnp.linspace(0.997,1.004, 101) 
+DRIVING_AMPLITUDE = jnp.linspace(0.1*f_hat, 1*f_hat, 4)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
+MULTISTART.generate_simulation_grid(MODEL, DRIVING_FREQUENCY, DRIVING_AMPLITUDE)
+print(MULTISTART.max_abs_displacement)
 SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=5, max_shooting_iterations=500, rtol=1e-9, atol=1e-12, multistart=MULTISTART, verbose=True)
 PRECISION = oscidyn.Precision.DOUBLE
 
@@ -38,10 +49,10 @@ drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = MULTISTART.gene
     MODEL, DRIVING_FREQUENCY, DRIVING_AMPLITUDE
 )
 
-title = f"Frequency sweep: Duffing (Q={Q}, $\gamma$={gamma})"
+title = f"Frequency sweep: Duffing (Q={Q}, $\\gamma$={gamma})"
 
 oscidyn.plot_branch_exploration(
-    drive_freq_mesh, drive_amp_mesh, frequency_sweep, tol_inside=1e-2, backbone={"f0": omega_0, "beta": gamma}, title=title
+    drive_freq_mesh, drive_amp_mesh, frequency_sweep, tol_inside=1e-1, backbone={"f0": omega_0, "beta": gamma}, title=title
 )
 
 # 1. Doe een simulatie met Q=1e6, bepaal hoeveel frequency steps nodig zijn voor een goede resolutie (half width bandwidth)
