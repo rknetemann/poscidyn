@@ -134,7 +134,7 @@ class MultipleShootingSolver(AbstractSolver):
             _, Rs = jax.lax.scan(_one, None, jnp.arange(self.m_segments))  # Rs: (m_segments, n_modes * 2)
             return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
 
-        solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
+        solver = optx.LevenbergMarquardt(rtol=1e-4, atol=1e-5) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
         sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations, throw=False) 
 
         # This again is probably very sensitive to the initial conditions again, have to think about that
