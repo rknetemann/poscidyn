@@ -48,6 +48,7 @@ class BaseDuffingOscillator(AbstractModel):
         A = jnp.block([[zero_block, identity_block],
                        [A_bottom_left, A_bottom_right]])
         return A
+   
     
     @property
     def n_modes(self) -> int:

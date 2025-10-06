@@ -92,12 +92,14 @@ class MultipleShootingSolver(AbstractSolver):
             driving_frequency: jax.Array,
             driving_amplitude: jax.Array,
             y0_guess: jax.Array):
+        
+        ts = jnp.linspace(self.t0, self.t1, self.m_segments + 1)
     
         s0 = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
             t0=self.t0, t1=self.t1, dt0=None,
             y0=y0_guess,
-            saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.m_segments + 1)),
+            saveat=diffrax.SaveAt(ts=ts),
             throw=False,
             max_steps=self.max_steps,
             progress_meter=diffrax.NoProgressMeter(),
@@ -122,19 +124,27 @@ class MultipleShootingSolver(AbstractSolver):
             )
             return solk.ys.squeeze(0)   # (n_modes * 2,)
 
-        def _residual(s, _args=None):               # s: (m_segments, n_modes * 2)
-            ts = jnp.linspace(self.t0, self.t1, self.m_segments + 1)
-            def _one(carry, i):
-                sk  = s[i]
-                sk1 = s[(i + 1) % self.m_segments]    # wrap for periodicity
-                Phi = _integrate_segment(sk, ts[i], ts[i + 1])  # (n_modes * 2,)
-                r = Phi - sk1
-                return carry, r
+        # def _residual(s, _args=None):               # s: (m_segments, n_modes * 2)
+        #     def _one(carry, i):
+        #         sk  = s[i]
+        #         sk1 = s[(i + 1) % self.m_segments]    # wrap for periodicity
+        #         Phi = _integrate_segment(sk, ts[i], ts[i + 1])  # (n_modes * 2,)
+        #         r = Phi - sk1
+        #         return carry, r
 
-            _, Rs = jax.lax.scan(_one, None, jnp.arange(self.m_segments))  # Rs: (m_segments, n_modes * 2)
-            return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
+        #     _, Rs = jax.lax.scan(_one, None, jnp.arange(self.m_segments))  # Rs: (m_segments, n_modes * 2)
+        #     return Rs.reshape((-1,))                         # (m_segments * n_modes * 2,)
+        
+        def _residual(s, _args=None): # s: (m_segments + 1, n_modes * 2)
+            t0 = ts[:-1]
+            t1 = ts[1:]
+            s_next = jnp.roll(s, shift=-1, axis=0)
 
-        solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-9) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
+            Phi = jax.vmap(_integrate_segment, in_axes=(0, 0, 0))(s, t0, t1)  # (m, n)
+            R = Phi - s_next                                                  # (m, n)
+            return R.reshape(-1)                                              # (m*n,)
+
+        solver = optx.LevenbergMarquardt(rtol=1e-6, atol=1e-8, norm=optx.rms_norm) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
         sol = optx.least_squares(_residual, solver, y0=s0, options={"jac": "bwd"}, max_steps=self.max_shooting_iterations, throw=False) 
 
         # This again is probably very sensitive to the initial conditions again, have to think about that
@@ -265,4 +275,3 @@ class MultipleShootingSolver(AbstractSolver):
         dydt = self.model.f(t, y, args) / drive_freq
 
         return dydt
-
