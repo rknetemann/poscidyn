@@ -1,5 +1,5 @@
 import os
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"  # Use 95% of GPU memory
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.85"
 
 from jax import numpy as jnp
 import oscidyn
@@ -22,10 +22,8 @@ SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.997,1.004, 101) 
 DRIVING_AMPLITUDE = jnp.linspace(0.1*f_hat, 1*f_hat, 4)
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
-MULTISTART.generate_simulation_grid(MODEL, DRIVING_FREQUENCY, DRIVING_AMPLITUDE)
-print(MULTISTART.max_abs_displacement)
-SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=5, max_shooting_iterations=500, rtol=1e-9, atol=1e-12, multistart=MULTISTART, verbose=True)
-PRECISION = oscidyn.Precision.DOUBLE
+SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=10, max_shooting_iterations=500, rtol=1e-6, atol=1e-7, multistart=MULTISTART, verbose=True)
+PRECISION = oscidyn.Precision.SINGLE
 
 print("Frequency sweeping: ", MODEL)
 
