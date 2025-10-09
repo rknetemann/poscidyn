@@ -46,7 +46,7 @@ class MultipleShootingSolver(AbstractSolver):
         def _solve_one_period(y0):               
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
-                solver=diffrax.Tsit5(),
+                solver=diffrax.Kvaerno5(),
                 t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.n_time_steps)),
@@ -96,7 +96,7 @@ class MultipleShootingSolver(AbstractSolver):
         ts = jnp.linspace(self.t0, self.t1, self.m_segments + 1)
     
         s0 = diffrax.diffeqsolve(
-            terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
+            terms=diffrax.ODETerm(self._rhs), solver=diffrax.Kvaerno5(),
             t0=self.t0, t1=self.t1, dt0=None,
             y0=y0_guess,
             saveat=diffrax.SaveAt(ts=ts),
@@ -111,7 +111,7 @@ class MultipleShootingSolver(AbstractSolver):
         def _integrate_segment(sk, t0k, t1k):
             solk = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
-                solver=diffrax.Tsit5(),
+                solver=diffrax.Kvaerno5(),
                 t0=t0k, t1=t1k, dt0=None,
                 y0=sk,
                 adjoint=diffrax.RecursiveCheckpointAdjoint(),
@@ -153,7 +153,7 @@ class MultipleShootingSolver(AbstractSolver):
 
             # fine trajectory to get x_max
             sol_traj = diffrax.diffeqsolve(
-                terms=diffrax.ODETerm(self._rhs), solver=diffrax.Tsit5(),
+                terms=diffrax.ODETerm(self._rhs), solver=diffrax.Kvaerno5(),
                 t0=self.t0, t1=self.t1, dt0=None,
                 y0=y0_periodic,
                 saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.n_time_steps)),
@@ -212,7 +212,7 @@ class MultipleShootingSolver(AbstractSolver):
         def flow_map(y):
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
-                solver=diffrax.Tsit5(),
+                solver=diffrax.Kvaerno5(),
                 t0=self.t0, t1=self.t1, dt0=None,
                 adjoint=diffrax.ForwardMode(),
                 y0=y,
