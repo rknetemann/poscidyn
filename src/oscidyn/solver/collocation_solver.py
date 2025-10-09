@@ -10,15 +10,17 @@ from ..model.abstract_model import AbstractModel
 from .multistart.abstract_multistart import AbstractMultistart
 from .multistart.linear_response_multistart import LinearResponseMultistart
 from .. import constants as const 
+from .utils.polynomials import LagrangeBasis
 
 class CollocationSolver(AbstractSolver):
-    def __init__(self,  max_iterations: int = 20, n_collocation_points: int = 10, multistart: AbstractMultistart = LinearResponseMultistart(),
+    def __init__(self,  max_iterations: int = 20, N_elements: int = 10, K_polynomial_degree: int = 2, multistart: AbstractMultistart = LinearResponseMultistart(),
                  rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, verbose: bool = False):
 
         self.n_time_steps = n_time_steps
         self.max_steps = max_steps
         self.max_iterations = max_iterations
-        self.n_collocation_points = n_collocation_points
+        self.N_elements = N_elements
+        self.K_polynomial_degree = K_polynomial_degree
         self.order_approx = 5
         self.multistart = multistart
         self.rtol = rtol
@@ -31,7 +33,15 @@ class CollocationSolver(AbstractSolver):
 
         self.T = 2.0 * jnp.pi
         self.t0 = 0.0
-        self.t1 = self.T * 3.0  # 3 forcing periods for 1/3 subharmonic
+        self.t1 = self.T
+        
+        self.ts = jnp.linspace(self.t0, self.t1, self.N_elements * (self.K_polynomial_degree + 1))  # (N_elements*(K_polynomial_degree+1),)
+        self.ts_segments = self.ts.reshape(self.N_elements, self.K_polynomial_degree + 1)  # (N_elements, K_polynomial_degree+1)
+        self.he = (self.t1 - self.t0) / self.N_elements 
+        
+        self.tau = jnp.linspace(0, 1, self.K_polynomial_degree + 1)  # (K_polynomial_degree+1,)
+        self.lagrange_basis = LagrangeBasis(self.tau)
+        self.f = jax.vmap(self._rhs, in_axes=(0, 0, None))  # (K+1, n_modes*2)
    
     def time_response(self,
                  drive_freq: jax.Array,  
@@ -87,11 +97,79 @@ class CollocationSolver(AbstractSolver):
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes)
 
         return periodic_solutions
-
-    @filter_jit
+    
     def _calc_periodic_solution(self,
             driving_frequency: jax.Array,
             driving_amplitude: jax.Array,
             y0_guess: jax.Array):
         
-        pass
+        args = driving_amplitude, driving_frequency
+                
+        Y0 = diffrax.diffeqsolve(
+            terms=diffrax.ODETerm(self._rhs), solver=diffrax.Kvaerno5(),
+            t0=self.t0, t1=self.t1, dt0=None,
+            y0=y0_guess,
+            saveat=diffrax.SaveAt(ts=self.ts),
+            throw=False,
+            max_steps=self.max_steps,
+            progress_meter=diffrax.NoProgressMeter(),
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+            args=(driving_amplitude, driving_frequency),
+        ).ys  # (N_elements*(K_polynomial_degree+1), n_modes * 2)
+                
+        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm, verbose=frozenset({"step", "accepted", "loss", "step_size"})) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
+        sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, options={"jac": "bwd"}, max_steps=self.max_iterations, throw=True) 
+        
+        ### TEMPORARY PLOTTING CODE ###
+        Y = sol.value
+        x = Y[0, :]  # (n_modes*2,)
+        Y_series = Y.reshape(-1, self.model.n_modes * 2)
+        ts = self.ts
+        x_series = Y_series[:, 0]
+
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.plot(ts, x_series)
+        plt.xlabel('Time')
+        plt.ylabel('Displacement x')
+        plt.title('Periodic Solution – x vs. t')
+        plt.show()
+        y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
+        return Y[0], y_max, None
+
+    def _residual(self, Y, args):
+        Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)  # (N_elements, K+1, n_modes*2)
+        
+        def _collocation_residual(ts_segments, Y_segments):
+            def _one_segment(ts_i, Y_i):
+                dz_dtau = self.lagrange_basis.differentiation_matrix() @ Y_i  # (K+1, n_modes*2)
+                dy_dt = (1.0 / self.he) * dz_dtau   # (K+1, n_modes*2)
+
+                dy_dt_eff = dy_dt[1:, :]            # rows 1..K
+                t_i_eff   = ts_i[1:]                # same rows
+                r_col = dy_dt_eff - self.f(t_i_eff, Y_i[1:, :], args)  # (K, n)
+
+                return r_col
+            
+            _batch_segments = jax.vmap(_one_segment, in_axes=(0, 0))
+            R_col = _batch_segments(ts_segments, Y_segments)  # (N_elements, K+1, n_modes*2)
+            return R_col
+        
+        def _continuity_residual(Y_segments):
+            R_cont = Y_segments[1:, 0, :] - Y_segments[:-1, -1, :]  # (N_elements-1, n_modes*2)
+            return R_cont
+        
+        def _periodicity_residual(Y_segments):
+            R_per = Y_segments[0, 0, :] - Y_segments[-1, -1, :]  # (n_modes*2,)
+            return R_per
+
+        R_col = _collocation_residual(self.ts_segments, Y_segments)  # (N_elements, K+1, n_modes*2)
+        R_cont = _continuity_residual(Y_segments)               # (N_elements-1, n_modes*2)
+        R_per = _periodicity_residual(Y_segments)               # (n_modes*2,)
+
+        R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])  # (n_modes*2*N_elements*(K+1),)
+        return R
+    
+    def _rhs(self, t, y, args):
+        # args = (drive_amp, drive_freq); pass them through to the model
+        return self.model.f(t, y, args)
