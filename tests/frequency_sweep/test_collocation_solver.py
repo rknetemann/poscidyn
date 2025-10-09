@@ -1,5 +1,5 @@
 import os
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.85"
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.90"
 
 from jax import numpy as jnp
 import oscidyn
@@ -20,10 +20,10 @@ full_width_half_max = omega_0 / Q
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.997,1.004, 101) 
-DRIVING_AMPLITUDE = jnp.linspace(0.1*f_hat, 1*f_hat, 4)
+DRIVING_AMPLITUDE = jnp.linspace(0.1*f_hat, 1*f_hat, 1)
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=10, K_polynomial_degree=2, multistart=MULTISTART, verbose=True, rtol=1e-9, atol=1e-11, n_time_steps=500)
-PRECISION = oscidyn.Precision.DOUBLE
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=16, K_polynomial_degree=2, max_iterations=1000, multistart=MULTISTART, verbose=True, rtol=1e-4, atol=1e-7)
+PRECISION = oscidyn.Precision.SINGLE
 
 print("Frequency sweeping: ", MODEL)
 

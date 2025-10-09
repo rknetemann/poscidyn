@@ -94,10 +94,11 @@ class CollocationSolver(AbstractSolver):
 
         periodic_solutions = jax.vmap(self._calc_periodic_solution)(
             drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess
-        )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes)
-
+        )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes), None
+        
         return periodic_solutions
     
+    @filter_jit
     def _calc_periodic_solution(self,
             driving_frequency: jax.Array,
             driving_amplitude: jax.Array,
@@ -117,26 +118,18 @@ class CollocationSolver(AbstractSolver):
             args=(driving_amplitude, driving_frequency),
         ).ys  # (N_elements*(K_polynomial_degree+1), n_modes * 2)
                 
-        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm, verbose=frozenset({"step", "accepted", "loss", "step_size"})) # for debugging: verbose=frozenset({"step", "accepted", "loss", "step_size"})
-        sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, options={"jac": "bwd"}, max_steps=self.max_iterations, throw=True) 
+        #solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm, verbose=frozenset({"step", "accepted", "loss", "step_size"})) 
+        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm) 
+        sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, options={"jac": "bwd"}, max_steps=self.max_iterations, throw=False) 
         
         ### TEMPORARY PLOTTING CODE ###
         Y = sol.value
-        x = Y[0, :]  # (n_modes*2,)
         Y_series = Y.reshape(-1, self.model.n_modes * 2)
-        ts = self.ts
-        x_series = Y_series[:, 0]
 
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.plot(ts, x_series)
-        plt.xlabel('Time')
-        plt.ylabel('Displacement x')
-        plt.title('Periodic Solution – x vs. t')
-        plt.show()
         y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
         return Y[0], y_max, None
 
+    @filter_jit
     def _residual(self, Y, args):
         Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)  # (N_elements, K+1, n_modes*2)
         
@@ -170,6 +163,11 @@ class CollocationSolver(AbstractSolver):
         R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])  # (n_modes*2*N_elements*(K+1),)
         return R
     
-    def _rhs(self, t, y, args):
-        # args = (drive_amp, drive_freq); pass them through to the model
-        return self.model.f(t, y, args)
+    @filter_jit
+    def _rhs(self, tau, y, args):
+        _drive_amp, drive_freq  = args
+
+        t = tau / drive_freq
+        dydt = self.model.f(t, y, args) / drive_freq
+
+        return dydt

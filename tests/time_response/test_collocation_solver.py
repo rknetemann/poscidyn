@@ -2,18 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from jax import numpy as jnp
 import oscidyn
+import time
 
 import jax.profiler
 
-Q, omega_0, gamma = 10.0, 1.0, 0.1
+Q, omega_0, gamma = 100000.0, 1.0, 1.0
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=128, K_polynomial_degree=2, max_iterations=300, multistart=MULTISTART, verbose=True, rtol=1e-9, atol=1e-11, n_time_steps=500)
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=16, K_polynomial_degree=2, max_iterations=300, multistart=MULTISTART, verbose=True, rtol=1e-4, atol=1e-7, n_time_steps=500)
 DRIVING_FREQUENCY = 1.02
 DRIVING_AMPLITUDE = 1.0*omega_0**2/Q
 INITIAL_DISPLACEMENT = np.array([1.0])
 INITIAL_VELOCITY = np.array([0.0])
-PRECISION = oscidyn.Precision.DOUBLE
+PRECISION = oscidyn.Precision.SINGLE
+
+start_time = time.time()
 
 time_response_steady_state = oscidyn.time_response(
     model = MODEL,
@@ -24,6 +27,8 @@ time_response_steady_state = oscidyn.time_response(
     solver = SOLVER,
     precision = PRECISION,
 )
+
+print("Time response completed in {:.2f} seconds".format(time.time() - start_time))
 
 time_steady_state,displacements_steady_state, velocities_steady_state = time_response_steady_state
 total_displacement_steady_state = displacements_steady_state.sum(axis=1)
