@@ -127,13 +127,13 @@ class CollocationSolver(AbstractSolver):
         ts = self.ts
         x_series = Y_series[:, 0]
 
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.plot(ts, x_series)
-        plt.xlabel('Time')
-        plt.ylabel('Displacement x')
-        plt.title('Periodic Solution – x vs. t')
-        plt.show()
+        # import matplotlib.pyplot as plt
+        # plt.figure()
+        # plt.plot(ts, x_series)
+        # plt.xlabel('Time')
+        # plt.ylabel('Displacement x')
+        # plt.title('Periodic Solution – x vs. t')
+        # plt.show()
         y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
         return Y[0], y_max, None
 
