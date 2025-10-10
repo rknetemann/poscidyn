@@ -1,20 +1,28 @@
+import os
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
+#os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
 import numpy as np
 import matplotlib.pyplot as plt
 from jax import numpy as jnp
 import oscidyn
 import time
 
-import jax.profiler
+Q, omega_0, gamma = jnp.array([70000.0]), jnp.array([207.65e3*2*jnp.pi]), jnp.array([3e22])
+full_width_half_max = omega_0 / Q
 
-Q, omega_0, gamma = 100000.0, 1.0, 1.0
-MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
+MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0, x_ref=np.array([1e-8]))
+
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=16, K_polynomial_degree=2, max_iterations=300, multistart=MULTISTART, verbose=True, rtol=1e-5, atol=1e-7, n_time_steps=500)
-DRIVING_FREQUENCY = 1.02
-DRIVING_AMPLITUDE = 1.0*omega_0**2/Q
-INITIAL_DISPLACEMENT = np.array([1.0])
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=128, K_polynomial_degree=2, max_iterations=10000, multistart=MULTISTART, verbose=True, rtol=1e-9, atol=1e-12, n_time_steps=500)
+DRIVING_FREQUENCY = 207.65e3*2*jnp.pi + 1000
+DRIVING_AMPLITUDE = 13.0
+INITIAL_DISPLACEMENT = np.array([53.0])
 INITIAL_VELOCITY = np.array([0.0])
-PRECISION = oscidyn.Precision.SINGLE
+PRECISION = oscidyn.Precision.DOUBLE
+
+print("Time response: ", MODEL)
+start_time = time.time()
 
 time_response_steady_state = oscidyn.time_response(
     model = MODEL,
@@ -43,6 +51,3 @@ plt.title(
 plt.legend()
 plt.grid()
 plt.show()
-
-
-jax.profiler.save_device_memory_profile("memory.prof")

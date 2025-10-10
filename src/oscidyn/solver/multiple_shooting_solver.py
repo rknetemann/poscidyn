@@ -275,3 +275,18 @@ class MultipleShootingSolver(AbstractSolver):
         dydt = self.model.f(t, y, args) / drive_freq
 
         return dydt
+    
+    @filter_jit
+    def _aug_rhs(self, tau, y_aug, args):
+        _drive_amp, drive_freq = args
+        
+        y  = y_aug[:self.model.n_modes*2]
+        X  = y_aug[self.model.n_modes*2:].reshape(self.model.n_modes, self.model.n_modes)
+
+        t   = tau / drive_freq
+        f   = self.model.f(t, y, args)
+        f_y = self.model.f_y(t, y, args)
+
+        dydt  = f / drive_freq
+        dXdt  = ((f_y @ X) / drive_freq).reshape(-1)
+        return jnp.hstack([dydt, dXdt])

@@ -35,24 +35,8 @@ def frequency_sweep(
     # Ensure inputs are jax arrays (handles Python floats, lists, numpy arrays) before dtype enforcement
     driving_frequencies = jnp.asarray(driving_frequencies, dtype=dtype)
     driving_amplitudes = jnp.asarray(driving_amplitudes, dtype=dtype)
-
-    if isinstance(solver, SteadyStateSolver) and jnp.any(driving_frequencies == 0):
-        raise TypeError("SteadyStateSolver is not compatible with zero driving frequency. Use StandardSolver for zero frequency cases (free vibration).")
     
-    if solver.n_time_steps is None:
-        '''
-        ASSUMPTION: Minimum required sampling frequency for the steady state solver based on gpt prompt, should investigate
-        '''
-        rtol = 0.001
-        max_driving_frequency = jnp.max(driving_frequencies)
-        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * max_driving_frequency
-        
-        one_period = 2.0 * jnp.pi / max_frequency_component
-        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
-        
-        n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int) # Number of time steps to cover one period with the given sampling frequency
-        solver.n_time_steps = n_time_steps
-
+    model = model.to_dtype(dtype)
     solver.model = model
 
     return solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)

@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import diffrax
-from equinox import filter_jit
+from equinox import filter_jit, filter_checkpoint
 import optimistix as optx
 import lineax as lx
 
@@ -31,16 +31,16 @@ class CollocationSolver(AbstractSolver):
 
         self.multistart.verbose = self.verbose
 
-        self.T = 2.0 * jnp.pi
         self.t0 = 0.0
-        self.t1 = self.T
+        self.t1 = 1.0
         
         self.ts = jnp.linspace(self.t0, self.t1, self.N_elements * (self.K_polynomial_degree + 1))  # (N_elements*(K_polynomial_degree+1),)
         self.ts_segments = self.ts.reshape(self.N_elements, self.K_polynomial_degree + 1)  # (N_elements, K_polynomial_degree+1)
         self.he = (self.t1 - self.t0) / self.N_elements 
-        
+       
         self.tau = jnp.linspace(0, 1, self.K_polynomial_degree + 1)  # (K_polynomial_degree+1,)
         self.lagrange_basis = LagrangeBasis(self.tau)
+        self.D = self.lagrange_basis.differentiation_matrix()  # (K_polynomial_degree+1, K_polynomial_degree+1)
         self.f = jax.vmap(self._rhs, in_axes=(0, 0, None))  # (K+1, n_modes*2)
    
     def time_response(self,
@@ -51,8 +51,10 @@ class CollocationSolver(AbstractSolver):
                 ):
 
         y0_guess = jnp.array([init_disp, init_vel]).flatten()
-
-        y0, _, _ = self._calc_periodic_solution(drive_freq, drive_amp, y0_guess)
+        # jax.profiler.start_trace("profiling/profile-data")
+        y0, _, _ = self._calc_periodic_solution((drive_amp, drive_freq), y0_guess)
+        # y0.block_until_ready()
+        # jax.profiler.stop_trace()
 
         def _solve_one_period(y0):               
             sol = diffrax.diffeqsolve(
@@ -75,6 +77,9 @@ class CollocationSolver(AbstractSolver):
             lambda: _solve_one_period(y0)
         )
 
+        ts = ts * (2.0 * jnp.pi * (self.model.omega_ref / drive_freq))
+        ys = ys * self.model.x_ref
+
         return ts, ys
     
     def frequency_sweep(self,
@@ -89,24 +94,26 @@ class CollocationSolver(AbstractSolver):
         drive_freq_mesh_flat = drive_freq_mesh.ravel()                       # (n_sim,)
         drive_amp_mesh_flat  = drive_amp_mesh.ravel()                        # (n_sim,)
 
-        y0_guess = jnp.stack([init_disp_mesh, init_vel_mesh], axis=-1)  # (F, A, D, V, 2)
-        y0_guess = y0_guess.reshape(-1, 2)                              # (n_sim, 2) for 1 mode
+        y0_guess = jnp.stack([init_disp_mesh, init_vel_mesh], axis=-1)  # (F, A, D, V, n_modes, 2) or (..., n_modes, 2)
+        # flatten preserving all mode DOFs: final shape (n_sim, n_modes*2)
+        y0_guess = y0_guess.reshape(-1, self.model.n_modes * 2)
 
-        periodic_solutions = jax.vmap(self._calc_periodic_solution)(
-            drive_freq_mesh_flat, drive_amp_mesh_flat, y0_guess
+        # map over the batch: args is a tuple (drive_amp, drive_freq), so in_axes for the tuple is (0,0)
+        periodic_solutions = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
+            (drive_amp_mesh_flat, drive_freq_mesh_flat), y0_guess
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes), None
-        
+
+        _, y_max, _ = periodic_solutions
+
+
         return periodic_solutions
     
-    @filter_jit
+    @filter_jit(donate="all")
     def _calc_periodic_solution(self,
-            driving_frequency: jax.Array,
-            driving_amplitude: jax.Array,
+            args: jax.Array,
             y0_guess: jax.Array):
-        
-        args = driving_amplitude, driving_frequency
                 
-        Y0 = diffrax.diffeqsolve(
+        sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(self._rhs), solver=diffrax.Kvaerno5(),
             t0=self.t0, t1=self.t1, dt0=None,
             y0=y0_guess,
@@ -115,68 +122,115 @@ class CollocationSolver(AbstractSolver):
             max_steps=self.max_steps,
             progress_meter=diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-            args=(driving_amplitude, driving_frequency),
-        ).ys  # (N_elements*(K_polynomial_degree+1), n_modes * 2)
-                
-        #solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm, verbose=frozenset({"step", "accepted", "loss", "step_size"})) 
-        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm) 
-        sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, options={"jac": "bwd"}, max_steps=self.max_iterations, throw=False) 
+            args=args,
+        )
         
-        ### TEMPORARY PLOTTING CODE ###
-        Y = sol.value
-        Y_series = Y.reshape(-1, self.model.n_modes * 2)
-        ts = self.ts
-        x_series = Y_series[:, 0]
+        def _return_fail():
+            y0_fail = jnp.full((self.model.n_modes * 2,), jnp.nan)
+            y_max_fail = jnp.full((self.model.n_modes,), jnp.nan)
+            return y0_fail, y_max_fail
 
-        # import matplotlib.pyplot as plt
-        # plt.figure()
-        # plt.plot(ts, x_series)
-        # plt.xlabel('Time')
-        # plt.ylabel('Displacement x')
-        # plt.title('Periodic Solution – x vs. t')
-        # plt.show()
-        y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
-        return Y[0], y_max, None
+        def _find_periodic_solution(Y0):
+            #solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm, verbose=frozenset({"step", "accepted", "loss", "step_size"})) 
+            solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.max_norm) 
+            sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, max_steps=self.max_iterations, throw=False) 
 
-    @filter_jit
-    def _residual(self, Y, args):
-        Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)  # (N_elements, K+1, n_modes*2)
-        
-        def _collocation_residual(ts_segments, Y_segments):
-            def _one_segment(ts_i, Y_i):
-                dz_dtau = self.lagrange_basis.differentiation_matrix() @ Y_i  # (K+1, n_modes*2)
-                dy_dt = (1.0 / self.he) * dz_dtau   # (K+1, n_modes*2)
+            def _postprocess_periodic_solution(Y):    
+                Y_series = Y.reshape(-1, self.model.n_modes * 2)
+                y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
 
-                dy_dt_eff = dy_dt[1:, :]            # rows 1..K
-                t_i_eff   = ts_i[1:]                # same rows
-                r_col = dy_dt_eff - self.f(t_i_eff, Y_i[1:, :], args)  # (K, n)
+                #self._analyze_periodic_solution(Y[0], args)
 
-                return r_col
+                y0 = Y[0]
+                return y0, y_max
             
-            _batch_segments = jax.vmap(_one_segment, in_axes=(0, 0))
-            R_col = _batch_segments(ts_segments, Y_segments)  # (N_elements, K+1, n_modes*2)
-            return R_col
-        
-        def _continuity_residual(Y_segments):
-            R_cont = Y_segments[1:, 0, :] - Y_segments[:-1, -1, :]  # (N_elements-1, n_modes*2)
-            return R_cont
-        
-        def _periodicity_residual(Y_segments):
-            R_per = Y_segments[0, 0, :] - Y_segments[-1, -1, :]  # (n_modes*2,)
-            return R_per
+            y0, y_max = jax.lax.cond(
+                sol.result == optx.RESULTS.successful,
+                lambda: _postprocess_periodic_solution(sol.value),
+                lambda: _return_fail()
+            )
+            return y0, y_max
 
-        R_col = _collocation_residual(self.ts_segments, Y_segments)  # (N_elements, K+1, n_modes*2)
-        R_cont = _continuity_residual(Y_segments)               # (N_elements-1, n_modes*2)
-        R_per = _periodicity_residual(Y_segments)               # (n_modes*2,)
+        y0, y_max = jax.lax.cond(
+            sol.result == diffrax.RESULTS.successful,
+            lambda: _find_periodic_solution(sol.ys),
+            lambda: _return_fail()
+        )
+        return y0, y_max, None
 
-        R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])  # (n_modes*2*N_elements*(K+1),)
+    @filter_jit(donate="all")
+    def _residual(self, Y, args):
+        Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)
+
+        D = self.D  # (K+1, K+1)
+
+        @filter_checkpoint 
+        def _one_segment(ts_i, Y_i):
+            # D @ Y_i uses (K+1, K+1) x (K+1, n) -> (K+1, n)
+            dz_dtau = D @ Y_i
+            dy_dt   = (1.0 / self.he) * dz_dtau
+
+            dy_dt_eff = dy_dt[1:, :]            # K x n
+            t_i_eff   = ts_i[1:]                # K
+            r_col     = dy_dt_eff - self.f(t_i_eff, Y_i[1:, :], args)  # K x n
+            return r_col
+
+        _batch_segments = jax.vmap(_one_segment, in_axes=(0, 0))
+        R_col  = _batch_segments(self.ts_segments, Y_segments)     # (N, K, n)
+        R_cont = Y_segments[1:, 0, :] - Y_segments[:-1, -1, :]     # (N-1, n)
+        R_per  = Y_segments[0, 0, :] - Y_segments[-1, -1, :]       # (n,)
+
+        R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])
         return R
     
+    def _analyze_periodic_solution(self, Y0, args):
+        X0 = jnp.eye(self.model.n_modes * 2).reshape(-1)
+        y0_aug = jnp.hstack([Y0, X0])
+
+        sol = diffrax.diffeqsolve(
+            terms=diffrax.ODETerm(self._aug_rhs),
+            solver=diffrax.Kvaerno5(),
+            t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
+            y0=y0_aug,
+            saveat=diffrax.SaveAt(t1=True),
+            throw=False,
+            progress_meter=diffrax.NoProgressMeter(),
+            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
+            args=args,
+        )
+
+        y = sol.ys[:, :self.model.n_modes*2]
+        XT = sol.ys[-1, self.model.n_modes*2:].reshape(self.model.n_modes*2, self.model.n_modes*2)
+
+        eigenvalues, _ = jnp.linalg.eig(XT)
+
+        abs_eigenvalues = jnp.abs(eigenvalues)
+
+        # jax.debug.print("Eigenvalues of the monodromy matrix: {eigenvalues}", eigenvalues=eigenvalues)
+        # jax.debug.print("Absolute values of the eigenvalues: {abs_eigenvalues}", abs_eigenvalues=abs_eigenvalues)
+
     @filter_jit
-    def _rhs(self, tau, y, args):
-        _drive_amp, drive_freq  = args
+    def _rhs(self, t, y, args):
+        f_amp, f_omega  = args
 
-        t = tau / drive_freq
-        dydt = self.model.f(t, y, args) / drive_freq
+        dtau_dt = 2.0 * jnp.pi * (self.model.omega_ref / f_omega)
+        tau = dtau_dt * t
 
-        return dydt
+        dy_dt = self.model.f(tau, y, args) * dtau_dt
+
+        return dy_dt
+    
+    @filter_jit
+    def _aug_rhs(self, t, y_aug, args):
+        f_amp, f_omega = args
+        
+        y  = y_aug[:self.model.n_modes*2]
+        X  = y_aug[self.model.n_modes*2:].reshape(self.model.n_modes*2, self.model.n_modes*2)
+    
+        dtau_dt = 2.0 * jnp.pi * (self.model.omega_ref / f_omega)
+        tau = dtau_dt * t
+
+        dydt  = self.model.f(tau, y, args) * dtau_dt
+        dXdt  = (self.model.f_y(tau, y, args) * dtau_dt) @ X
+
+        return jnp.hstack([dydt, dXdt])

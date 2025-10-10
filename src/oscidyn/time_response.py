@@ -57,6 +57,7 @@ def time_response(
 
         print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
 
+    model = model.to_dtype(dtype)
     solver.model = model
 
     initial_condition = jnp.concatenate([initial_displacement, initial_velocity])

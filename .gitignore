@@ -28,6 +28,7 @@ logs/
 *.npz
 *.npy
 *.pkl
+.profiling/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -40,6 +41,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.venv.bak/
 
 # IDE files
 .idea/
