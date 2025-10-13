@@ -50,11 +50,14 @@ class CollocationSolver(AbstractSolver):
                  init_vel: jax.Array
                 ):
 
+        # TO DO: Non-dimensionalize initial conditions
         y0_guess = jnp.array([init_disp, init_vel]).flatten()
         # jax.profiler.start_trace("profiling/profile-data")
         y0, _, _ = self._calc_periodic_solution((drive_amp, drive_freq), y0_guess)
         # y0.block_until_ready()
         # jax.profiler.stop_trace()
+
+        ts = jnp.linspace(self.t0, self.t1, self.n_time_steps)
 
         def _solve_one_period(y0):               
             sol = diffrax.diffeqsolve(
@@ -62,7 +65,7 @@ class CollocationSolver(AbstractSolver):
                 solver=diffrax.Tsit5(),
                 t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
-                saveat=diffrax.SaveAt(ts=jnp.linspace(self.t0, self.t1, self.n_time_steps)),
+                saveat=diffrax.SaveAt(ts=ts),
                 throw=False,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
@@ -70,15 +73,19 @@ class CollocationSolver(AbstractSolver):
             )
             return sol.ts, sol.ys
 
-        ts, ys = jax.lax.cond(
+        _, ys = jax.lax.cond(
             jnp.isnan(y0).any(),
             lambda: (jnp.zeros((self.n_time_steps,)),
                      jnp.zeros((self.n_time_steps, self.model.n_modes * 2))),
             lambda: _solve_one_period(y0)
         )
 
-        ts = ts * (2.0 * jnp.pi * (self.model.omega_ref / drive_freq))
-        ys = ys * self.model.x_ref
+        ts = ts * 1 / (drive_freq / (2 * jnp.pi))
+
+        xs = ys[:, :self.model.n_modes] * self.model.x_ref
+        vs = ys[:, self.model.n_modes:] * self.model.x_ref * (self.model.omega_ref / drive_freq)
+
+        ys = jnp.concatenate([xs, vs], axis=-1)
 
         return ts, ys
     
@@ -108,7 +115,7 @@ class CollocationSolver(AbstractSolver):
 
         return periodic_solutions
     
-    @filter_jit(donate="all")
+    @filter_jit
     def _calc_periodic_solution(self,
             args: jax.Array,
             y0_guess: jax.Array):

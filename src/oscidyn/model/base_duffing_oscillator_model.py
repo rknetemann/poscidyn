@@ -86,9 +86,7 @@ class BaseDuffingOscillator(AbstractModel):
         return BaseDuffingOscillator(
             Q=self.Q.astype(dtype),
             omega_0=self.omega_0.astype(dtype),
-            gamma=self.gamma.astype(dtype),
-            omega_ref=self.omega_ref.astype(dtype),
-            x_ref=self.x_ref.astype(dtype)
+            gamma=self.gamma.astype(dtype)
         )
     
     def __repr__(self):
