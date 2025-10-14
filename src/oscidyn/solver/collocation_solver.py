@@ -96,7 +96,7 @@ class CollocationSolver(AbstractSolver):
             ):
 
         drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = self.multistart.generate_simulation_grid(
-            self.model, drive_freq, drive_amp
+            self.model, drive_freq.flatten(), drive_amp.flatten()
         )
         drive_freq_mesh_flat = drive_freq_mesh.ravel()                       # (n_sim,)
         drive_amp_mesh_flat  = drive_amp_mesh.ravel()                        # (n_sim,)
@@ -105,12 +105,16 @@ class CollocationSolver(AbstractSolver):
         # flatten preserving all mode DOFs: final shape (n_sim, n_modes*2)
         y0_guess = y0_guess.reshape(-1, self.model.n_modes * 2)
 
+        jax.profiler.start_trace("profiling/profile-data")
         # map over the batch: args is a tuple (drive_amp, drive_freq), so in_axes for the tuple is (0,0)
         periodic_solutions = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
             (drive_amp_mesh_flat, drive_freq_mesh_flat), y0_guess
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes), None
 
         _, y_max, _ = periodic_solutions
+
+        y_max.block_until_ready()
+        jax.profiler.stop_trace()
 
 
         return periodic_solutions
@@ -165,13 +169,11 @@ class CollocationSolver(AbstractSolver):
         )
         return y0, y_max, None
 
-    @filter_jit(donate="all")
     def _residual(self, Y, args):
         Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)
 
         D = self.D  # (K+1, K+1)
 
-        @filter_checkpoint 
         def _one_segment(ts_i, Y_i):
             # D @ Y_i uses (K+1, K+1) x (K+1, n) -> (K+1, n)
             dz_dtau = D @ Y_i

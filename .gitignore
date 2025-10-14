@@ -29,6 +29,7 @@ logs/
 *.npy
 *.pkl
 .profiling/
+profiling/
 
 # Jupyter Notebook
 .ipynb_checkpoints
