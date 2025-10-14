@@ -7,7 +7,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-Q, omega_0, gamma = np.array([100000.0]), np.array([1.0]), np.array([0.0])
+Q, omega_0, gamma = np.array([100000.0]), np.array([1.0]), np.array([0.00000001])
 full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
