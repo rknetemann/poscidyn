@@ -4,6 +4,7 @@ import diffrax
 from equinox import filter_jit, filter_checkpoint
 import optimistix as optx
 import lineax as lx
+import jaxopt
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
@@ -14,7 +15,8 @@ from .utils.polynomials import LagrangeBasis
 
 class CollocationSolver(AbstractSolver):
     def __init__(self,  max_iterations: int = 20, N_elements: int = 10, K_polynomial_degree: int = 2, multistart: AbstractMultistart = LinearResponseMultistart(),
-                 rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, verbose: bool = False):
+                 rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
+                 verbose: bool = False, throw: bool = False):
 
         self.n_time_steps = n_time_steps
         self.max_steps = max_steps
@@ -26,6 +28,7 @@ class CollocationSolver(AbstractSolver):
         self.rtol = rtol
         self.atol = atol
         self.verbose = verbose
+        self.throw = throw
 
         self.model: AbstractModel = None
 
@@ -62,11 +65,11 @@ class CollocationSolver(AbstractSolver):
         def _solve_one_period(y0):               
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
-                solver=diffrax.Tsit5(),
+                solver=diffrax.Kvaerno5(),
                 t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
-                throw=False,
+                throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
                 args=(drive_amp, drive_freq),
@@ -90,32 +93,22 @@ class CollocationSolver(AbstractSolver):
         return ts, ys
     
     def frequency_sweep(self,
-             drive_freq: jax.Array,
-             drive_amp: jax.Array, 
+             f_omega: jax.Array,
+             f_amp: jax.Array, 
              sweep_direction: const.SweepDirection,
             ):
 
-        drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = self.multistart.generate_simulation_grid(
-            self.model, drive_freq.flatten(), drive_amp.flatten()
+        f_omega_mesh, f_amp_mesh, x0_mesh, v0_mesh = self.multistart.generate_simulation_grid(
+            self.model, f_omega.flatten(), f_amp.flatten()
         )
-        drive_freq_mesh_flat = drive_freq_mesh.ravel()                       # (n_sim,)
-        drive_amp_mesh_flat  = drive_amp_mesh.ravel()                        # (n_sim,)
 
-        y0_guess = jnp.stack([init_disp_mesh, init_vel_mesh], axis=-1)  # (F, A, D, V, n_modes, 2) or (..., n_modes, 2)
-        # flatten preserving all mode DOFs: final shape (n_sim, n_modes*2)
-        y0_guess = y0_guess.reshape(-1, self.model.n_modes * 2)
+        f_omega_mesh_flat = f_omega_mesh.ravel()
+        f_amp_mesh_flat  = f_amp_mesh.ravel()
+        y0_guess = jnp.stack([x0_mesh, v0_mesh], axis=-1).reshape(-1, self.model.n_states) 
 
-        jax.profiler.start_trace("profiling/profile-data")
-        # map over the batch: args is a tuple (drive_amp, drive_freq), so in_axes for the tuple is (0,0)
         periodic_solutions = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
-            (drive_amp_mesh_flat, drive_freq_mesh_flat), y0_guess
+            (f_amp_mesh_flat, f_omega_mesh_flat), y0_guess
         )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes), None
-
-        _, y_max, _ = periodic_solutions
-
-        y_max.block_until_ready()
-        jax.profiler.stop_trace()
-
 
         return periodic_solutions
     
@@ -129,22 +122,26 @@ class CollocationSolver(AbstractSolver):
             t0=self.t0, t1=self.t1, dt0=None,
             y0=y0_guess,
             saveat=diffrax.SaveAt(ts=self.ts),
-            throw=False,
+            throw=self.throw,
             max_steps=self.max_steps,
             progress_meter=diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=args,
         )
         
-        def _return_fail():
-            y0_fail = jnp.full((self.model.n_modes * 2,), jnp.nan)
-            y_max_fail = jnp.full((self.model.n_modes,), jnp.nan)
-            return y0_fail, y_max_fail
+        def _initial_guess_fallback():
+            Y0 = jnp.tile(y0_guess, (self.N_elements * (self.K_polynomial_degree + 1), 1))
+            return _find_periodic_solution(Y0)
 
         def _find_periodic_solution(Y0):
-            #solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm, verbose=frozenset({"step", "accepted", "loss", "step_size"})) 
+            #solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm) 
             solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.max_norm) 
-            sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, max_steps=self.max_iterations, throw=False) 
+            sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, max_steps=self.max_iterations, throw=self.throw) 
+
+            def _return_fail():
+                y0_fail = jnp.full((self.model.n_modes * 2,), jnp.nan)
+                y_max_fail = jnp.full((self.model.n_modes,), jnp.nan)
+                return y0_fail, y_max_fail
 
             def _postprocess_periodic_solution(Y):    
                 Y_series = Y.reshape(-1, self.model.n_modes * 2)
@@ -155,19 +152,28 @@ class CollocationSolver(AbstractSolver):
                 y0 = Y[0]
                 return y0, y_max
             
+            is_successful = sol.result == optx.RESULTS.successful
+            is_finite = jnp.all(jnp.isfinite(sol.value))
             y0, y_max = jax.lax.cond(
-                sol.result == optx.RESULTS.successful,
+                jnp.logical_and(is_successful, is_finite),
                 lambda: _postprocess_periodic_solution(sol.value),
                 lambda: _return_fail()
             )
             return y0, y_max
 
+        is_successful = sol.result == diffrax.RESULTS.successful
+        is_finite = jnp.all(jnp.isfinite(sol.ys))
         y0, y_max = jax.lax.cond(
-            sol.result == diffrax.RESULTS.successful,
+            jnp.logical_and(is_successful, is_finite),
             lambda: _find_periodic_solution(sol.ys),
-            lambda: _return_fail()
+            lambda: _initial_guess_fallback()
         )
-        return y0, y_max, None
+
+        return {
+            "y0": y0,
+            "y_max": y_max,
+            "mu": None
+        }
 
     def _residual(self, Y, args):
         Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)
@@ -202,7 +208,7 @@ class CollocationSolver(AbstractSolver):
             t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
             y0=y0_aug,
             saveat=diffrax.SaveAt(t1=True),
-            throw=False,
+            throw=self.throw,
             progress_meter=diffrax.NoProgressMeter(),
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=args,

@@ -39,13 +39,13 @@ class BaseDuffingOscillator(AbstractModel):
         cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * self.gamma * q**3
         forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
 
-        d2q_dq2 = (
+        d2q_dtau2 = (
             - damping_term
             - linear_stiffness_term
             - cubic_stiffness_term
             + forcing_term
         ) 
-        return jnp.concatenate([dq_dtau, d2q_dq2])
+        return jnp.concatenate([dq_dtau, d2q_dtau2])
 
     def f_y(self, tau, state, args):
         q, dq_dtau = jnp.split(state, 2)
