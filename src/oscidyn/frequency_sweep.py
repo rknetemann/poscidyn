@@ -2,6 +2,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from typing import Tuple, Dict
+import time
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
@@ -32,11 +33,17 @@ def frequency_sweep(
     else:
         raise ValueError(f"Unsupported precision: {precision}")
 
-    # Ensure inputs are jax arrays (handles Python floats, lists, numpy arrays) before dtype enforcement
     driving_frequencies = jnp.asarray(driving_frequencies, dtype=dtype)
     driving_amplitudes = jnp.asarray(driving_amplitudes, dtype=dtype)
     
     model = model.to_dtype(dtype)
     solver.model = model
 
-    return solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)
+    print("Frequency sweeping: ", model)
+    start_time = time.time()
+
+    frequency_sweep = solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)
+    
+    print("Frequency sweep completed in {:.2f} seconds".format(time.time() - start_time))
+
+    return frequency_sweep

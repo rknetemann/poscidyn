@@ -85,8 +85,8 @@ class CollocationSolver(AbstractSolver):
 
         ts = ts * 1 / (drive_freq / (2 * jnp.pi))
 
-        xs = ys[:, :self.model.n_modes] * self.model.x_ref
-        vs = ys[:, self.model.n_modes:] * self.model.x_ref * (self.model.omega_ref / drive_freq)
+        xs = ys[:, :self.model.n_modes]
+        vs = ys[:, self.model.n_modes:] / drive_freq
 
         ys = jnp.concatenate([xs, vs], axis=-1)
 

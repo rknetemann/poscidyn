@@ -4,23 +4,18 @@ os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
 
 import oscidyn
 import numpy as np
-import time
 import matplotlib.pyplot as plt
 
-Q, omega_0, gamma = np.array([100000.0]), np.array([1.0]), np.array([0.00000001])
+Q, omega_0, gamma = np.array([10000.0]), np.array([1.0]), np.array([0.0])
 full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(1.006 - 1000*full_width_half_max[0], 1.006 + 1000*full_width_half_max[0], 32)
-DRIVING_AMPLITUDE = np.array([0.1 * omega_0[0]**2/Q[0], 1.0 * omega_0[0]**2/Q[0]])
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=16, K_polynomial_degree=2, multistart=MULTISTART, max_iterations=1000, rtol=1e-9, atol=1e-12)
+DRIVING_FREQUENCY = np.linspace(1.0 - 1000*full_width_half_max[0], 1.0 + 1000*full_width_half_max[0], 11)
+DRIVING_AMPLITUDE = np.array([0.3, 1.0]) * omega_0[0]**2/Q[0]
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(6, 1), linear_response_factor=1.5)
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=32, K_polynomial_degree=4, multistart=MULTISTART, max_iterations=1000, rtol=1e-9, atol=1e-12)
 PRECISION = oscidyn.Precision.DOUBLE
-
-print("Frequency sweeping: ", MODEL)
-
-start_time = time.time()
 
 frequency_sweep = oscidyn.frequency_sweep(
     model = MODEL,
@@ -30,8 +25,6 @@ frequency_sweep = oscidyn.frequency_sweep(
     solver = SOLVER,
     precision = PRECISION,
 )
-
-print("Frequency sweep completed in {:.2f} seconds".format(time.time() - start_time))
 
 drive_freq_mesh, drive_amp_mesh, init_disp_mesh, init_vel_mesh = MULTISTART.generate_simulation_grid(
     MODEL, DRIVING_FREQUENCY.flatten(), DRIVING_AMPLITUDE.flatten()
