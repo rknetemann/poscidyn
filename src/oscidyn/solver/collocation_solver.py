@@ -54,12 +54,9 @@ class CollocationSolver(AbstractSolver):
                  init_vel: jax.Array
                 ):
 
-        # TO DO: Non-dimensionalize initial conditions
-        y0_guess = jnp.array([init_disp, init_vel]).flatten()
-        # jax.profiler.start_trace("profiling/profile-data")
-        periodic_solution = self._calc_periodic_solution((drive_amp, drive_freq), y0_guess)
-        # y0.block_until_ready()
-        # jax.profiler.stop_trace()
+        y0_guess = jnp.concatenate([jnp.atleast_1d(init_disp), jnp.atleast_1d(init_vel)], axis=-1)
+        Y0 = self._calc_Y0((drive_amp, drive_freq), y0_guess)
+        y0, y_max = self._calc_periodic_solution((drive_amp, drive_freq), Y0)
 
         ts = jnp.linspace(self.t0, self.t1, self.n_time_steps)
 
@@ -78,10 +75,10 @@ class CollocationSolver(AbstractSolver):
             return sol.ts, sol.ys
 
         _, ys = jax.lax.cond(
-            jnp.isnan(periodic_solution["y0"]).any(),
+            jnp.isnan(y0).any(),
             lambda: (jnp.zeros((self.n_time_steps,)),
                      jnp.zeros((self.n_time_steps, self.model.n_modes * 2))),
-            lambda: _solve_one_period(periodic_solution["y0"])
+            lambda: _solve_one_period(y0)
         )
 
         ts = ts * 1 / (drive_freq / (2 * jnp.pi))
@@ -107,36 +104,18 @@ class CollocationSolver(AbstractSolver):
         f_amp_mesh_flat  = f_amp_mesh.ravel()
         y0_guess = jnp.stack([x0_mesh, v0_mesh], axis=-1).reshape(-1, self.model.n_states) 
 
-        if self.verbose:
-            print("Calculating initial guesses...")
-            start_time = time.time()
-
-        jax.profiler.start_trace("profiling/profile-data")
-
         Y0 = jax.vmap(self._calc_Y0, in_axes=((0,0), 0))(
             (f_amp_mesh_flat, f_omega_mesh_flat), y0_guess
         )  # Y0: (n_sim, N_elements*(K_polynomial_degree+1), n_states)
-
-        Y0.block_until_ready()
-        jax.profiler.stop_trace()
-
-        if self.verbose:
-            end_time = time.time()
-            print(f"  Time elapsed: {end_time - start_time:.2f} seconds")
-
-        if self.verbose:
-            print("Calculating periodic solutions...")
-            start_time = time.time()
 
         y0, y_max = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
             (f_amp_mesh_flat, f_omega_mesh_flat), Y0
         )  # y0: (n_sim, n_states)  y_max: (n_sim, n_modes)
 
-        if self.verbose:
-            end_time = time.time()
-            print(f"  Time elapsed: {end_time - start_time:.2f} seconds")
-
-        return Y0
+        return {
+            "y0": y0,
+            "y_max": y_max,
+        }
     
     @filter_jit
     def _calc_Y0(self,
@@ -229,31 +208,8 @@ class CollocationSolver(AbstractSolver):
         R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])
         return R
     
-    def _analyze_periodic_solution(self, Y0, args):
-        X0 = jnp.eye(self.model.n_modes * 2).reshape(-1)
-        y0_aug = jnp.hstack([Y0, X0])
-
-        sol = diffrax.diffeqsolve(
-            terms=diffrax.ODETerm(self._aug_rhs),
-            solver=diffrax.Kvaerno5(),
-            t0=self.t0, t1=self.t1, dt0=None, max_steps=self.max_steps,
-            y0=y0_aug,
-            saveat=diffrax.SaveAt(t1=True),
-            throw=self.throw,
-            progress_meter=diffrax.NoProgressMeter(),
-            stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-            args=args,
-        )
-
-        y = sol.ys[:, :self.model.n_modes*2]
-        XT = sol.ys[-1, self.model.n_modes*2:].reshape(self.model.n_modes*2, self.model.n_modes*2)
-
-        eigenvalues, _ = jnp.linalg.eig(XT)
-
-        abs_eigenvalues = jnp.abs(eigenvalues)
-
-        # jax.debug.print("Eigenvalues of the monodromy matrix: {eigenvalues}", eigenvalues=eigenvalues)
-        # jax.debug.print("Absolute values of the eigenvalues: {abs_eigenvalues}", abs_eigenvalues=abs_eigenvalues)
+    def _analyze_periodic_solution(self):
+        raise NotImplementedError
 
     @filter_jit
     def _rhs(self, t, y, args):
@@ -265,18 +221,4 @@ class CollocationSolver(AbstractSolver):
         dy_dt = self.model.f(tau, y, args) * dtau_dt
 
         return dy_dt
-    
-    @filter_jit
-    def _aug_rhs(self, t, y_aug, args):
-        f_amp, f_omega = args
-        
-        y  = y_aug[:self.model.n_modes*2]
-        X  = y_aug[self.model.n_modes*2:].reshape(self.model.n_modes*2, self.model.n_modes*2)
-    
-        dtau_dt = 2.0 * jnp.pi * (self.model.omega_ref / f_omega)
-        tau = dtau_dt * t
 
-        dydt  = self.model.f(tau, y, args) * dtau_dt
-        dXdt  = (self.model.f_y(tau, y, args) * dtau_dt) @ X
-
-        return jnp.hstack([dydt, dXdt])

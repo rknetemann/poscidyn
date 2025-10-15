@@ -1,10 +1,6 @@
-# nonlinear_dynamics.py
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-from typing import Tuple
-import numpy as np
-import time
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
@@ -60,9 +56,10 @@ def time_response(
     model = model.to_dtype(dtype)
     solver.model = model
 
-    initial_condition = jnp.concatenate([initial_displacement, initial_velocity])
-
+    print("Time response: ", model)
+    start_time = time.time()
     ts, ys = solver.time_response(driving_frequency, driving_amplitude, initial_displacement, initial_velocity)
+    print("Time response completed in {:.2f} seconds".format(time.time() - start_time))
 
     if isinstance(solver, SteadyStateSolver):
         time = ts.flatten()

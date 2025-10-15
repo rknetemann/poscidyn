@@ -1,15 +1,6 @@
-import os
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.9"
-#os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"i
-
-import jax
-jax.config.update("jax_platform_name", "cpu")
-print(jax.devices())
-
 import numpy as np
 import matplotlib.pyplot as plt
 import oscidyn
-import time
 
 Q, omega_0, gamma = np.array([10000.0]), np.array([1.0]), np.array([0.0])
 full_width_half_max = omega_0 / Q
@@ -23,9 +14,6 @@ INITIAL_DISPLACEMENT = np.array([0.0])
 INITIAL_VELOCITY = np.array([0.0])
 PRECISION = oscidyn.Precision.DOUBLE
 
-print("Time response: ", MODEL)
-start_time = time.time()
-
 time_response_steady_state = oscidyn.time_response(
     model = MODEL,
     driving_frequency = DRIVING_FREQUENCY,
@@ -35,8 +23,6 @@ time_response_steady_state = oscidyn.time_response(
     solver = SOLVER,
     precision = PRECISION,
 )
-
-print("Time response completed in {:.2f} seconds".format(time.time() - start_time))
 
 time_steady_state,displacements_steady_state, velocities_steady_state = time_response_steady_state
 total_displacement_steady_state = displacements_steady_state.sum(axis=1)
