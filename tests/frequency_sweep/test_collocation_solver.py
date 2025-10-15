@@ -40,11 +40,3 @@ for i_amp, amp in enumerate(DRIVING_AMPLITUDE):
     ax.legend()
     ax.grid(True)
 plt.show()
-
-# title = f"Frequency sweep: Duffing (Q={Q}, $\\gamma$={gamma})"
-
-# oscidyn.plot_branch_exploration(
-#     drive_freq_mesh, drive_amp_mesh, frequency_sweep, tol_inside=1e-1, backbone={"f0": omega_0, "beta": gamma}, title=title
-# )
-
-# CHRIS: 0.996 - 1.006, 300 punten
