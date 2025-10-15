@@ -11,10 +11,10 @@ full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(1.0 - 1000*full_width_half_max[0], 1.0 + 1000*full_width_half_max[0], 11)
-DRIVING_AMPLITUDE = np.array([0.3, 1.0]) * omega_0[0]**2/Q[0]
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(6, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=32, K_polynomial_degree=4, multistart=MULTISTART, max_iterations=1000, rtol=1e-9, atol=1e-12)
+DRIVING_FREQUENCY = np.linspace(1.0 - 1000*full_width_half_max[0], 1.0 + 1000*full_width_half_max[0], 101)
+DRIVING_AMPLITUDE = np.linspace(0.1, 1.0, 5) * omega_0[0]**2/Q[0]
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(6, 6), linear_response_factor=1.5)
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=32, K_polynomial_degree=4, multistart=MULTISTART, verbose=True, max_iterations=1000, rtol=1e-9, atol=1e-12)
 PRECISION = oscidyn.Precision.DOUBLE
 
 frequency_sweep = oscidyn.frequency_sweep(

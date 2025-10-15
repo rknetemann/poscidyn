@@ -5,6 +5,7 @@ from equinox import filter_jit, filter_checkpoint
 import optimistix as optx
 import lineax as lx
 import jaxopt
+import time
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
@@ -106,14 +107,39 @@ class CollocationSolver(AbstractSolver):
         f_amp_mesh_flat  = f_amp_mesh.ravel()
         y0_guess = jnp.stack([x0_mesh, v0_mesh], axis=-1).reshape(-1, self.model.n_states) 
 
-        periodic_solutions = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
-            (f_amp_mesh_flat, f_omega_mesh_flat), y0_guess
-        )  # y0: (n_sim, n_modes*2)  y_max: (n_sim, n_modes), None
+        if self.verbose:
+            print("Calculating initial guesses...")
+            start_time = time.time()
 
-        return periodic_solutions
+        jax.profiler.start_trace("profiling/profile-data")
+
+        Y0 = jax.vmap(self._calc_Y0, in_axes=((0,0), 0))(
+            (f_amp_mesh_flat, f_omega_mesh_flat), y0_guess
+        )  # Y0: (n_sim, N_elements*(K_polynomial_degree+1), n_states)
+
+        Y0.block_until_ready()
+        jax.profiler.stop_trace()
+
+        if self.verbose:
+            end_time = time.time()
+            print(f"  Time elapsed: {end_time - start_time:.2f} seconds")
+
+        if self.verbose:
+            print("Calculating periodic solutions...")
+            start_time = time.time()
+
+        y0, y_max = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
+            (f_amp_mesh_flat, f_omega_mesh_flat), Y0
+        )  # y0: (n_sim, n_states)  y_max: (n_sim, n_modes)
+
+        if self.verbose:
+            end_time = time.time()
+            print(f"  Time elapsed: {end_time - start_time:.2f} seconds")
+
+        return Y0
     
     @filter_jit
-    def _calc_periodic_solution(self,
+    def _calc_Y0(self,
             args: jax.Array,
             y0_guess: jax.Array):
                 
@@ -128,52 +154,57 @@ class CollocationSolver(AbstractSolver):
             stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
             args=args,
         )
-        
+
+        def _process_success(sol):
+            Y0 = sol.ys
+            return Y0
+
         def _initial_guess_fallback():
             Y0 = jnp.tile(y0_guess, (self.N_elements * (self.K_polynomial_degree + 1), 1))
-            return _find_periodic_solution(Y0)
-
-        def _find_periodic_solution(Y0):
-            #solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.rms_norm) 
-            solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.max_norm) 
-            sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, max_steps=self.max_iterations, throw=self.throw) 
-
-            def _return_fail():
-                y0_fail = jnp.full((self.model.n_modes * 2,), jnp.nan)
-                y_max_fail = jnp.full((self.model.n_modes,), jnp.nan)
-                return y0_fail, y_max_fail
-
-            def _postprocess_periodic_solution(Y):    
-                Y_series = Y.reshape(-1, self.model.n_modes * 2)
-                y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
-
-                #self._analyze_periodic_solution(Y[0], args)
-
-                y0 = Y[0]
-                return y0, y_max
-            
-            is_successful = sol.result == optx.RESULTS.successful
-            is_finite = jnp.all(jnp.isfinite(sol.value))
-            y0, y_max = jax.lax.cond(
-                jnp.logical_and(is_successful, is_finite),
-                lambda: _postprocess_periodic_solution(sol.value),
-                lambda: _return_fail()
-            )
-            return y0, y_max
+            return Y0
 
         is_successful = sol.result == diffrax.RESULTS.successful
         is_finite = jnp.all(jnp.isfinite(sol.ys))
-        y0, y_max = jax.lax.cond(
-            jnp.logical_and(is_successful, is_finite),
-            lambda: _find_periodic_solution(sol.ys),
-            lambda: _initial_guess_fallback()
+        fallback = jnp.logical_not(jnp.logical_and(is_successful, is_finite))
+        
+        Y0 = jax.lax.cond(
+            fallback,
+            lambda: _initial_guess_fallback(),
+            lambda: _process_success(sol)
         )
 
-        return {
-            "y0": y0,
-            "y_max": y_max,
-            "mu": None
-        }
+        return Y0
+    
+    @filter_jit
+    def _calc_periodic_solution(self,
+            args: jax.Array,
+            Y0: jax.Array):
+        
+        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.max_norm) 
+        sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, max_steps=self.max_iterations, throw=self.throw) 
+
+        def _return_fail():
+            y0_fail = jnp.full((self.model.n_modes * 2,), jnp.nan)
+            y_max_fail = jnp.full((self.model.n_modes,), jnp.nan)
+            return y0_fail, y_max_fail
+
+        def _postprocess_periodic_solution(Y):    
+            Y_series = Y.reshape(-1, self.model.n_modes * 2)
+            y_max = jnp.max(jnp.abs(Y_series[:, 0::2]), axis=0)
+
+            #self._analyze_periodic_solution(Y[0], args)
+
+            y0 = Y[0]
+            return y0, y_max
+        
+        is_successful = sol.result == optx.RESULTS.successful
+        is_finite = jnp.all(jnp.isfinite(sol.value))
+        y0, y_max = jax.lax.cond(
+            jnp.logical_and(is_successful, is_finite),
+            lambda: _postprocess_periodic_solution(sol.value),
+            lambda: _return_fail()
+        )
+        return y0, y_max
 
     def _residual(self, Y, args):
         Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)
