@@ -56,7 +56,7 @@ class CollocationSolver(AbstractSolver):
         # TO DO: Non-dimensionalize initial conditions
         y0_guess = jnp.array([init_disp, init_vel]).flatten()
         # jax.profiler.start_trace("profiling/profile-data")
-        y0, _, _ = self._calc_periodic_solution((drive_amp, drive_freq), y0_guess)
+        periodic_solution = self._calc_periodic_solution((drive_amp, drive_freq), y0_guess)
         # y0.block_until_ready()
         # jax.profiler.stop_trace()
 
@@ -77,10 +77,10 @@ class CollocationSolver(AbstractSolver):
             return sol.ts, sol.ys
 
         _, ys = jax.lax.cond(
-            jnp.isnan(y0).any(),
+            jnp.isnan(periodic_solution["y0"]).any(),
             lambda: (jnp.zeros((self.n_time_steps,)),
                      jnp.zeros((self.n_time_steps, self.model.n_modes * 2))),
-            lambda: _solve_one_period(y0)
+            lambda: _solve_one_period(periodic_solution["y0"])
         )
 
         ts = ts * 1 / (drive_freq / (2 * jnp.pi))

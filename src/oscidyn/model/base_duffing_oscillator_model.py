@@ -21,8 +21,10 @@ class BaseDuffingOscillator(AbstractModel):
     def __post_init__(self):
         if self.omega_ref is None:
             self.omega_ref = jnp.max(self.omega_0)
+            self.omega_ref = 1.0
         if self.x_ref is None:
             self.x_ref = jnp.max(self.Q) / (self.omega_ref**2)
+            self.x_ref = 1.0
 
         jnp.asarray(self.Q)
         jnp.asarray(self.omega_0)
