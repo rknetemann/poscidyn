@@ -46,13 +46,20 @@ class CollocationSolver(AbstractSolver):
         self.lagrange_basis = LagrangeBasis(self.tau)
         self.D = self.lagrange_basis.differentiation_matrix()  # (K_polynomial_degree+1, K_polynomial_degree+1)
         self.f = jax.vmap(self._rhs, in_axes=(0, 0, None))  # (K+1, n_modes*2)
-   
+
     def time_response(self,
                  drive_freq: jax.Array,  
                  drive_amp: jax.Array, 
                  init_disp: jax.Array,  
                  init_vel: jax.Array
                 ):
+
+        Y_test = jnp.zeros((self.N_elements * (self.K_polynomial_degree + 1) * self.model.n_states,))
+        args_test = (drive_amp, drive_freq)
+        jacobian = jax.jacobian(self._residual)
+        jacobian_val = jacobian(Y_test, args_test)
+        print("Jacobian shape:", jacobian_val.shape)
+        print("Jacobian values:\n", jacobian_val)
 
         y0_guess = jnp.concatenate([jnp.atleast_1d(init_disp), jnp.atleast_1d(init_vel)], axis=-1)
         Y0 = self._calc_Y0((drive_amp, drive_freq), y0_guess)
@@ -208,6 +215,9 @@ class CollocationSolver(AbstractSolver):
         R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])
         return R
     
+    def _jacobian_residual(self, Y, args):
+        raise NotImplementedError
+
     def _analyze_periodic_solution(self):
         raise NotImplementedError
 
