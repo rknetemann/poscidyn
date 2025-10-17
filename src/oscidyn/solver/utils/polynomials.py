@@ -16,9 +16,6 @@ class LagrangeBasis:
         self.Phi = self._lagrange_basis(self.t)
         self.dPhi_dt = self._derivative_lagrange_basis(self.t)
 
-        print("Phi:", self.Phi.shape)
-        print("dPhi_dt:", self.dPhi_dt.shape)
-
     @filter_jit
     def evaluate(self, Y: jnp.ndarray) -> jnp.ndarray:
         '''
