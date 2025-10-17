@@ -4,8 +4,7 @@ import diffrax
 from equinox import filter_jit, filter_checkpoint
 import optimistix as optx
 import lineax as lx
-import jaxopt
-import time
+import numpy as np
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
@@ -15,7 +14,7 @@ from .. import constants as const
 from .utils.polynomials import LagrangeBasis
 
 class CollocationSolver(AbstractSolver):
-    def __init__(self,  max_iterations: int = 20, N_elements: int = 10, K_polynomial_degree: int = 2, multistart: AbstractMultistart = LinearResponseMultistart(),
+    def __init__(self,  max_iterations: int = 20, N_elements: int = 10, m_collocation_points: int = 2, multistart: AbstractMultistart = LinearResponseMultistart(),
                  rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
                  verbose: bool = False, throw: bool = False):
 
@@ -23,7 +22,7 @@ class CollocationSolver(AbstractSolver):
         self.max_steps = max_steps
         self.max_iterations = max_iterations
         self.N_elements = N_elements
-        self.K_polynomial_degree = K_polynomial_degree
+        self.m_collocation_points = m_collocation_points
         self.order_approx = 5
         self.multistart = multistart
         self.rtol = rtol
@@ -38,13 +37,16 @@ class CollocationSolver(AbstractSolver):
         self.t0 = 0.0
         self.t1 = 1.0
         
-        self.ts = jnp.linspace(self.t0, self.t1, self.N_elements * (self.K_polynomial_degree + 1))  # (N_elements*(K_polynomial_degree+1),)
-        self.ts_segments = self.ts.reshape(self.N_elements, self.K_polynomial_degree + 1)  # (N_elements, K_polynomial_degree+1)
+        self.ts = jnp.linspace(self.t0, self.t1, self.N_elements * (self.m_collocation_points + 1))  # (N_elements*(m_collocation_points+1),)
+        self.ts_segments = self.ts.reshape(self.N_elements, self.m_collocation_points + 1)  # (N_elements, m_collocation_points+1)
+
+
         self.he = (self.t1 - self.t0) / self.N_elements 
-       
-        self.tau = jnp.linspace(0, 1, self.K_polynomial_degree + 1)  # (K_polynomial_degree+1,)
-        self.lagrange_basis = LagrangeBasis(self.tau)
-        self.D = self.lagrange_basis.differentiation_matrix()  # (K_polynomial_degree+1, K_polynomial_degree+1)
+
+        self.legendre_nodes, self.legendre_weights = np.polynomial.legendre.leggauss(self.m_collocation_points)  # nodes and weights on [-1,1]
+        self.local_collocation_points = 0.5 * (self.legendre_nodes + 1.0)
+        self.lagrange_basis = LagrangeBasis(self.m_collocation_points, self.local_collocation_points)
+
         self.f = jax.vmap(self._rhs, in_axes=(0, 0, None))  # (K+1, n_modes*2)
 
     def time_response(self,
@@ -54,12 +56,6 @@ class CollocationSolver(AbstractSolver):
                  init_vel: jax.Array
                 ):
 
-        Y_test = jnp.zeros((self.N_elements * (self.K_polynomial_degree + 1) * self.model.n_states,))
-        args_test = (drive_amp, drive_freq)
-        jacobian = jax.jacobian(self._residual)
-        jacobian_val = jacobian(Y_test, args_test)
-        print("Jacobian shape:", jacobian_val.shape)
-        print("Jacobian values:\n", jacobian_val)
 
         y0_guess = jnp.concatenate([jnp.atleast_1d(init_disp), jnp.atleast_1d(init_vel)], axis=-1)
         Y0 = self._calc_Y0((drive_amp, drive_freq), y0_guess)
@@ -113,7 +109,7 @@ class CollocationSolver(AbstractSolver):
 
         Y0 = jax.vmap(self._calc_Y0, in_axes=((0,0), 0))(
             (f_amp_mesh_flat, f_omega_mesh_flat), y0_guess
-        )  # Y0: (n_sim, N_elements*(K_polynomial_degree+1), n_states)
+        )  # Y0: (n_sim, N_elements*(m_collocation_points+1), n_states)
 
         y0, y_max = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
             (f_amp_mesh_flat, f_omega_mesh_flat), Y0
@@ -146,7 +142,7 @@ class CollocationSolver(AbstractSolver):
             return Y0
 
         def _initial_guess_fallback():
-            Y0 = jnp.tile(y0_guess, (self.N_elements * (self.K_polynomial_degree + 1), 1))
+            Y0 = jnp.tile(y0_guess, (self.N_elements * (self.m_collocation_points + 1), 1))
             return Y0
 
         is_successful = sol.result == diffrax.RESULTS.successful
@@ -193,24 +189,22 @@ class CollocationSolver(AbstractSolver):
         return y0, y_max
 
     def _residual(self, Y, args):
-        Y_segments = Y.reshape(self.N_elements, self.K_polynomial_degree + 1, -1)
+        Y_segments = Y.reshape(self.N_elements, self.m_collocation_points + 1, -1)
+        
+        def _one_segment_rcol(ts_i, Y_i):
+            p, dp_dt = self.lagrange_basis.evaluate(Y_i) # (m, n), (m, n)
 
-        D = self.D  # (K+1, K+1)
+            ts_col_i = ts_i[0] + self.he * self.local_collocation_points # (m,)
 
-        def _one_segment(ts_i, Y_i):
-            # D @ Y_i uses (K+1, K+1) x (K+1, n) -> (K+1, n)
-            dz_dtau = D @ Y_i
-            dy_dt   = (1.0 / self.he) * dz_dtau
+            r_col = dp_dt - self.he * self.f(ts_col_i, p, args) # (m, n)
 
-            dy_dt_eff = dy_dt[1:, :]            # K x n
-            t_i_eff   = ts_i[1:]                # K
-            r_col     = dy_dt_eff - self.f(t_i_eff, Y_i[1:, :], args)  # K x n
             return r_col
+    
+        _batch_segments = jax.vmap(_one_segment_rcol, in_axes=(0, 0))
 
-        _batch_segments = jax.vmap(_one_segment, in_axes=(0, 0))
-        R_col  = _batch_segments(self.ts_segments, Y_segments)     # (N, K, n)
-        R_cont = Y_segments[1:, 0, :] - Y_segments[:-1, -1, :]     # (N-1, n)
-        R_per  = Y_segments[0, 0, :] - Y_segments[-1, -1, :]       # (n,)
+        R_col  = _batch_segments(self.ts_segments, Y_segments) # (N, m, n)
+        R_cont = Y_segments[1:, 0, :] - Y_segments[:-1, -1, :] # (N-1, n)
+        R_per  = Y_segments[0, 0, :] - Y_segments[-1, -1, :] # (n,)
 
         R = jnp.concatenate([R_col.flatten(), R_cont.flatten(), R_per.flatten()])
         return R

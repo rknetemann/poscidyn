@@ -2,15 +2,15 @@ import oscidyn
 import numpy as np
 import matplotlib.pyplot as plt
 
-Q, omega_0, gamma = np.array([10000.0]), np.array([1.0]), np.array([0.0])
+Q, omega_0, gamma = np.array([10000.0]), np.array([1.0]), np.array([0.00])
 full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(1.0 - 1000*full_width_half_max[0], 1.0 + 1000*full_width_half_max[0], 2)
-DRIVING_AMPLITUDE = np.linspace(0.1, 1.0, 5) * omega_0[0]**2/Q[0]
+DRIVING_FREQUENCY = np.linspace(1.0 - 100*full_width_half_max[0], 1.0 + 100*full_width_half_max[0], 51)
+DRIVING_AMPLITUDE = np.linspace(0.1, 1.0, 3) * omega_0[0]**2/Q[0]
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(6, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=32, K_polynomial_degree=4, multistart=MULTISTART, verbose=True, max_iterations=1000, rtol=1e-9, atol=1e-12)
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=3, m_collocation_points=4, multistart=MULTISTART, verbose=True, max_iterations=1000, rtol=1e-9, atol=1e-12)
 PRECISION = oscidyn.Precision.DOUBLE
 
 frequency_sweep = oscidyn.frequency_sweep(

@@ -7,7 +7,7 @@ full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=3, K_polynomial_degree=2, max_iterations=500, multistart=MULTISTART, verbose=True, rtol=1e-9, atol=1e-12, n_time_steps=500, throw=True)
+SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=32, m_collocation_points=4, max_iterations=500, multistart=MULTISTART, verbose=True, rtol=1e-9, atol=1e-12, n_time_steps=500, throw=True)
 DRIVING_FREQUENCY = omega_0*1.000
 DRIVING_AMPLITUDE = 1.0 * omega_0**2/Q
 INITIAL_DISPLACEMENT = np.array([0.0])
