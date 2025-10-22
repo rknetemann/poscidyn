@@ -162,7 +162,17 @@ class CollocationSolver(AbstractSolver):
             args: jax.Array,
             Y0: jax.Array):
         
-        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, norm=optx.max_norm) 
+        def _solve_linear_system(Y):
+            jacobian = jax.jacobian(self._residual)(Y, args)
+            print(jacobian.shape)
+            jacobian = lx.MatrixLinearOperator(jacobian)
+            residual = self._residual(Y, args)
+            return lx.linear_solve(jacobian, -residual, lx.Tridiagonal())
+        
+        test_delta_Y = _solve_linear_system(Y0)
+        jax.debug.print("Test delta Y: {norm}", norm=test_delta_Y)
+
+        solver = optx.LevenbergMarquardt(rtol=self.rtol, atol=self.atol, linear_solver=lx.Tridiagonal(), norm=optx.max_norm) 
         sol = optx.least_squares(self._residual, solver, args=args, y0=Y0, max_steps=self.max_iterations, throw=self.throw) 
 
         def _return_fail():
