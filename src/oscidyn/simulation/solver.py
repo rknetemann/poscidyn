@@ -33,7 +33,7 @@ class AbstractSolver:
         sol = diffrax.diffeqsolve(
             terms=diffrax.ODETerm(model.rhs_jit),
             solver=diffrax.Tsit5(),
-            adjoint=diffrax.RecursiveCheckpointAdjoint(),
+            #adjoint=diffrax.RecursiveCheckpointAdjoint(),
             t0=t0,
             t1=t1,
             dt0=None,
