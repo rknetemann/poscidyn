@@ -198,6 +198,7 @@ class CollocationSolver(AbstractSolver):
         )
         return y0, y_max
 
+    @filter_jit
     def _residual(self, Y, args):
         Y_segments = Y.reshape(self.N_elements, self.m_collocation_points + 1, -1)
         

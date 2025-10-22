@@ -3,6 +3,7 @@ from .solver.abstract_solver import *
 from .solver.single_shooting_solver import *
 from .solver.multiple_shooting_solver import *
 from .solver.collocation_solver import *
+from .solver.fixed_time_solver import *
 from .solver.multistart.linear_response_multistart import *
 
 from .model.abstract_model import *
