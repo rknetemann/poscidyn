@@ -76,12 +76,12 @@ def _explore_branches(
         jnp.min(drive_amp), jnp.max(drive_amp), const.N_COARSE_DRIVING_AMPLITUDES
     ) # (N_COARSE_DRIVING_AMPLITUDES,)
 
-    max_abs_displacement = 10.0 # TO DO: Determine the max amplitude based on the model or a fixed value
+    max_abs_displacement = 1.2 # TO DO: Determine the max amplitude based on the model or a fixed value
     coarse_init_disp = jnp.linspace(
         -max_abs_displacement, max_abs_displacement, const.N_COARSE_INITIAL_DISPLACEMENTS
     ) # (N_COARSE_INITIAL_DISPLACEMENTS,)
     
-    max_abs_velocity = 10.0 # TO DO: Determine the max velocity based on the model or a fixed value
+    max_abs_velocity = 1.2 # TO DO: Determine the max velocity based on the model or a fixed value
     coarse_init_vel = jnp.linspace(
         -max_abs_velocity, max_abs_velocity, const.N_COARSE_INITIAL_VELOCITIES
     ) # (N_COARSE_INITIAL_VELOCITIES,)
