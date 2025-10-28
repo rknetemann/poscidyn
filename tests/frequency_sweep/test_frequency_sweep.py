@@ -10,8 +10,8 @@ SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 #DRIVING_FREQUENCY = jnp.linspace(1.0 - 25*full_width_half_max, 1.0 + 25*full_width_half_max, 101)
 DRIVING_FREQUENCY = jnp.linspace(0.1, 3.5, 151)
 DRIVING_AMPLITUDE = jnp.linspace(0.1 * (omega_0**2 / Q).mean(), 1.0 * (omega_0**2 / Q).mean(), 20)
-SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1000, rtol=1e-5, atol=1e-8, progress_bar=True)
-PRECISION = oscidyn.Precision.DOUBLE
+SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1000, rtol=1e-5, atol=1e-7, progress_bar=True)
+PRECISION = oscidyn.Precision.SINGLE
 
 start_time = time.time()
 
