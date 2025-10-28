@@ -2,15 +2,15 @@ from jax import numpy as jnp
 import time
 import oscidyn
 
-Q, omega_0, gamma = 5.0, 1.0, 0.0
+Q, omega_0, gamma = jnp.array([10.0, 8.0, 10.0, 20.0]), jnp.array([1.0, 1.6, 2.0, 3.0]), jnp.array([0.1, -0.7, 0.1, 0.2])
 full_width_half_max = omega_0 / Q
 
-MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
+MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=Q, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = jnp.linspace(1.0 - 25*full_width_half_max, 1.0 + 25*full_width_half_max, 101)
-DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 101)
-DRIVING_AMPLITUDE = jnp.linspace(0.1*omega_0**2/Q, 1.0*omega_0**2/Q, 2)
-SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1000, rtol=1e-7, atol=1e-10, progress_bar=True)
+#DRIVING_FREQUENCY = jnp.linspace(1.0 - 25*full_width_half_max, 1.0 + 25*full_width_half_max, 101)
+DRIVING_FREQUENCY = jnp.linspace(0.1, 3.5, 151)
+DRIVING_AMPLITUDE = jnp.linspace(0.1 * (omega_0**2 / Q).mean(), 1.0 * (omega_0**2 / Q).mean(), 20)
+SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1000, rtol=1e-5, atol=1e-8, progress_bar=True)
 PRECISION = oscidyn.Precision.DOUBLE
 
 start_time = time.time()
@@ -24,20 +24,27 @@ frequency_sweep = oscidyn.frequency_sweep(
     precision = PRECISION,
 )
 
-print("Frequency sweep completed in %.2f seconds." % (time.time() - start_time))
+duration = time.time() - start_time
+print("Frequency sweep completed in %.2f seconds." % (duration))
 
-tot_ss_disp_amp = frequency_sweep['tot_ss_disp_amp'].reshape(DRIVING_FREQUENCY.shape[0], DRIVING_AMPLITUDE.shape[0]) # Shape: (n_driving_frequencies, n_driving_amplitudes)
+tot_ss_disp_amp = frequency_sweep['tot_ss_disp_amp'].reshape(
+    DRIVING_FREQUENCY.shape[0], -1
+)  # Shape: (n_driving_frequencies, n_driving_amplitudes)
 
 import matplotlib.pyplot as plt
+min_amp = float(jnp.min(DRIVING_AMPLITUDE))
+max_amp = float(jnp.max(DRIVING_AMPLITUDE))
+
 plt.figure(figsize=(8, 6))
 for i in range(DRIVING_AMPLITUDE.shape[0]):
-    plt.plot(DRIVING_FREQUENCY, tot_ss_disp_amp[:, i], label=f"A={DRIVING_AMPLITUDE[i]:.2f}")
+    plt.plot(DRIVING_FREQUENCY, tot_ss_disp_amp[:, i])
 plt.xlabel("Driving frequency")
 plt.ylabel("Steady-state displacement amplitude")
-plt.title("Frequency Sweep")
-plt.legend()
+plt.title(
+    f"Frequency sweep: Q = {Q}, omega_0 = {omega_0}, gamma = {gamma}\n"
+    f"Driving amplitude range: {min_amp:.3g} – {max_amp:.3g} ({duration:.2f} s)"
+)
 plt.grid(True)
 plt.tight_layout()
 plt.savefig("frequency_sweep.png", dpi=300)
 plt.show()
-

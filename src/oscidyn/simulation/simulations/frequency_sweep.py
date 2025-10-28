@@ -241,6 +241,8 @@ def _fine_sweep(
     n_modes  = model.n_modes
     n_state  = 2 * n_modes
     n_freq   = driving_frequencies.shape[0]
+    
+    driving_amplitudes = driving_amplitudes.ravel()
     n_amp    = driving_amplitudes.shape[0]
 
     # coarse to fine grid using interpolation of initial conditions
