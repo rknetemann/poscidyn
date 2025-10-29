@@ -2,14 +2,20 @@ from jax import numpy as jnp
 import time
 import oscidyn
 
-Q, omega_0, gamma = jnp.array([10.0, 8.0, 10.0, 20.0]), jnp.array([1.0, 1.6, 2.0, 3.0]), jnp.array([0.1, -0.7, 0.1, 0.2])
+Q, omega_0, gamma = jnp.array([10.0, 8.0, 10.0, 20.0]), jnp.array([1.0, 1.6, 2.0, 3.0]), jnp.zeros((4,4,4,4))
+
+gamma = gamma.at[0,0,0,0].set(0.1)
+gamma = gamma.at[1,1,1,1].set(-0.7)
+gamma = gamma.at[2,2,2,2].set(0.1)
+
+gamma = gamma.at[2,0,0,2].set(-0.0)
 full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=Q, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 #DRIVING_FREQUENCY = jnp.linspace(1.0 - 25*full_width_half_max, 1.0 + 25*full_width_half_max, 101)
-DRIVING_FREQUENCY = jnp.linspace(0.1, 3.5, 151)
-DRIVING_AMPLITUDE = jnp.linspace(0.1 * (omega_0**2 / Q).mean(), 1.0 * (omega_0**2 / Q).mean(), 20)
+DRIVING_FREQUENCY = jnp.linspace(0.1, 3.5, 351)
+DRIVING_AMPLITUDE = jnp.linspace(0.1 * (omega_0**2 / Q).mean(), 1.0 * (omega_0**2 / Q).mean(), 50)
 SOLVER = oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1000, rtol=1e-5, atol=1e-7, progress_bar=True)
 PRECISION = oscidyn.Precision.SINGLE
 
@@ -41,8 +47,7 @@ for i in range(DRIVING_AMPLITUDE.shape[0]):
 plt.xlabel("Driving frequency")
 plt.ylabel("Steady-state displacement amplitude")
 plt.title(
-    f"Frequency sweep: Q = {Q}, omega_0 = {omega_0}, gamma = {gamma}\n"
-    f"Driving amplitude range: {min_amp:.3g} – {max_amp:.3g} ({duration:.2f} s)"
+    f"Frequency sweep: {duration:.2f} s"
 )
 plt.grid(True)
 plt.tight_layout()
