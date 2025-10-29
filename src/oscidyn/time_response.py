@@ -5,7 +5,6 @@ import time
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
-from .solver.steady_state_window_solver import SteadyStateSolver
 from . import constants as const
 
 

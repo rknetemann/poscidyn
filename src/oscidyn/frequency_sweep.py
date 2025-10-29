@@ -6,11 +6,8 @@ import time
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
-from .solver.fixed_time_solver import FixedTimeSolver
-from .solver.steady_state_window_solver import SteadyStateSolver
-from .solver.fixed_time_steady_state_solver import FixedTimeSteadyStateSolver
-from .solver.single_shooting_solver import SingleShootingSolver
-from .solver.multiple_shooting_solver import MultipleShootingSolver
+from .solver.time_integration_solver import TimeIntegrationSolver
+from .solver.shooting_solver import MultipleShootingSolver
 
 from . import constants as const
 from .utils import plotting as plt

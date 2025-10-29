@@ -1,11 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from jax import numpy as jnp
 import oscidyn
 
 Q, omega_0, gamma = 5.0, 1.0, 0.4
-MODEL = oscidyn.BaseDuffingOscillator(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
-SOLVER = oscidyn.FixedTimeSolver(n_time_steps=1000, max_steps=4096*5, rtol=1e-4, atol=1e-7, verbose=True)
+MODEL = oscidyn.BaseDuffingOscillator(Q=np.array([Q]), gamma=np.array([gamma]), omega_0=np.array([omega_0]))
+SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=1000, max_steps=4096*5, rtol=1e-4, atol=1e-7, verbose=True)
 DRIVING_FREQUENCY = 1.1
 DRIVING_AMPLITUDE = 1.0*omega_0**2/Q
 INITIAL_DISPLACEMENT = np.array([1.0])
