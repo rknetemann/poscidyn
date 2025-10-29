@@ -274,17 +274,14 @@ def _fine_sweep(
     vel  = ys[..., n_modes:]
 
     _ss_time, ss_disp, ss_vel = _get_steady_state_part(freq_flat, ts, disp, vel)
+    
+    max_disp_total = jnp.max(jnp.abs(jnp.sum(ss_disp, axis=1)), axis=1)  # (n_freq*n_amp,)
+    max_vel_total  = jnp.max(jnp.abs(jnp.sum(ss_vel,  axis=1)), axis=1)  # (n_freq*n_amp,)
 
-    max_disp = jnp.max(jnp.abs(ss_disp), axis=1)   # (n_freq*n_amp, n_modes)
-    max_vel  = jnp.max(jnp.abs(ss_vel),  axis=1)   # (n_freq*n_amp, n_modes)
-
-
-    # elapsed = time.time() - start_time
-    # sims_per_sec = n_simulations / elapsed
-    # sims_per_sec_formatted = f"{sims_per_sec:,.0f}".replace(",", ".")
-    # print(f"-> completed in {elapsed:.3f} seconds ", f"({sims_per_sec_formatted} simulations/sec)")
-
-    return max_disp, max_vel
+    max_disp_modes = jnp.max(jnp.abs(ss_disp), axis=1)   # (n_freq*n_amp, n_modes)
+    max_vel_modes  = jnp.max(jnp.abs(ss_vel),  axis=1)   # (n_freq*n_amp, n_modes)
+    
+    return max_disp_total, max_vel_total, max_disp_modes, max_vel_modes
 
 def frequency_sweep(
     model: AbstractModel,
@@ -342,8 +339,8 @@ def frequency_sweep(
     ss_disp_amp = jnp.abs(y_max_disp_sel[..., :model.n_modes])   # (n_coarse_freq, n_coarse_amp, n_modes)
 
     #plt.plot_branch_selection(driving_frequencies, driving_amplitudes, ss_disp_amp)
-    
-    ss_disp_amp, ss_vel_amp = _fine_sweep(
+
+    max_disp_total, max_vel_total, max_disp_modes, max_vel_modes = _fine_sweep(
         model=model,
         t_max_disp=t_max_disp_sel,
         y_max_disp=y_max_disp_sel,
@@ -352,15 +349,11 @@ def frequency_sweep(
         solver=solver,
     )
 
-    # ASSUMPTION: Mode superposition validity for nonlinear systems
-    tot_ss_disp_amp = jnp.sum(ss_disp_amp, axis=1)
-    tot_ss_vel_amp = jnp.sum(ss_vel_amp, axis=1)
-
     result = {
-        'ss_disp_amp': ss_disp_amp, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
-        'ss_vel_amp': ss_vel_amp, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
-        'tot_ss_disp_amp': tot_ss_disp_amp, # (n_driving_frequencies * n_driving_amplitudes,)
-        'tot_ss_vel_amp': tot_ss_vel_amp, # (n_driving_frequencies * n_driving_amplitudes,)
+        'ss_disp_amp': max_disp_modes, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        'ss_vel_amp': max_vel_modes, # (n_driving_frequencies * n_driving_amplitudes, n_modes)
+        'tot_ss_disp_amp': max_disp_total, # (n_driving_frequencies * n_driving_amplitudes,)
+        'tot_ss_vel_amp': max_vel_total, # (n_driving_frequencies * n_driving_amplitudes,)
         'model': model,
     }
     return result
