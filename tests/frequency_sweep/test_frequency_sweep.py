@@ -13,17 +13,18 @@ gamma = 3e22
 f_hat = f / (omega_ref**2 * x_ref)
 gamma_hat = gamma * (x_ref**2 / omega_ref**2)
 
-Q, omega_0, gamma = 70000.0, 1.0, gamma_hat
+Q, omega_0, gamma, beta = 70000.0, 1.0, gamma_hat, 3
 full_width_half_max = omega_0 / Q
 
 
-MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]), omega_0=jnp.array([omega_0]))
+MODEL = oscidyn.BaseDuffingOscillator.from_physical_params(Q=jnp.array([Q]), gamma=jnp.array([gamma]),  omega_0=jnp.array([omega_0]))
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = jnp.linspace(0.997,1.004, 101) 
 DRIVING_AMPLITUDE = jnp.linspace(0.1*f_hat, 1*f_hat, 4)
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(21, 1), linear_response_factor=1.5)
 SOLVER = oscidyn.MultipleShootingSolver(max_steps=1000, m_segments=10, max_shooting_iterations=500, rtol=1e-6, atol=1e-7, multistart=MULTISTART, verbose=True)
 PRECISION = oscidyn.Precision.SINGLE
+
 
 print("Frequency sweeping: ", MODEL)
 
