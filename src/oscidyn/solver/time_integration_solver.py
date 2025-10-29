@@ -107,8 +107,8 @@ class TimeIntegrationSolver(AbstractSolver):
 
         f_omega_flat = f_omega_mesh.ravel()
         f_amp_flat = f_amp_mesh.ravel()
-        x0_flat = x0_mesh.ravel()
-        v0_flat = v0_mesh.ravel()
+        x0_flat = x0_mesh.reshape(-1, self.model.n_modes)  # Flatten while keeping n_modes
+        v0_flat = v0_mesh.reshape(-1, self.model.n_modes)  # Flatten while keeping n_modes
         
         ys = jax.vmap(solve_one_case)(f_omega_flat, f_amp_flat, x0_flat, v0_flat).reshape(f_omega_mesh.shape + (self.n_time_steps, self.model.n_states))
         

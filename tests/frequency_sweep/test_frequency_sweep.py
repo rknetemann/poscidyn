@@ -1,7 +1,11 @@
 import numpy as np
 import oscidyn
 
-Q, omega_0, gamma = np.array([20.0]), np.array([1.0]), np.array([1.0])
+# 1 mode: 
+#Q, omega_0, gamma = np.array([20.0]), np.array([1.0]), np.array([1.0])
+# 2 modes:
+Q, omega_0, gamma = np.array([20.0, 10.0]), np.array([1.0, 1.5]), np.array([1.0, 0.0])
+
 full_width_half_max = omega_0 / Q
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)

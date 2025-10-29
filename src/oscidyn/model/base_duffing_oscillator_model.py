@@ -39,7 +39,8 @@ class BaseDuffingOscillator(AbstractModel):
         damping_term = (self.omega_0/self.omega_ref) * 1/self.Q * dq_dtau
         linear_stiffness_term = (1/self.omega_ref**2) * self.omega_0**2 * q
         cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * self.gamma * q**3
-        forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
+        #forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
+        forcing_term = jnp.ones((self.n_modes,)) * (f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
 
         d2q_dtau2 = (
             - damping_term
