@@ -44,8 +44,8 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
             self.n_time_steps = n_time_steps
 
-        T = jnp.max(2.0 * jnp.pi / f_omega)
-        t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol))
+        T = jnp.max(2.0 * jnp.pi / f_omega) * 5
+        t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * 3
         t0 = 0.0
         t1 = t_ss + T
 
@@ -81,8 +81,8 @@ class TimeIntegrationSolver(AbstractSolver):
             v0 = jnp.full((self.model.n_modes,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
-            T = jnp.max(2.0 * jnp.pi / f_omega)
-            t_ss = self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol) 
+            T = jnp.max(2.0 * jnp.pi / f_omega) * 5
+            t_ss = self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)  * 3
             
             t0 = 0.0
             t1 = t_ss + T

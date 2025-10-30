@@ -12,6 +12,7 @@ class BaseDuffingOscillator(AbstractModel):
     # Physical parameters
     Q: jax.Array
     omega_0: jax.Array
+    alpha: jax.Array
     gamma: jax.Array
 
     # Reference parameters for non-dimensionalization
@@ -28,6 +29,7 @@ class BaseDuffingOscillator(AbstractModel):
 
         jnp.asarray(self.Q)
         jnp.asarray(self.omega_0)
+        jnp.asarray(self.alpha)
         jnp.asarray(self.gamma)
         jnp.asarray(self.omega_ref)
         jnp.asarray(self.x_ref)
@@ -38,6 +40,7 @@ class BaseDuffingOscillator(AbstractModel):
 
         damping_term = (self.omega_0/self.omega_ref) * 1/self.Q * dq_dtau
         linear_stiffness_term = (1/self.omega_ref**2) * self.omega_0**2 * q
+        quadratic_stiffness_term = (self.x_ref / self.omega_ref**2) * jnp.einsum("ijk,j,k->i", self.alpha, q, q)
         #cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * self.gamma * q**3
         cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
         #forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
@@ -46,6 +49,7 @@ class BaseDuffingOscillator(AbstractModel):
         d2q_dtau2 = (
             - damping_term
             - linear_stiffness_term
+            - quadratic_stiffness_term
             - cubic_stiffness_term
             + forcing_term
         ) 
@@ -87,9 +91,10 @@ class BaseDuffingOscillator(AbstractModel):
         return BaseDuffingOscillator(
             Q=self.Q.astype(dtype),
             omega_0=self.omega_0.astype(dtype),
+            alpha=self.alpha.astype(dtype),
             gamma=self.gamma.astype(dtype)
         )
     
     def __repr__(self):
         return (f"BaseDuffingOscillator(n_modes={self.n_modes}, "
-                f"Q={self.Q}, omega_0={self.omega_0}, gamma={self.gamma})")
+                f"Q={self.Q}, omega_0={self.omega_0}, alpha={self.alpha}, gamma={self.gamma})")
