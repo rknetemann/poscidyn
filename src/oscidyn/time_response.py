@@ -16,6 +16,7 @@ def time_response(
     initial_velocity: jax.Array, # Shape: (n_modes,)
     solver: AbstractSolver,
     precision: const.Precision = const.Precision.DOUBLE,
+    **kwargs
 ) -> tuple:
     
     if precision == const.Precision.DOUBLE:
@@ -38,27 +39,12 @@ def time_response(
     if model.n_modes != initial_velocity.size:
         raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
     
-    if solver.n_time_steps is None:
-        '''
-        ASSUMPTION: Minimum required sampling frequency for the steady state solver based on gpt prompt, should investigate
-        '''
-        rtol = 0.001
-        max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * driving_frequency
-        
-        one_period = 2.0 * jnp.pi / max_frequency_component
-        sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component * 1.05 # ASSUMPTION: 1.05 is a safety factor to ensure the sampling frequency is above the Nyquist rate
-        
-        n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
-        solver.n_time_steps = n_time_steps
-
-        print("\nAutomatically determined number of time steps for steady state solver:", n_time_steps)
-
     model = model.to_dtype(dtype)
     solver.model = model
 
     print("Time response: ", model)
     start_time = time.time()
-    ts, ys = solver.time_response(driving_frequency, driving_amplitude, initial_displacement, initial_velocity)
+    ts, ys = solver.time_response(driving_frequency, driving_amplitude, initial_displacement, initial_velocity, **kwargs)
     print("Time response completed in {:.2f} seconds".format(time.time() - start_time))
 
 

@@ -28,17 +28,32 @@ class TimeIntegrationSolver(AbstractSolver):
                  f_omega: jax.Array,  
                  f_amp: jax.Array, 
                  x0: jax.Array,  
-                 v0: jax.Array
+                 v0: jax.Array,
+                 **kwargs
                 ):
-        
+
         y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
-        
+
+        if self.n_time_steps is None:
+            rtol = 0.01
+            max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * f_omega.item()
+            
+            one_period = 2.0 * jnp.pi / max_frequency_component
+            sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
+            
+            n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+            self.n_time_steps = n_time_steps
+
         T = jnp.max(2.0 * jnp.pi / f_omega)
         t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol))
-
         t0 = 0.0
         t1 = t_ss + T
-        ts = jnp.linspace(t_ss, t1, self.n_time_steps)
+
+        if kwargs.get("only_save_steady_state"):
+            ts = jnp.linspace(t_ss, t1, self.n_time_steps)
+        else:
+            n_periods = (t1 - t0) / T
+            ts = jnp.linspace(t0, t1, self.n_time_steps * int(jnp.ceil(n_periods)))
 
         sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),

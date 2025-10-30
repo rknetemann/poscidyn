@@ -2,16 +2,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 import oscidyn
 
-Q, omega_0, gamma = 5.0, 1.0, 0.4
-MODEL = oscidyn.BaseDuffingOscillator(Q=np.array([Q]), gamma=np.array([gamma]), omega_0=np.array([omega_0]))
-SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=1000, max_steps=4096*5, rtol=1e-4, atol=1e-7, verbose=True)
-DRIVING_FREQUENCY = 1.1
-DRIVING_AMPLITUDE = 1.0*omega_0**2/Q
-INITIAL_DISPLACEMENT = np.array([1.0])
-INITIAL_VELOCITY = np.array([0])
-PRECISION = oscidyn.Precision.DOUBLE
+# 1 mode: 
+Q, omega_0, gamma = np.array([20.0]), np.array([1.0]), np.zeros((1,1,1,1))
+gamma[0,0,0,0] = 1.0
+# 2 modes:
+Q, omega_0, gamma = np.array([20.0, 17.0]), np.array([1.0, 2.0]), np.zeros((2,2,2,2))
+gamma[0,0,0,0] = 0.1
+gamma[1,1,1,1] = -1.0
+gamma[0,0,1,1] = 0.02
 
-time_response_steady_state = oscidyn.time_response(
+MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, rtol=1e-4, atol=1e-7, verbose=True)
+DRIVING_FREQUENCY = 1.1
+DRIVING_AMPLITUDE = 1.0*omega_0[0]**2/Q[0]
+INITIAL_DISPLACEMENT = np.array([1.0, 0.0])
+INITIAL_VELOCITY = np.array([0.0, 0.0])
+PRECISION = oscidyn.Precision.SINGLE
+
+time_response = oscidyn.time_response(
     model = MODEL,
     driving_frequency = DRIVING_FREQUENCY,
     driving_amplitude = DRIVING_AMPLITUDE,
@@ -19,31 +27,38 @@ time_response_steady_state = oscidyn.time_response(
     initial_velocity = INITIAL_VELOCITY,
     solver = SOLVER,
     precision = PRECISION,
+    only_save_steady_state = False
 )
 
+ts, xs, vs = time_response
+num_modes = xs.shape[-1]
 
+# Plot total response
+total_xs = xs.sum(axis=1)
+total_vs = vs.sum(axis=1)
 
+plt.figure(figsize=(10, 6))
 
+# Plot individual modes first
+for mode in range(num_modes):
+    plt.subplot(num_modes + 1, 1, mode + 1)
+    plt.plot(ts, xs[:, mode], label=f'Displacement')
+    plt.plot(ts, vs[:, mode], label=f'Velocity')
+    plt.xlabel('Time')
+    plt.ylabel('Response')
+    plt.title(f"Time Response (Mode {mode + 1})")
+    plt.legend()
+    plt.grid()
 
-
-
-
-
-
-
-
-time_steady_state,displacements_steady_state, velocities_steady_state = time_response_steady_state
-total_displacement_steady_state = displacements_steady_state.sum(axis=1)
-total_velocity_steady_state = velocities_steady_state.sum(axis=1)
-
-plt.figure()
-plt.plot(time_steady_state, total_displacement_steady_state, label='Total Displacement')
-plt.plot(time_steady_state, total_velocity_steady_state, label='Total Velocity')
+# Plot total response at the end
+plt.subplot(num_modes + 1, 1, num_modes + 1)
+plt.plot(ts, total_xs, label='Displacement')
+plt.plot(ts, total_vs, label='Velocity')
 plt.xlabel('Time')
 plt.ylabel('Response')
-plt.title(
-    "Steady-State Time Response\n"
-)
+plt.title("Time Response (Total)")
 plt.legend()
 plt.grid()
+
+plt.tight_layout()
 plt.show()
