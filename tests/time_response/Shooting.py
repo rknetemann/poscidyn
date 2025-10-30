@@ -5,10 +5,10 @@ import timeit
 
 # Parameters
 w0   = 1.0      # natural frequency
-Q    = 1000.0    # quality factor (weak damping -> large Q)
-gamma= -1.5      # cubic stiffness
-F    = 0.2     # forcing amplitude
-w    = 1.0     # forcing frequency
+Q    = 200.0    # quality factor (weak damping -> large Q)
+gamma= 1.0      # cubic stiffness
+F    = 0.12     # forcing amplitude
+w    = 0.1     # forcing frequency
 T    = 2*np.pi/w
 
 def f(t, y):
@@ -73,27 +73,29 @@ def harmonic_balance_guess():
 def newton_shooting(x0=None, maxit=15, tol=1e-10):
     if x0 is None:
         x0 = harmonic_balance_guess()
+        print("Harmonic balance guess: ", x0)
 
     for k in range(maxit):
         yT, XT = flow_and_stm(x0)
-        S = yT - x0
-        if norm(S, ord=np.inf) < tol:
+        F = yT - x0
+        
+        if norm(F, ord=np.inf) < tol:
             # Floquet multipliers from XT
             multipliers = eigvals(XT)
             return x0, yT, XT, multipliers, k
         
         Jsh = XT - np.eye(2)
 
-        # Solve (XT - I) dx = -S with a tiny Tikhonov if near-singular
+        # Solve (XT - I) dx = -F with a tiny Tikhonov if near-singular
         try:
-            dx = solve(Jsh, -S)
+            dx = solve(Jsh, -F)
         except np.linalg.LinAlgError:
             lam = 1e-8
-            dx = solve(Jsh.T@Jsh + lam*np.eye(2), -Jsh.T@S)
+            dx = solve(Jsh.T@Jsh + lam*np.eye(2), -Jsh.T@F)
 
         # Simple backtracking to ensure residual decrease
         lam = 1.0
-        r0 = norm(S)
+        r0 = norm(F)
         for _ in range(8):
             x_try = x0 + lam*dx
             r_try = norm(shooting_residual(x_try))
@@ -106,14 +108,8 @@ def newton_shooting(x0=None, maxit=15, tol=1e-10):
 
     raise RuntimeError("Newton did not converge; try a different seed/params.")
 
-# --- run it with timing ---
-
-def run_shooting():
-    # perform one shooting solve
-    return newton_shooting()
-
-# do a single run to get and display results
-x0, yT, XT, mu, iters = run_shooting()
+# --- run it ---
+x0, yT, XT, mu, iters = newton_shooting(np.array([1.0, 0.0]))
 print("Converged in", iters, "Newton steps.")
 print("Periodic initial state x0* =", x0)
 print("Residual ||Phi_T(x0*)-x0*|| =", norm(yT - x0))

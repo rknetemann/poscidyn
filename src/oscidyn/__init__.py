@@ -1,12 +1,19 @@
-from .simulation.constants import *
-from .simulation.solver import *
+from .constants import *
+from .solver.abstract_solver import *
+from .solver.shooting_solver import *
+from .solver.collocation_solver import *
+from .solver.time_integration_solver import *
+from .solver.multistart.linear_response_multistart import *
 
-from .simulation.models import *
+from .model.abstract_model import *
+from .model.base_duffing_oscillator_model import *
 
-from .simulation.simulations.frequency_sweep import frequency_sweep
-from .simulation.simulations.time_response import time_response
+from .frequency_sweep import frequency_sweep
+from .time_response import time_response
 
-from .simulation.utils.plotting import *
+from .utils.plotting import *
+
+from .solver.utils.coarse_grid import gen_coarse_grid_1, gen_grid_2
 
 """
 A Python toolkit for simulating and visualizing nonlinear oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.
