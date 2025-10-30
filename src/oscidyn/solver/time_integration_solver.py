@@ -61,7 +61,9 @@ class TimeIntegrationSolver(AbstractSolver):
             ):
         
         @filter_jit
-        def solve_one_case(f_omega, f_amp, x0, v0):           
+        def solve_one_case(f_omega, f_amp, x0, v0):  
+            x0 = jnp.full((self.model.n_modes,), x0)         
+            v0 = jnp.full((self.model.n_modes,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
             T = jnp.max(2.0 * jnp.pi / f_omega)
@@ -107,8 +109,8 @@ class TimeIntegrationSolver(AbstractSolver):
 
         f_omega_flat = f_omega_mesh.ravel()
         f_amp_flat = f_amp_mesh.ravel()
-        x0_flat = x0_mesh.reshape(-1, self.model.n_modes)  # Flatten while keeping n_modes
-        v0_flat = v0_mesh.reshape(-1, self.model.n_modes)  # Flatten while keeping n_modes
+        x0_flat = x0_mesh.ravel()
+        v0_flat = v0_mesh.ravel()
         
         ys = jax.vmap(solve_one_case)(f_omega_flat, f_amp_flat, x0_flat, v0_flat).reshape(f_omega_mesh.shape + (self.n_time_steps, self.model.n_states))
         
