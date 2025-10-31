@@ -81,8 +81,8 @@ class TimeIntegrationSolver(AbstractSolver):
             v0 = jnp.full((self.model.n_modes,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
-            T = jnp.max(2.0 * jnp.pi / f_omega) * 5
-            t_ss = self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)  * 3
+            T = jnp.max(2.0 * jnp.pi / f_omega) * const.N_PERIODS_TO_RETAIN
+            t_ss = self.model.t_steady_state(f_omega, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE
             
             t0 = 0.0
             t1 = t_ss + T

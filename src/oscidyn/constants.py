@@ -22,9 +22,7 @@ DT_MAX_FACTOR = 200
 
 MAX_SHOOTING_ITERATIONS = 20
 
-N_PERIODS_TO_RETAIN = 5
-MIN_WINDOWS = 3  # Minimum number of windows to consider for convergence
-
 PLOT_GRID = True
 
+N_PERIODS_TO_RETAIN = 5
 SAFETY_FACTOR_T_STEADY_STATE = 1.0
