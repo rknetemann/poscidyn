@@ -108,8 +108,8 @@ class TimeIntegrationSolver(AbstractSolver):
             
             one_period = 2.0 * jnp.pi / max_frequency_component
             sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
-            
-            n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+
+            n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int)
             self.n_time_steps = n_time_steps
         
         # TO DO: Determine the max amplitude based on the model or a fixed value
