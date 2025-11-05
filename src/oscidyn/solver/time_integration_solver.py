@@ -99,7 +99,9 @@ class TimeIntegrationSolver(AbstractSolver):
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
                 args=(f_amp, f_omega),
             )
-            return sol.ys
+            
+            succesful = sol.result == diffrax.RESULTS.successful
+            return sol.ys, succesful
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
@@ -112,22 +114,16 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int)
             self.n_time_steps = n_time_steps
         
-        # TO DO: Determine the max amplitude based on the model or a fixed value
-        max_abs_x0 = 1.0 * self.multistart.linear_response_factor
-        x0 = jnp.linspace(-max_abs_x0, max_abs_x0, self.multistart.init_cond_shape[0])
-
-        # TO DO: Determine the max velocity based on the model or a fixed value
-        max_abs_v0 = 1.0 * self.multistart.linear_response_factor
-        v0 = jnp.linspace(-max_abs_v0, max_abs_v0, self.multistart.init_cond_shape[1])
-
-        f_omega_mesh, f_amp_mesh, x0_mesh, v0_mesh = jnp.meshgrid(f_omegas, f_amps, x0, v0, indexing="ij")
+        f_omega_mesh, f_amp_mesh, x0_mesh, v0_mesh = self.multistart.generate_simulation_grid(self.model, f_omegas, f_amps)
 
         f_omega_flat = f_omega_mesh.ravel()
         f_amp_flat = f_amp_mesh.ravel()
         x0_flat = x0_mesh.ravel()
         v0_flat = v0_mesh.ravel()
         
-        ys = jax.vmap(solve_one_case)(f_omega_flat, f_amp_flat, x0_flat, v0_flat).reshape(f_omega_mesh.shape + (self.n_time_steps, self.model.n_states))
+        ys, successful = jax.vmap(solve_one_case)(f_omega_flat, f_amp_flat, x0_flat, v0_flat)
+        ys = ys.reshape(f_omega_mesh.shape + (self.n_time_steps, self.model.n_states))
+        successful = successful.reshape(f_omega_mesh.shape)
         
         xs = ys[..., :self.model.n_modes]
         vs = ys[..., self.model.n_modes:]
@@ -138,7 +134,17 @@ class TimeIntegrationSolver(AbstractSolver):
         max_x_modes = jnp.max(jnp.abs(xs), axis=4)
         max_v_modes  = jnp.max(jnp.abs(vs),  axis=4) 
         
-        return max_x_total
+        return dict(
+            max_x_total=max_x_total, 
+            max_v_total=max_v_total, 
+            max_x_modes=max_x_modes, 
+            max_v_modes=max_v_modes, 
+            x0_mesh=x0_mesh, 
+            v0_mesh=v0_mesh, 
+            f_omega_mesh=f_omega_mesh, 
+            f_amp_mesh=f_amp_mesh,
+            successful=successful
+        )
 
     @filter_jit
     def _rhs(self, t, y, args):

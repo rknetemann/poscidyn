@@ -5,7 +5,6 @@ Q = np.array([4.28e5, 2.76e5, 1.75e5, 1.16e5, 8.22e4])
 alpha = np.zeros((5,5,5))
 gamma = np.zeros((5,5,5,5))
 
-# Fill gamma from the paper's k^i_{jkl} values (mode i = 1..5)
 rows = {
     (1,1,1): [3.56e22, 2.08e18, -1.66e21, 4.85e18, -3.35e21],
     (1,1,2): [6.64e18, 1.49e23, 1.19e19, -1.88e21, 1.78e19],
