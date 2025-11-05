@@ -39,4 +39,6 @@ class LinearResponseMultistart(AbstractMultistart):
         x0_mesh = x0_grid[f_amp_idx_mesh, x0_idx_mesh]
         v0_mesh = v0_grid[f_amp_idx_mesh, v0_idx_mesh]
 
-        return (f_omega_mesh, f_amp_mesh, x0_mesh, v0_mesh)
+        shape = f_omega_mesh.shape
+
+        return (f_omega_mesh.ravel(), f_amp_mesh.ravel(), x0_mesh.ravel(), v0_mesh.ravel(), shape)

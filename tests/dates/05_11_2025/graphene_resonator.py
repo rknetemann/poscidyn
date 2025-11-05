@@ -8,10 +8,10 @@ gamma[0,0,0,0] = 0.0638
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(0.8, 1.2, 101)
+DRIVING_FREQUENCY = np.linspace(0.8, 1.2, 51)
 DRIVING_AMPLITUDE = np.linspace(0.00005, 0.005, 10)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(11, 11), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*20, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(23, 23), linear_response_factor=1.2)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 frequency_sweep = oscidyn.frequency_sweep(
@@ -21,7 +21,8 @@ frequency_sweep = oscidyn.frequency_sweep(
     driving_amplitudes = DRIVING_AMPLITUDE,
     solver = SOLVER,
     precision = PRECISION,
-) #n_freq, n_amp, n_init_disp, n_init_vel
+) 
+
 
 import matplotlib.pyplot as plt
 n_freq, n_amp, n_init_disp, n_init_vel = frequency_sweep['max_x_total'].shape

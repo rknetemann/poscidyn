@@ -97,5 +97,15 @@ class BaseDuffingOscillator(AbstractModel):
         )
     
     def __repr__(self):
+        Q_terms = ", ".join([f"Q[{i+1}]={v}" for i, v in enumerate(self.Q)])
+        omega_0_terms = ", ".join([f"omega_0[{i+1}]={v}" for i, v in enumerate(self.omega_0)])
+
+        alpha_indices, alpha_value = jnp.where(self.alpha != 0.0), self.alpha[jnp.where(self.alpha != 0.0)]
+        alpha_terms = ", ".join([f"alpha[{i[0]+1},{i[1]+1},{i[2]+1}]={v}" for i, v in zip(alpha_indices, alpha_value)])
+
+        gamma_indices, gamma_value = jnp.where(self.gamma != 0.0), self.gamma[jnp.where(self.gamma != 0.0)]
+        gamma_terms = ", ".join([f"gamma[{i[0]+1},{i[1]+1},{i[2]+1},{i[3]+1}]={v}" for i, v in zip(gamma_indices, gamma_value)])
+
         return (f"BaseDuffingOscillator(n_modes={self.n_modes}, "
-                f"Q={self.Q}, omega_0={self.omega_0}, alpha={self.alpha}, gamma={self.gamma})")
+                f"{Q_terms}, {omega_0_terms}, "
+                f"{alpha_terms}, {gamma_terms})")

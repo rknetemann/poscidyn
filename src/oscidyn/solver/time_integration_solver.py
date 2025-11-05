@@ -100,8 +100,28 @@ class TimeIntegrationSolver(AbstractSolver):
                 args=(f_amp, f_omega),
             )
             
-            succesful = sol.result == diffrax.RESULTS.successful
-            return sol.ys, succesful
+            successful = sol.result == diffrax.RESULTS.successful
+
+            xs = sol.ys[:, :self.model.n_modes]
+            vs = sol.ys[:, self.model.n_modes:]
+
+            max_x_total = jnp.max(jnp.abs(jnp.sum(xs, axis=-1)))
+            max_v_total = jnp.max(jnp.abs(jnp.sum(vs, axis=-1)))
+
+            max_x_modes = jnp.max(jnp.abs(xs), axis=0)
+            max_v_modes = jnp.max(jnp.abs(vs), axis=0)
+
+            return dict(
+                f_omega=f_omega, 
+                f_amp=f_amp,
+                x0=x0, 
+                v0=v0, 
+                max_x_total=max_x_total, 
+                max_v_total=max_v_total, 
+                max_x_modes=max_x_modes, 
+                max_v_modes=max_v_modes, 
+                successful=successful
+            )
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
@@ -114,37 +134,15 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int)
             self.n_time_steps = n_time_steps
         
-        f_omega_mesh, f_amp_mesh, x0_mesh, v0_mesh = self.multistart.generate_simulation_grid(self.model, f_omegas, f_amps)
+        f_omegas, f_amps, x0s, v0s, shape = self.multistart.generate_simulation_grid(self.model, f_omegas, f_amps)
 
-        f_omega_flat = f_omega_mesh.ravel()
-        f_amp_flat = f_amp_mesh.ravel()
-        x0_flat = x0_mesh.ravel()
-        v0_flat = v0_mesh.ravel()
-        
-        ys, successful = jax.vmap(solve_one_case)(f_omega_flat, f_amp_flat, x0_flat, v0_flat)
-        ys = ys.reshape(f_omega_mesh.shape + (self.n_time_steps, self.model.n_states))
-        successful = successful.reshape(f_omega_mesh.shape)
-        
-        xs = ys[..., :self.model.n_modes]
-        vs = ys[..., self.model.n_modes:]
-
-        max_x_total = jnp.max(jnp.abs(jnp.sum(xs, axis=-1)), axis=-1)
-        max_v_total  = jnp.max(jnp.abs(jnp.sum(vs,  axis=-1)), axis=-1) 
-
-        max_x_modes = jnp.max(jnp.abs(xs), axis=4)
-        max_v_modes  = jnp.max(jnp.abs(vs),  axis=4) 
-        
-        return dict(
-            max_x_total=max_x_total, 
-            max_v_total=max_v_total, 
-            max_x_modes=max_x_modes, 
-            max_v_modes=max_v_modes, 
-            x0_mesh=x0_mesh, 
-            v0_mesh=v0_mesh, 
-            f_omega_mesh=f_omega_mesh, 
-            f_amp_mesh=f_amp_mesh,
-            successful=successful
+        flat_solutions = jax.vmap(solve_one_case)(f_omegas, f_amps, x0s, v0s)
+        solutions = jax.tree_util.tree_map(
+            lambda leaf: leaf.reshape(shape + leaf.shape[1:]),
+            flat_solutions
         )
+        
+        return solutions
 
     @filter_jit
     def _rhs(self, t, y, args):
