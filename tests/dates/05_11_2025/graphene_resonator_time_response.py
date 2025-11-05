@@ -9,8 +9,8 @@ gamma[0,0,0,0] = 0.0638
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*20, rtol=1e-5, atol=1e-7, verbose=True)
-DRIVING_FREQUENCY = 0.99
-DRIVING_AMPLITUDE = 0.0015
+DRIVING_FREQUENCY = 0.875
+DRIVING_AMPLITUDE = 0.005
 INITIAL_DISPLACEMENT = np.array([0.0, 0.0])
 INITIAL_VELOCITY = np.array([0.0, 0.0])
 PRECISION = oscidyn.Precision.SINGLE
