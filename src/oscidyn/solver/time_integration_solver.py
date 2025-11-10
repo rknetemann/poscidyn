@@ -137,9 +137,10 @@ class TimeIntegrationSolver(AbstractSolver):
         
         f_omegas, f_amps, x0s, v0s, shape = self.multistart.generate_simulation_grid(self.model, f_omegas, f_amps)
 
-        flat_solutions = jax.vmap(solve_one_case)(f_omegas, f_amps, x0s, v0s)
+        # If we make sure every leading axis is the amount of simulations, and the second dimension is for each mode, we can vmap over the first axis
+        flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
         solutions = jax.tree_util.tree_map(
-            lambda leaf: leaf.reshape(shape + leaf.shape[1:]),
+            lambda leaf: leaf.reshape(shape[:-1] + leaf.shape[1:]),  # Adjust reshape to exclude the last dimension of shape
             flat_solutions
         )
         
@@ -147,8 +148,9 @@ class TimeIntegrationSolver(AbstractSolver):
 
     @filter_jit
     def _rhs(self, t, y, args):
-        f_amp, f_omega  = args
+        f_amp, f_omega = args
 
-        dy_dt = self.model.f(t, y, args) 
+        # Ensure f_amp and f_omega are passed correctly
+        dy_dt = self.model.f(t, y, (f_amp, f_omega))
 
         return dy_dt

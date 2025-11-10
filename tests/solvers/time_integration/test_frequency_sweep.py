@@ -2,19 +2,19 @@ import numpy as np
 import oscidyn
 
 # 1 mode: 
-# Q, omega_0, alpha, gamma = np.array([80.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-# gamma[0,0,0,0] = 0.0123
+Q, omega_0, alpha, gamma = np.array([80.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+gamma[0,0,0,0] = 0.0123
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([1.0, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-alpha[0,0,1] = 2 * 4.0
-alpha[1,0,0] = 4.0
-gamma[0,0,0,0] = 0.0123
+# Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([1.0, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+# alpha[0,0,1] = 2 * 4.0
+# alpha[1,0,0] = 4.0
+# gamma[0,0,0,0] = 0.0123
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.01, 2.5, 251)
-DRIVING_AMPLITUDE = np.linspace(0.0001, 0.0031, 10)
+DRIVING_AMPLITUDE = np.outer(np.linspace(0.0001, 0.0031, 10), np.array([1.0]))
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.2)
 SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE

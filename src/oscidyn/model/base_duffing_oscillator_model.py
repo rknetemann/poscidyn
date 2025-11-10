@@ -36,16 +36,13 @@ class BaseDuffingOscillator(AbstractModel):
 
     def f(self, tau, state, args):
         q, dq_dtau   = jnp.split(state, 2)
-        f, omega = [jnp.asarray(v).reshape(()) for v in args]
+        f_amp, f_omega = [jnp.asarray(v).squeeze(()) for v in args]
 
         damping_term = (self.omega_0/self.omega_ref) * 1/self.Q * dq_dtau
         linear_stiffness_term = (1/self.omega_ref**2) * self.omega_0**2 * q
         quadratic_stiffness_term = (self.x_ref / self.omega_ref**2) * jnp.einsum("ijk,j,k->i", self.alpha, q, q)
-        #cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * self.gamma * q**3
         cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
-        #forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
-        forcing_term = jnp.ones((self.n_modes,)) * (f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
-        forcing_term = forcing_term.at[1:].set(1.0*forcing_term[1:])  # Reduce forcing on higher modes
+        forcing_term = f_amp / (self.omega_ref**2 * self.x_ref) * jnp.cos(f_omega/self.omega_ref * tau)
 
         d2q_dtau2 = (
             - damping_term
@@ -76,16 +73,13 @@ class BaseDuffingOscillator(AbstractModel):
     def n_states(self) -> int:
         return self.n_modes * 2
 
-    def t_steady_state(self, driving_frequency: float, ss_tol: float) -> float:
+    def t_steady_state(self, driving_frequency: jax.Array, ss_tol: float) -> float:
         '''driving_frequency
         Calculates the settling time for a given Q-factor and driving frequency.
         Equation from Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
         '''
-        driving_frequency = jnp.asarray(driving_frequency).reshape(())
-        tau_d = -2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / jnp.max(driving_frequency))
+        t_steady_state = jnp.max(-2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / (driving_frequency))).reshape(())
 
-        t_steady_state = tau_d * const.SAFETY_FACTOR_T_STEADY_STATE
-        
         return t_steady_state
     
     def to_dtype(self, dtype: jnp.dtype) -> BaseDuffingOscillator:

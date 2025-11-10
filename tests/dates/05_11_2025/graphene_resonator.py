@@ -8,9 +8,9 @@ gamma[0,0,0,0] = 0.0638
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(0.8, 1.2, 101)
-DRIVING_AMPLITUDE = np.linspace(0.00005, 0.005, 10)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(9, 9), linear_response_factor=1.2)
+DRIVING_FREQUENCY = np.linspace(0.8, 1.2, 151)
+DRIVING_AMPLITUDE = np.outer(np.linspace(0.00005, 0.005, 10), np.array([1.0, 0.0]))
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=0.7)
 SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
@@ -38,7 +38,7 @@ for i_disp in range(n_init_disp):
         for i_amp in range(n_amp):
             frequencies.extend(DRIVING_FREQUENCY)
             responses.extend(frequency_sweep['max_x_total'][:, i_amp, i_disp, i_vel])
-            colors.extend([DRIVING_AMPLITUDE[i_amp]] * len(DRIVING_FREQUENCY))
+            colors.extend([DRIVING_AMPLITUDE[i_amp, 0]] * len(DRIVING_FREQUENCY))
 
 plt.figure(figsize=(12, 8))
 
