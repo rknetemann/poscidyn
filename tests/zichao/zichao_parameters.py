@@ -1,7 +1,7 @@
 import numpy as np
 
 omega_0 = np.array([2.11e5, 4.24e5, 6.39e5, 8.58e5, 1.08e6]) * 2 * np.pi
-Q = np.array([4.28e5, 2.76e5, 1.75e5, 1.16e5, 8.22e4])
+Q = np.array([50, 50, 50, 50, 50])
 alpha = np.zeros((5,5,5))
 gamma = np.zeros((5,5,5,5))
 
@@ -47,3 +47,10 @@ for (j, k, l), vals in rows.items():
     for i, val in enumerate(vals, start=1):  # mode number i = 1..5
         gamma[i-1, j-1, k-1, l-1] = val
 
+
+x_ref = 4.0e-6
+omega_ref = 211.0e3 * 2 * np.pi
+
+gamma = gamma * (x_ref**2) / (omega_ref**2)
+alpha = alpha * x_ref / (omega_ref**2)
+omega_0 = omega_0 / omega_ref

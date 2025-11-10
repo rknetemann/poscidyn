@@ -36,11 +36,11 @@ def frequency_sweep(
     model = model.to_dtype(dtype)
     solver.model = model
 
-    print("Frequency sweeping: ", model)
+    print("\nFrequency sweeping: ", model)
     start_time = time.time()
 
     frequency_sweep = solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)
     
-    print("Frequency sweep completed in {:.2f} seconds".format(time.time() - start_time))
+    print("\n-> Frequency sweep completed in {:.2f} seconds".format(time.time() - start_time))
 
     return frequency_sweep

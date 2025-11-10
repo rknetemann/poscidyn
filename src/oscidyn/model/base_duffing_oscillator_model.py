@@ -45,7 +45,7 @@ class BaseDuffingOscillator(AbstractModel):
         cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
         #forcing_term = jnp.zeros((self.n_modes,)).at[:1].set(f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
         forcing_term = jnp.ones((self.n_modes,)) * (f / (self.omega_ref**2 * self.x_ref) * jnp.cos(omega/self.omega_ref * tau))
-        forcing_term = forcing_term.at[1:].set(0.0)
+        forcing_term = forcing_term.at[1:].set(1.0*forcing_term[1:])  # Reduce forcing on higher modes
 
         d2q_dtau2 = (
             - damping_term
@@ -97,15 +97,19 @@ class BaseDuffingOscillator(AbstractModel):
         )
     
     def __repr__(self):
-        Q_terms = ", ".join([f"Q[{i}]={v}" for i, v in enumerate(self.Q)])
-        omega_0_terms = ", ".join([f"omega_0[{i}]={v}" for i, v in enumerate(self.omega_0)])
+        Q_terms = ", ".join([f"Q[{i}]={float(v):.6f}" for i, v in enumerate(self.Q)])
+        omega_0_terms = ", ".join([f"omega_0[{i}]={float(v):.6f}" for i, v in enumerate(self.omega_0)])
 
         alpha_indices, alpha_value = jnp.where(self.alpha != 0.0), self.alpha[jnp.where(self.alpha != 0.0)]
-        alpha_terms = ", ".join([f"alpha[{i[0]},{i[1]},{i[2]}]={v}" for i, v in zip(alpha_indices, alpha_value)])
+        alpha_terms = [f"alpha[{i[0]},{i[1]},{i[2]}]={float(v):.6f}" for i, v in zip(zip(*alpha_indices), alpha_value)]
+        if len(alpha_terms) > 20:
+            alpha_terms = alpha_terms[:20] + ["... (truncated)"]
 
         gamma_indices, gamma_value = jnp.where(self.gamma != 0.0), self.gamma[jnp.where(self.gamma != 0.0)]
-        gamma_terms = ", ".join([f"gamma[{i[0]},{i[1]},{i[2]},{i[3]}]={v}" for i, v in zip(gamma_indices, gamma_value)])
+        gamma_terms = [f"gamma[{i[0]},{i[1]},{i[2]},{i[3]}]={float(v):.6f}" for i, v in zip(zip(*gamma_indices), gamma_value)]
+        if len(gamma_terms) > 20:
+            gamma_terms = gamma_terms[:20] + ["... (truncated)"]
 
         return (f"BaseDuffingOscillator(n_modes={self.n_modes}, "
                 f"{Q_terms}, {omega_0_terms}, "
-                f"{alpha_terms}, {gamma_terms})")
+                f"{', '.join(alpha_terms)}, {', '.join(gamma_terms)})")

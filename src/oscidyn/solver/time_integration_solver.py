@@ -69,6 +69,7 @@ class TimeIntegrationSolver(AbstractSolver):
 
         return sol.ts, sol.ys
         
+    # TO DO: Add phase difference results
     def frequency_sweep(self,
              f_omegas: jax.Array,
              f_amps: jax.Array, 
@@ -99,7 +100,7 @@ class TimeIntegrationSolver(AbstractSolver):
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
                 args=(f_amp, f_omega),
             )
-            
+
             successful = sol.result == diffrax.RESULTS.successful
 
             xs = sol.ys[:, :self.model.n_modes]

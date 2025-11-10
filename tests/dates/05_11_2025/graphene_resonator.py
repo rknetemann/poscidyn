@@ -10,8 +10,8 @@ MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=ome
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.8, 1.2, 101)
 DRIVING_AMPLITUDE = np.linspace(0.00005, 0.005, 10)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(9, 9), linear_response_factor=1.2)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 frequency_sweep = oscidyn.frequency_sweep(
@@ -23,9 +23,11 @@ frequency_sweep = oscidyn.frequency_sweep(
     precision = PRECISION,
 ) 
 
+max_x_total =  frequency_sweep['max_x_total']
+max_x_modes = frequency_sweep['max_x_modes']
 
 import matplotlib.pyplot as plt
-n_freq, n_amp, n_init_disp, n_init_vel = frequency_sweep['max_x_total'].shape
+n_freq, n_amp, n_init_disp, n_init_vel, n_modes = max_x_modes.shape
 
 frequencies = []
 responses = []
@@ -38,11 +40,32 @@ for i_disp in range(n_init_disp):
             responses.extend(frequency_sweep['max_x_total'][:, i_amp, i_disp, i_vel])
             colors.extend([DRIVING_AMPLITUDE[i_amp]] * len(DRIVING_FREQUENCY))
 
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(12, 8))
+
+# Plot total response
+plt.subplot(n_modes + 1, 1, 1)
 scatter = plt.scatter(frequencies, responses, c=colors, cmap='viridis', alpha=0.7)
 plt.colorbar(scatter, label="Driving Amplitude")
-plt.title(MODEL)
+plt.title(f"Total Response - {MODEL}")
 plt.xlabel("Driving Frequency")
 plt.ylabel("Response Amplitude")
 plt.grid(True)
+
+# Plot individual modes
+for mode in range(n_modes):
+    mode_responses = []
+    for i_disp in range(n_init_disp):
+        for i_vel in range(n_init_vel):
+            for i_amp in range(n_amp):
+                mode_responses.extend(max_x_modes[:, i_amp, i_disp, i_vel, mode])
+    
+    plt.subplot(n_modes + 1, 1, mode + 2)
+    scatter = plt.scatter(frequencies, mode_responses, c=colors, cmap='viridis', alpha=0.7)
+    plt.colorbar(scatter, label="Driving Amplitude")
+    plt.title(f"Mode {mode + 1} Response")
+    plt.xlabel("Driving Frequency")
+    plt.ylabel("Response Amplitude")
+    plt.grid(True)
+
+plt.tight_layout()
 plt.show()
