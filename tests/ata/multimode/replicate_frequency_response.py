@@ -5,10 +5,10 @@ from parameters_table_4 import Q, omega_0, alpha, gamma
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(0.1, 4.5, 401)
-DRIVING_AMPLITUDE = np.outer(np.linspace(0.5, 1.0, 10), np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])) * 0.003
+DRIVING_FREQUENCY = np.linspace(0.1, 4.5, 301)
+DRIVING_AMPLITUDE = np.outer(np.linspace(0.5, 1.0, 2), np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])) * 0.003
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*15, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 frequency_sweep = oscidyn.frequency_sweep(
@@ -35,7 +35,7 @@ for i_disp in range(n_init_disp):
         for i_amp in range(n_amp):
             frequencies.extend(DRIVING_FREQUENCY)
             responses = frequency_sweep['max_x_total'][:, i_amp, i_disp, i_vel]
-            responsivities.extend(responses / DRIVING_AMPLITUDE[i_amp])
+            responsivities.extend(responses / DRIVING_AMPLITUDE[i_amp, 0])
             colors.extend([DRIVING_AMPLITUDE[i_amp, 0]] * len(DRIVING_FREQUENCY))
 
 plt.figure(figsize=(12, 12))
@@ -49,22 +49,4 @@ plt.xlabel("Driving Frequency")
 plt.ylabel("Responsivity")
 plt.yscale('log')
 plt.grid(True)
-
-# Plot highest force individual modes as responsivity
-plt.subplot(2, 1, 2)
-for mode in range(n_modes):
-    mode_responsivities = []
-    for i_amp in range(n_amp):
-        mode_responses = max_x_modes[:, i_amp, :, :, mode].max(axis=(1, 2))
-        mode_responsivities.append(mode_responses / DRIVING_AMPLITUDE[i_amp])
-    mode_responsivities = np.array(mode_responsivities).max(axis=0)
-    plt.scatter(DRIVING_FREQUENCY, mode_responsivities, label=f"Mode {mode + 1}", alpha=0.7)
-plt.title("Highest Force Individual Modes Responsivity")
-plt.xlabel("Driving Frequency")
-plt.ylabel("Responsivity")
-plt.yscale('log')
-plt.legend()
-plt.grid(True)
-
-plt.tight_layout()
 plt.show()
