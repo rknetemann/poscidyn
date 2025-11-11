@@ -5,10 +5,10 @@ from parameters_table_4 import Q, omega_0, alpha, gamma
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(0.1, 4.5, 301)
-DRIVING_AMPLITUDE = np.outer(np.linspace(0.5, 1.0, 2), np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])) * 0.003
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
+DRIVING_FREQUENCY = np.linspace(0.1, 4.5, 601)
+DRIVING_AMPLITUDE = np.outer(np.linspace(0.15, 1.0, 6), np.array([0.9, 0.1, 0.05, 0.4, 0.03, 0.08, 0.1])) * 0.003
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 frequency_sweep = oscidyn.frequency_sweep(
@@ -42,11 +42,60 @@ plt.figure(figsize=(12, 12))
 
 # Plot total responsivity
 plt.subplot(2, 1, 1)
-scatter = plt.scatter(frequencies, responsivities, c=colors, cmap='viridis', alpha=0.7)
+scatter = plt.scatter(frequencies, responsivities, c=colors, cmap='viridis', alpha=0.7, s=10)  # Decreased marker size
 plt.colorbar(scatter, label="Driving Amplitude")
 plt.title(f"Total Responsivity - {MODEL}")
 plt.xlabel("Driving Frequency")
 plt.ylabel("Responsivity")
 plt.yscale('log')
 plt.grid(True)
+
+# Plot highest force individual modes as responsivity
+plt.subplot(2, 1, 2)
+colors = plt.cm.tab10(np.linspace(0, 1, n_modes))  # Generate distinct colors for each mode
+for mode in range(n_modes):
+    mode_responsivities = []
+    for i_amp in range(n_amp):
+        mode_responses = max_x_modes[:, i_amp, :, :, mode].max(axis=(1, 2))
+        mode_responsivities.append(mode_responses / DRIVING_AMPLITUDE[i_amp, 0])
+    mode_responsivities = np.array(mode_responsivities).max(axis=0)  # Only show the highest force
+    plt.scatter(DRIVING_FREQUENCY, mode_responsivities, label=f"Mode {mode + 1}", alpha=0.7, color=colors[mode])
+plt.title("Highest Force Individual Modes Responsivity")
+plt.xlabel("Driving Frequency")
+plt.ylabel("Responsivity")
+plt.yscale('log')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Plot total responsivity in a separate figure
+plt.figure(figsize=(12, 6))
+scatter = plt.scatter(frequencies, responsivities, c=colors, cmap='viridis', alpha=0.7, s=10)  # Decreased marker size
+plt.colorbar(scatter, label="Driving Amplitude")
+plt.title(f"Total Responsivity - {MODEL}")
+plt.xlabel("Driving Frequency")
+plt.ylabel("Responsivity")
+plt.yscale('log')
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Plot highest force individual modes as responsivity in another figure
+plt.figure(figsize=(12, 6))
+colors = plt.cm.tab10(np.linspace(0, 1, n_modes))  # Generate distinct colors for each mode
+for mode in range(n_modes):
+    mode_responsivities = []
+    for i_amp in range(n_amp):
+        mode_responses = max_x_modes[:, i_amp, :, :, mode].max(axis=(1, 2))
+        mode_responsivities.append(mode_responses / DRIVING_AMPLITUDE[i_amp, 0])
+    mode_responsivities = np.array(mode_responsivities).max(axis=0)  # Only show the highest force
+    plt.scatter(DRIVING_FREQUENCY, mode_responsivities, label=f"Mode {mode + 1}", alpha=0.7, color=colors[mode])
+plt.title("Highest Force Individual Modes Responsivity")
+plt.xlabel("Driving Frequency")
+plt.ylabel("Responsivity")
+plt.yscale('log')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
 plt.show()

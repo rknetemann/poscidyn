@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 from typing import Tuple, Dict
 import time
+from numpy.typing import ArrayLike
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
@@ -15,10 +16,11 @@ from .utils import plotting as plt
 def frequency_sweep(
     model: AbstractModel,
     sweep_direction: const.SweepDirection,
-    driving_frequencies: jax.Array, # Shape: (n_driving_frequencies,)
-    driving_amplitudes: jax.Array, # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
+    driving_frequencies: jax.Array,  # Shape: (n_driving_frequencies,)
+    driving_amplitudes: jax.Array,  # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
     solver: AbstractSolver,
     precision: const.Precision = const.Precision.DOUBLE,
+    axis: Tuple[int, ...] = None,
 ) -> Dict[str, jax.Array]:
             
     if precision == const.Precision.DOUBLE:
