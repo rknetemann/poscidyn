@@ -2,25 +2,27 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from typing import Tuple, Dict
-import time
-from numpy.typing import ArrayLike
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
+from .excitation.abstract_excitation import AbstractExcitation
+from .multistart.abstract_multistart import AbstractMultistart
+from .sweep.abstract_sweep import AbstractSweep
+
 from .solver.time_integration_solver import TimeIntegrationSolver
-from .solver.shooting_solver import MultipleShootingSolver
+from .multistart.linear_response_multistart import LinearResponseMultistart
+from .sweep.nearest_neighbour_sweep import NearestNeighbourSweep
 
 from . import constants as const
-from .utils import plotting as plt
 
 def frequency_sweep(
     model: AbstractModel,
-    sweep_direction: const.SweepDirection,
-    driving_frequencies: jax.Array,  # Shape: (n_driving_frequencies,)
-    driving_amplitudes: jax.Array,  # Shape: (n_driving_amplitudes,)(n_driving_frequencies * n_driving_amplitudes, n_modes)
-    solver: AbstractSolver,
+    excitation: AbstractExcitation,
+    sweep: AbstractSweep = NearestNeighbourSweep(),
+    solver: AbstractSolver = TimeIntegrationSolver(),
+    multistart: AbstractMultistart = LinearResponseMultistart(),
     precision: const.Precision = const.Precision.DOUBLE,
-    axis: Tuple[int, ...] = None,
+    
 ) -> Dict[str, jax.Array]:
             
     if precision == const.Precision.DOUBLE:
@@ -32,17 +34,14 @@ def frequency_sweep(
     else:
         raise ValueError(f"Unsupported precision: {precision}")
 
-    driving_frequencies = jnp.asarray(driving_frequencies, dtype=dtype)
-    driving_amplitudes = jnp.asarray(driving_amplitudes, dtype=dtype)
-    
     model = model.to_dtype(dtype)
-    solver.model = model
-
-    print("\nFrequency sweeping: ", model)
-    start_time = time.time()
-
-    frequency_sweep = solver.frequency_sweep(driving_frequencies, driving_amplitudes, sweep_direction)
+    excitation = excitation.to_dtype(dtype)
+    sweep = sweep.to_dtype(dtype)
+    multistart = multistart.to_dtype(dtype)
     
-    print("\n-> Frequency sweep completed in {:.2f} seconds".format(time.time() - start_time))
+    solver.model = model
+    solver.multistart = multistart
+
+    frequency_sweep = solver.frequency_sweep(excitation, sweep)
 
     return frequency_sweep

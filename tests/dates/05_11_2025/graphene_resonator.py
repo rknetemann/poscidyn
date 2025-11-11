@@ -7,19 +7,19 @@ alpha[1,0,0] = 1.4542
 gamma[0,0,0,0] = 0.0638
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(0.8, 1.2, 151)
-DRIVING_AMPLITUDE = np.outer(np.linspace(0.00005, 0.005, 10), np.array([1.0, 0.0]))
+SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=oscidyn.Forward())
+EXCITATION = oscidyn.OneToneExcitation(drive_frequencies=np.linspace(0.8, 1.2, 151), drive_amplitudes=np.linspace(0.00005, 0.005, 10), 
+                                       modal_forces=np.array([1.0, 0.0]))
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=0.7)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 frequency_sweep = oscidyn.frequency_sweep(
     model = MODEL,
-    sweep_direction = SWEEP_DIRECTION,
-    driving_frequencies = DRIVING_FREQUENCY,
-    driving_amplitudes = DRIVING_AMPLITUDE,
+    excitation=EXCITATION,
+    sweep = SWEEP,
     solver = SOLVER,
+    multistart=MULTISTART,
     precision = PRECISION,
 ) 
 
@@ -36,9 +36,9 @@ colors = []
 for i_disp in range(n_init_disp):
     for i_vel in range(n_init_vel):
         for i_amp in range(n_amp):
-            frequencies.extend(DRIVING_FREQUENCY)
+            frequencies.extend(EXCITATION.drive_frequencies.tolist())
             responses.extend(frequency_sweep['max_x_total'][:, i_amp, i_disp, i_vel])
-            colors.extend([DRIVING_AMPLITUDE[i_amp, 0]] * len(DRIVING_FREQUENCY))
+            colors.extend([EXCITATION.drive_amplitudes[i_amp]] * len(EXCITATION.drive_frequencies))
 
 plt.figure(figsize=(12, 8))
 

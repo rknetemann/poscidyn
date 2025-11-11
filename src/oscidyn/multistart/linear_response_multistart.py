@@ -58,3 +58,9 @@ class LinearResponseMultistart(AbstractMultistart):
         shape = (n_f_omegas, n_f_amps, n_x0s, n_v0s, n_modes)  # Update shape to reflect the full grid dimensions
 
         return (f_omegas_mesh, f_amps_mesh, x0_mesh, v0_mesh, shape)
+    
+    def to_dtype(self, dtype: jnp.dtype):
+        return LinearResponseMultistart(
+            init_cond_shape=self.init_cond_shape,
+            linear_response_factor=self.linear_response_factor
+        )

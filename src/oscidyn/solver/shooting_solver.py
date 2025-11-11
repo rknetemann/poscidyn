@@ -7,8 +7,8 @@ import lineax as lx
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
-from .multistart.abstract_multistart import AbstractMultistart
-from .multistart.linear_response_multistart import LinearResponseMultistart
+from ..multistart.abstract_multistart import AbstractMultistart
+from ..multistart.linear_response_multistart import LinearResponseMultistart
 from .. import constants as const 
 
 class MultipleShootingSolver(AbstractSolver):

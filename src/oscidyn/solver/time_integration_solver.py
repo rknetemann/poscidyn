@@ -5,24 +5,25 @@ import diffrax
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
-from .multistart.abstract_multistart import AbstractMultistart
-from .multistart.linear_response_multistart import LinearResponseMultistart
+from ..multistart.abstract_multistart import AbstractMultistart
+from ..excitation.abstract_excitation import AbstractExcitation
+from ..sweep.abstract_sweep import AbstractSweep
+
 from .. import constants as const 
 
 class TimeIntegrationSolver(AbstractSolver):
-    def __init__(self, multistart: AbstractMultistart = LinearResponseMultistart(),
-                 rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
+    def __init__(self, rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
                  verbose: bool = False, throw: bool = False):
         
         self.max_steps = max_steps
         self.n_time_steps = n_time_steps
-        self.multistart = multistart
         self.rtol = rtol
         self.atol = atol
         self.verbose = verbose
         self.throw = throw
 
         self.model: AbstractModel = None
+        self.multistart: AbstractMultistart = None
 
     def time_response(self,
                  f_omega: jax.Array,  
@@ -71,9 +72,8 @@ class TimeIntegrationSolver(AbstractSolver):
         
     # TO DO: Add phase difference results
     def frequency_sweep(self,
-             f_omegas: jax.Array,
-             f_amps: jax.Array, 
-             sweep_direction: const.SweepDirection,
+             excitation: AbstractExcitation,
+             sweep: AbstractSweep,
             ):
         
         @filter_jit
@@ -123,6 +123,9 @@ class TimeIntegrationSolver(AbstractSolver):
                 max_v_modes=max_v_modes, 
                 successful=successful
             )
+            
+        f_omegas = excitation.f_omegas
+        f_amps = excitation.f_amps
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:

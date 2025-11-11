@@ -8,6 +8,10 @@ oscimodel = lambda cls: dataclass(eq=False, kw_only=True)(cls)
 class AbstractModel(ABC):
     def __post_init__(self):
         pass
+    
+    @abstractmethod
+    def to_dtype(self, dtype):
+        pass
 
     @abstractmethod
     def f(self, t, state, args):
