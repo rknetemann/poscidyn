@@ -12,7 +12,7 @@ import oscidyn
 N_DUFFING_IN_PARALLEL = 2
 DUFFING_COEFFICIENTS = np.array([0.01, 0.02, 0.03, 0.04])
 
-SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=oscidyn.Forward())
+SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 EXCITATION = oscidyn.OneToneExcitation(drive_frequencies=np.linspace(0.1, 3.0, 151), drive_amplitudes=np.linspace(0.01, 0.1, 5), 
                                        modal_forces=np.array([1.0, 0.5]))
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.2)
@@ -33,10 +33,10 @@ def batched_frequency_sweep(duffing: jax.Array):
 
     return oscidyn.frequency_sweep(
         model=model,
-        sweep = SWEEP,
-        excitation=EXCITATION,
+        sweeper=SWEEP,
+        excitor=EXCITATION,
         solver=SOLVER,
-        multistart=MULTISTART,
+        multistarter=MULTISTART,
         precision=PRECISION,
     )
 
@@ -108,6 +108,45 @@ for item in results:
     plt.xlabel("Driving Frequency")
     plt.ylabel("Response Amplitude")
     plt.grid(True)
+
+        # --- Plot sweep lines: exactly n_drive_amplitudes per direction ---
+    sweeped_frequencies = EXCITATION.drive_frequencies
+    sweeps = sweep["sweeped_periodic_solutions"]
+
+    def to_total(arr):
+        """
+        Convert sweep array to total response of shape (n_freq, n_amp).
+        - (n_freq, n_amp): already total -> return as is
+        - (n_modes, n_freq, n_amp): collapse modes via Euclidean norm
+        """
+        if arr is None:
+            return None
+        if arr.ndim == 2:
+            # (n_freq, n_amp)
+            return arr
+        if arr.ndim == 3:
+            # (n_modes, n_freq, n_amp) -> total over modes
+            return np.linalg.norm(arr, axis=0)
+        raise ValueError(f"Unexpected sweep array shape: {arr.shape}")
+
+    fwd = to_total(sweeps.get("forward", None))
+    bwd = to_total(sweeps.get("backward", None))
+
+    # Draw one line per drive amplitude (NOT per mode)
+    if fwd is not None:
+        for amp_idx, amp in enumerate(EXCITATION.drive_amplitudes):
+            y = fwd[:, amp_idx]
+            plt.plot(sweeped_frequencies, y, "r-", lw=1.5,
+                     label="Forward" if amp_idx == 0 else None)
+
+    if bwd is not None:
+        for amp_idx, amp in enumerate(EXCITATION.drive_amplitudes):
+            y = bwd[:, amp_idx]
+            plt.plot(sweeped_frequencies, y, "b--", lw=1.5,
+                     label="Backward" if amp_idx == 0 else None)
+
+    plt.legend(ncol=2, fontsize=8, frameon=False)
+
 
     # Per-mode responses
     for mode in range(n_modes):

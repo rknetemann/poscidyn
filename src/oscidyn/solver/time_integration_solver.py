@@ -23,7 +23,7 @@ class TimeIntegrationSolver(AbstractSolver):
         self.throw = throw
 
         self.model: AbstractModel = None
-        self.multistart: AbstractMultistart = None
+        self.multistarter: AbstractMultistart = None
 
     def time_response(self,
                  f_omega: jax.Array,  
@@ -72,8 +72,8 @@ class TimeIntegrationSolver(AbstractSolver):
         
     # TO DO: Add phase difference results
     def frequency_sweep(self,
-             excitation: AbstractExcitation,
-             sweep: AbstractSweep,
+             excitor: AbstractExcitation,
+             sweeper: AbstractSweep,
             ):
         
         @filter_jit
@@ -124,8 +124,8 @@ class TimeIntegrationSolver(AbstractSolver):
                 successful=successful
             )
             
-        f_omegas = excitation.f_omegas
-        f_amps = excitation.f_amps
+        f_omegas = excitor.f_omegas
+        f_amps = excitor.f_amps
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
@@ -138,22 +138,27 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int)
             self.n_time_steps = n_time_steps
         
-        f_omegas, f_amps, x0s, v0s, shape = self.multistart.generate_simulation_grid(self.model, f_omegas, f_amps)
+        f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.model, f_omegas, f_amps)
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
 
-        solutions = jax.tree_util.tree_map(
+        periodic_solutions = jax.tree_util.tree_map(
             lambda leaf: leaf.reshape(shape[:-1] + leaf.shape[1:]),
             flat_solutions
         )
         
-        return solutions
+        sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
+        
+        periodic_solutions['sweeped_periodic_solutions'] = sweeped_periodic_solutions
+        
+        frequency_sweep = periodic_solutions
+        
+        return frequency_sweep
 
     @filter_jit
     def _rhs(self, t, y, args):
         f_amp, f_omega = args
 
-        # Ensure f_amp and f_omega are passed correctly
         dy_dt = self.model.f(t, y, (f_amp, f_omega))
 
         return dy_dt

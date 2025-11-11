@@ -4,6 +4,9 @@ class AbstractMultistart(ABC):
     def __init__(self):
         pass
 
+    @abstractmethod
+    def to_dtype(self, dtype):
+        pass
 
 '''
 To determine grid of initial conditions:

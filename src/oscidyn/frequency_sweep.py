@@ -17,10 +17,10 @@ from . import constants as const
 
 def frequency_sweep(
     model: AbstractModel,
-    excitation: AbstractExcitation,
-    sweep: AbstractSweep = NearestNeighbourSweep(),
+    excitor: AbstractExcitation,
+    sweeper: AbstractSweep = NearestNeighbourSweep(),
     solver: AbstractSolver = TimeIntegrationSolver(),
-    multistart: AbstractMultistart = LinearResponseMultistart(),
+    multistarter: AbstractMultistart = LinearResponseMultistart(),
     precision: const.Precision = const.Precision.DOUBLE,
     
 ) -> Dict[str, jax.Array]:
@@ -35,13 +35,13 @@ def frequency_sweep(
         raise ValueError(f"Unsupported precision: {precision}")
 
     model = model.to_dtype(dtype)
-    excitation = excitation.to_dtype(dtype)
-    sweep = sweep.to_dtype(dtype)
-    multistart = multistart.to_dtype(dtype)
+    excitor = excitor.to_dtype(dtype)
+    sweeper = sweeper.to_dtype(dtype)
+    multistarter = multistarter.to_dtype(dtype)
     
     solver.model = model
-    solver.multistart = multistart
+    solver.multistarter = multistarter
 
-    frequency_sweep = solver.frequency_sweep(excitation, sweep)
+    frequency_sweep = solver.frequency_sweep(excitor, sweeper)
 
     return frequency_sweep
