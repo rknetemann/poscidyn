@@ -18,8 +18,8 @@ class BaseDuffingOscillator(AbstractModel):
     gamma: jax.Array
 
     # Reference parameters for non-dimensionalization
-    omega_ref: Optional[jax.Array] = 1.0
-    x_ref: Optional[jax.Array] = 1.0
+    omega_ref: Optional[jax.Array] = None
+    x_ref: Optional[jax.Array] = None
     
     def __post_init__(self):
         if self.omega_ref is None:
@@ -109,15 +109,3 @@ class BaseDuffingOscillator(AbstractModel):
         return (f"BaseDuffingOscillator(n_modes={self.n_modes}, "
                 f"{Q_terms}, {omega_0_terms}, "
                 f"{', '.join(alpha_terms)}, {', '.join(gamma_terms)})")
-
-# Register BaseDuffingOscillator as a pytree
-def _tree_flatten(obj):
-    leaves = (obj.Q, obj.omega_0, obj.alpha, obj.gamma, obj.omega_ref, obj.x_ref)
-    aux_data = None
-    return leaves, aux_data
-
-def _tree_unflatten(aux_data, leaves):
-    Q, omega_0, alpha, gamma, omega_ref, x_ref = leaves
-    return BaseDuffingOscillator(Q=Q, omega_0=omega_0, alpha=alpha, gamma=gamma, omega_ref=omega_ref, x_ref=x_ref)
-
-tree_util.register_pytree_node(BaseDuffingOscillator, _tree_flatten, _tree_unflatten)

@@ -6,7 +6,7 @@ class OneToneExcitation:
         self.drive_frequencies = drive_frequencies
         self.drive_amplitudes = drive_amplitudes
         self.modal_forces = modal_forces
-        
+                
         self.f_omegas = jnp.asarray(drive_frequencies)
         self.f_amps = jnp.outer(jnp.asarray(drive_amplitudes), jnp.asarray(modal_forces))
         

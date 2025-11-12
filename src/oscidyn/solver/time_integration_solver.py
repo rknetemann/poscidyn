@@ -151,8 +151,12 @@ class TimeIntegrationSolver(AbstractSolver):
         sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
                 
         result = FrequencySweepResult(
-            model=self.model,
-            excitor=excitor,
+            f_omegas=excitor.f_omegas,
+            f_amps=excitor.f_amps,
+            Q=self.model.Q,
+            omega_0=self.model.omega_0,
+            alpha=self.model.alpha,
+            gamma=self.model.gamma,
             periodic_solutions=periodic_solutions,
             sweeped_periodic_solutions=sweeped_periodic_solutions
         )

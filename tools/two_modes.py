@@ -169,14 +169,19 @@ if __name__ == "__main__":
                     sim_index = start_idx + j
                     sim_id = f"simulation_{sim_index:0{sim_width}d}"
 
-                    tot_amp = np.asarray(batch_sweeps.sweeped_periodic_solutions['forward'][j, :, :]) 
-                    ds = grp.create_dataset(sim_id, data=tot_amp)
+                    sim_grp = grp.create_group(sim_id)
 
-                    ds.attrs['Q'] = np.asarray(batch_sweeps.model.Q)
-                    ds.attrs['omega_0'] = np.asarray(batch_sweeps.model.omega_0)
-                    ds.attrs['gamma'] = np.asarray(batch_sweeps.model.gamma)
-                    ds.attrs['f_omegas'] = np.asarray(batch_sweeps.excitor.f_omegas)
-                    ds.attrs['f_amps'] = np.asarray(batch_sweeps.excitor.f_amps)
+                    sweeped_periodic_solutions = sim_grp.create_dataset("sweeped_periodic_solutions", data=np.asarray(batch_sweeps.sweeped_periodic_solutions['forward'][j]))
+                    ds_x_max_total = sim_grp.create_dataset("x_max_total", data=np.asarray(batch_sweeps.periodic_solutions['max_x_total'][j]))
+                    ds_x_max_modes = sim_grp.create_dataset("x_max_modes", data=np.asarray(batch_sweeps.periodic_solutions['max_x_modes'][j]))
+                    #ds_x0 = sim_grp.create_dataset("x0", data=np.asarray(batch_sweeps.periodic_solutions['x0'][j]))
+                    #ds_v0 = sim_grp.create_dataset("v0", data=np.asarray(batch_sweeps.periodic_solutions['v0'][j]))
+
+                    sim_grp.attrs['f_omegas'] = np.asarray(batch_sweeps.f_omegas[j])
+                    sim_grp.attrs['f_amps'] = np.asarray(batch_sweeps.f_amps[j])
+                    sim_grp.attrs['Q'] = np.asarray(batch_sweeps.Q[j])
+                    sim_grp.attrs['omega_0'] = np.asarray(batch_sweeps.omega_0[j])
+                    sim_grp.attrs['gamma'] = np.asarray(batch_sweeps.gamma[j])
 
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 
