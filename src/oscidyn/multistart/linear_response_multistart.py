@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from .abstract_multistart import AbstractMultistart
 
 class LinearResponseMultistart(AbstractMultistart):
-    def __init__(self, init_cond_shape: tuple = (11, 11), linear_response_factor: float = 1.5):
+    def __init__(self, init_cond_shape: tuple = (11, 11), linear_response_factor: float = 1.0):
         super().__init__()
         self.init_cond_shape = init_cond_shape
         self.linear_response_factor = linear_response_factor

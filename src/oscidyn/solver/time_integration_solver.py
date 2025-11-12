@@ -152,6 +152,7 @@ class TimeIntegrationSolver(AbstractSolver):
         periodic_solutions['sweeped_periodic_solutions'] = sweeped_periodic_solutions
         
         frequency_sweep = periodic_solutions
+        frequency_sweep['f_omegas'] = excitor.f_omegas
         
         return frequency_sweep
 

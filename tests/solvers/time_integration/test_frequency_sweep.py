@@ -1,79 +1,104 @@
 import numpy as np
 import oscidyn
+import time
 
 # 1 mode: 
-Q, omega_0, alpha, gamma = np.array([80.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = 0.0123
-
-# 2 modes:
-# Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([1.0, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-# alpha[0,0,1] = 2 * 4.0
-# alpha[1,0,0] = 4.0
+# Q, omega_0, alpha, gamma = np.array([80.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
 # gamma[0,0,0,0] = 0.0123
 
+# 2 modes:
+Q, omega_0, alpha, gamma = np.array([1.1, 83.8531]), np.array([0.9, 4.331]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+gamma[1,1,1,1] = 0.08367347
+
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
-DRIVING_FREQUENCY = np.linspace(0.01, 2.5, 251)
-DRIVING_AMPLITUDE = np.outer(np.linspace(0.0001, 0.0031, 10), np.array([1.0]))
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
+DRIVING_FREQUENCY = np.linspace(0.1, 4.434, 300)
+DRIVING_AMPLITUDE = np.linspace(0.01, 1.0, 10) * np.max(omega_0)**2/np.max(Q)
+EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 0.5]))
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
+
+start_time = time.time()
 
 frequency_sweep = oscidyn.frequency_sweep(
     model = MODEL,
-    sweep_direction = SWEEP_DIRECTION,
-    driving_frequencies = DRIVING_FREQUENCY,
-    driving_amplitudes = DRIVING_AMPLITUDE,
+    sweeper=SWEEPER,
+    excitor=EXCITOR,
     solver = SOLVER,
     precision = PRECISION,
 ) #n_freq, n_amp, n_init_disp, n_init_vel
 
+end_time = time.time()
+print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
+
+max_x_total =  frequency_sweep['max_x_total']
+max_x_modes = frequency_sweep['max_x_modes']
+
 import matplotlib.pyplot as plt
-n_freq, n_amp, n_init_disp, n_init_vel = frequency_sweep['max_x_total'].shape
+n_freq, n_amp, n_init_disp, n_init_vel, n_modes = max_x_modes.shape
 
 frequencies = []
 responses = []
 colors = []
 
-
-
-
 for i_disp in range(n_init_disp):
     for i_vel in range(n_init_vel):
         for i_amp in range(n_amp):
-            frequencies.extend(DRIVING_FREQUENCY)
+            frequencies.extend(EXCITOR.drive_frequencies.tolist())
             responses.extend(frequency_sweep['max_x_total'][:, i_amp, i_disp, i_vel])
-            colors.extend([DRIVING_AMPLITUDE[i_amp]] * len(DRIVING_FREQUENCY))
+            colors.extend([EXCITOR.drive_amplitudes[i_amp]] * len(EXCITOR.drive_frequencies))
 
-plt.figure(figsize=(10, 6))
+PLOT_INDIVIDUAL_MODES = False  # Set to False to disable plotting individual modes
+
+plt.figure(figsize=(12, 8))
+
+if PLOT_INDIVIDUAL_MODES:
+    # Plot total response with subplots for individual modes
+    plt.subplot(n_modes + 1, 1, 1)
+else:
+    # Plot total response using the entire figure
+    plt.subplot(1, 1, 1)
+
 scatter = plt.scatter(frequencies, responses, c=colors, cmap='viridis', alpha=0.7)
 plt.colorbar(scatter, label="Driving Amplitude")
-plt.title("Frequency Sweep")
+plt.title(f"Total Response - {MODEL}")
 plt.xlabel("Driving Frequency")
 plt.ylabel("Response Amplitude")
 plt.grid(True)
-plt.show()
 
-unsuccessful_frequencies = []
-unsuccessful_amplitudes = []
+# Add sweeped periodic solutions for forward and backward sweeps
+sweeped_frequencies = EXCITOR.drive_frequencies
+sweeped_solutions = frequency_sweep['sweeped_periodic_solutions']
 
-for i_disp in range(n_init_disp):
-    for i_vel in range(n_init_vel):
-        for i_amp in range(n_amp):
-            for i_freq in range(n_freq):
-                if not frequency_sweep['successful'][i_freq, i_amp, i_disp, i_vel]:
-                    unsuccessful_frequencies.append(DRIVING_FREQUENCY[i_freq])
-                    unsuccessful_amplitudes.append(DRIVING_AMPLITUDE[i_amp])
-                    
-print(f"Number of unsuccessful points: {len(unsuccessful_frequencies)}")
-print(f"Number of total points: {n_freq * n_amp * n_init_disp * n_init_vel}")
-print(f"Percentage of unsuccessful points: {100.0 * len(unsuccessful_frequencies) / (n_freq * n_amp * n_init_disp * n_init_vel):.2f}%")
+if sweeped_solutions['forward'] is not None:
+    for amp_idx, amp in enumerate(EXCITOR.drive_amplitudes):
+        forward_responses = sweeped_solutions['forward'][:, amp_idx]
+        plt.plot(sweeped_frequencies, forward_responses, label=f"Forward Sweep (Amp={amp:.3f})", linestyle='-', color='r')
 
-plt.figure(figsize=(10, 6))
-plt.scatter(unsuccessful_frequencies, unsuccessful_amplitudes, color='red', alpha=0.7, label="Unsuccessful Points")
-plt.title("Unsuccessful Frequency-Amplitude Combinations")
-plt.xlabel("Driving Frequency")
-plt.ylabel("Driving Amplitude")
+if sweeped_solutions['backward'] is not None:
+    for amp_idx, amp in enumerate(EXCITOR.drive_amplitudes):
+        backward_responses = sweeped_solutions['backward'][:, amp_idx]
+        plt.plot(sweeped_frequencies, backward_responses, label=f"Backward Sweep (Amp={amp:.3f})", linestyle='-', color='b')
+
 plt.legend()
-plt.grid(True)
+
+if PLOT_INDIVIDUAL_MODES:
+    # Plot individual modes
+    for mode in range(n_modes):
+        mode_responses = []
+        for i_disp in range(n_init_disp):
+            for i_vel in range(n_init_vel):
+                for i_amp in range(n_amp):
+                    mode_responses.extend(max_x_modes[:, i_amp, i_disp, i_vel, mode])
+        
+        plt.subplot(n_modes + 1, 1, mode + 2)
+        scatter = plt.scatter(frequencies, mode_responses, c=colors, cmap='viridis', alpha=0.7)
+        plt.colorbar(scatter, label="Driving Amplitude")
+        plt.title(f"Mode {mode + 1} Response")
+        plt.xlabel("Driving Frequency")
+        plt.ylabel("Response Amplitude")
+        plt.grid(True)
+
+plt.tight_layout()
 plt.show()
