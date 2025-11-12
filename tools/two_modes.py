@@ -14,30 +14,33 @@ from utils.gpu_monitor import GpuMonitor
 import oscidyn
 import argparse
 
+N_FWHM = 4.0
+
 SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
 SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
-Q = np.linspace(1.1, 100.0, 50)  
-omega_0 = np.linspace(0.9, 5.0, 50)
-gamma = np.linspace(0.0, 0.1, 50)
+Q_values = np.linspace(1.1, 10.0, 5)  
+omega_0_values = np.linspace(0.9, 5.0, 5)
+gamma_values = np.linspace(0.0, 0.005, 5)
 
-# Create the parameter space for the two-mode system
-Q_1, Q_2 = np.meshgrid(Q, Q, indexing='ij')
-omega_0_1, omega_0_2 = np.meshgrid(omega_0, omega_0, indexing='ij')
-gamma_1, gamma_2 = np.meshgrid(gamma, gamma, indexing='ij')
+# Generate all combinations of parameters for the two modes
+params = []
+for Q_1 in Q_values:
+    for Q_2 in Q_values:
+        for omega_0_1 in omega_0_values:
+            for omega_0_2 in omega_0_values:
+                if omega_0_2 >= omega_0_1:  # Ensure the second mode's resonance frequency is not lower
+                    for gamma_1 in gamma_values:
+                        for gamma_2 in gamma_values:
+                            params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2])
 
-# Flatten the grids and create all combinations
-Q_1, Q_2 = Q_1.flatten(), Q_2.flatten()
-omega_0_1, omega_0_2 = omega_0_1.flatten(), omega_0_2.flatten()
-gamma_1, gamma_2 = gamma_1.flatten(), gamma_2.flatten()
+# Convert the list of parameters to a NumPy array
+params = np.array(params)
 
-# Combine all parameters into a single array
-params = np.column_stack((Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2))
-
-# Filter out combinations where omega_0_1 equals omega_0_2
-params = params[params[:, 2] != params[:, 3]]
+# Sort the parameters by Q_1 and then Q_2 in descending order
+params = params[np.lexsort((-params[:, 1], -params[:, 0]))]
 
 @filter_jit
 def simulate(params): # params: (n_params,)
@@ -55,11 +58,11 @@ def simulate(params): # params: (n_params,)
 
     model = oscidyn.BaseDuffingOscillator(Q=Q_val, omega_0=omega_0_val, alpha=alpha_val, gamma=gamma_val)
     drive_freq = jnp.linspace(
-        jnp.maximum(omega_0_val[0] - 2.0 * full_width_half_maxs[0], 0.1),
-        jnp.maximum(omega_0_val[1] + 2.0 * full_width_half_maxs[1], 0.1),
+        jnp.maximum(omega_0_val[0] - N_FWHM * full_width_half_maxs[0], 0.1),
+        jnp.maximum(omega_0_val[1] + N_FWHM * full_width_half_maxs[1], 0.1),
         300
     )
-    drive_amp = jnp.linspace(0.01, 1.0, 10) * jnp.max(omega_0_val)**2/jnp.max(Q_val)
+    drive_amp = jnp.linspace(0.01, 1.0, 10)
     excitation = oscidyn.OneToneExcitation(drive_frequencies=drive_freq, drive_amplitudes=drive_amp, modal_forces=np.array([1.0, 0.5]))
 
     return oscidyn.frequency_sweep(
