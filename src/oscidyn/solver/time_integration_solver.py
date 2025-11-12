@@ -8,6 +8,7 @@ from ..model.abstract_model import AbstractModel
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..excitation.abstract_excitation import AbstractExcitation
 from ..sweep.abstract_sweep import AbstractSweep
+from ..result.frequency_sweep_result import FrequencySweepResult
 
 from .. import constants as const 
 
@@ -74,7 +75,7 @@ class TimeIntegrationSolver(AbstractSolver):
     def frequency_sweep(self,
              excitor: AbstractExcitation,
              sweeper: AbstractSweep,
-            ):
+            ) -> FrequencySweepResult:
         
         @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
@@ -148,13 +149,15 @@ class TimeIntegrationSolver(AbstractSolver):
         )
         
         sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
-        
-        periodic_solutions['sweeped_periodic_solutions'] = sweeped_periodic_solutions
-        
-        frequency_sweep = periodic_solutions
-        frequency_sweep['f_omegas'] = excitor.f_omegas
-        
-        return frequency_sweep
+                
+        result = FrequencySweepResult(
+            model=self.model,
+            excitor=excitor,
+            periodic_solutions=periodic_solutions,
+            sweeped_periodic_solutions=sweeped_periodic_solutions
+        )
+
+        return result
 
     @filter_jit
     def _rhs(self, t, y, args):

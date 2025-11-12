@@ -8,6 +8,7 @@ from .solver.abstract_solver import AbstractSolver
 from .excitation.abstract_excitation import AbstractExcitation
 from .multistart.abstract_multistart import AbstractMultistart
 from .sweep.abstract_sweep import AbstractSweep
+from .result.frequency_sweep_result import FrequencySweepResult 
 
 from .solver.time_integration_solver import TimeIntegrationSolver
 from .multistart.linear_response_multistart import LinearResponseMultistart
@@ -22,8 +23,7 @@ def frequency_sweep(
     solver: AbstractSolver = TimeIntegrationSolver(),
     multistarter: AbstractMultistart = LinearResponseMultistart(),
     precision: const.Precision = const.Precision.DOUBLE,
-    
-) -> Dict[str, jax.Array]:
+) -> FrequencySweepResult:
             
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)

@@ -11,8 +11,8 @@ MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=ome
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=np.linspace(0.8, 1.2, 151), drive_amplitudes=np.array([0.0005, 0.001, 0.003, 0.005]), 
                                        modal_forces=np.array([1.0, 0.0]))
-MULTISTARTER = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
+MULTISTARTER = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*3, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 start_time = time.time()
@@ -26,11 +26,13 @@ frequency_sweep = oscidyn.frequency_sweep(
     precision = PRECISION,
 ) 
 
+print(frequency_sweep.e)
+
 end_time = time.time()
 print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
 
-max_x_total =  frequency_sweep['max_x_total']
-max_x_modes = frequency_sweep['max_x_modes']
+max_x_total =  frequency_sweep.periodic_solutions['max_x_total']
+max_x_modes = frequency_sweep.periodic_solutions['max_x_modes']
 
 import matplotlib.pyplot as plt
 n_freq, n_amp, n_init_disp, n_init_vel, n_modes = max_x_modes.shape
@@ -43,7 +45,7 @@ for i_disp in range(n_init_disp):
     for i_vel in range(n_init_vel):
         for i_amp in range(n_amp):
             frequencies.extend(EXCITOR.drive_frequencies.tolist())
-            responses.extend(frequency_sweep['max_x_total'][:, i_amp, i_disp, i_vel])
+            responses.extend(max_x_total[:, i_amp, i_disp, i_vel])
             colors.extend([EXCITOR.drive_amplitudes[i_amp]] * len(EXCITOR.drive_frequencies))
 
 PLOT_INDIVIDUAL_MODES = False  # Set to False to disable plotting individual modes
@@ -66,7 +68,7 @@ plt.grid(True)
 
 # Add sweeped periodic solutions for forward and backward sweeps
 sweeped_frequencies = EXCITOR.drive_frequencies
-sweeped_solutions = frequency_sweep['sweeped_periodic_solutions']
+sweeped_solutions = frequency_sweep.sweeped_periodic_solutions
 
 if sweeped_solutions['forward'] is not None:
     for amp_idx, amp in enumerate(EXCITOR.drive_amplitudes):

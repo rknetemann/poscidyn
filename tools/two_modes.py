@@ -169,17 +169,14 @@ if __name__ == "__main__":
                     sim_index = start_idx + j
                     sim_id = f"simulation_{sim_index:0{sim_width}d}"
 
-                    tot_amp = np.asarray(batch_sweeps["sweeped_periodic_solutions"]['forward'][j, :, :]) 
+                    tot_amp = np.asarray(batch_sweeps.sweeped_periodic_solutions['forward'][j, :, :]) 
                     ds = grp.create_dataset(sim_id, data=tot_amp)
 
-                    Q = np.array([batch_params[j, 0], batch_params[j, 1]])
-                    omega_0 = np.array([batch_params[j, 2], batch_params[j, 3]])
-                    gamma = np.array([batch_params[j, 4], batch_params[j, 5]])
-
-                    ds.attrs['Q'] = Q
-                    ds.attrs['omega_0'] = omega_0
-                    ds.attrs['gamma'] = gamma
-                    ds.attrs['f_omegas'] = np.asarray(batch_sweeps['f_omegas'][j])
+                    ds.attrs['Q'] = np.asarray(batch_sweeps.model.Q)
+                    ds.attrs['omega_0'] = np.asarray(batch_sweeps.model.omega_0)
+                    ds.attrs['gamma'] = np.asarray(batch_sweeps.model.gamma)
+                    ds.attrs['f_omegas'] = np.asarray(batch_sweeps.excitor.f_omegas)
+                    ds.attrs['f_amps'] = np.asarray(batch_sweeps.excitor.f_amps)
 
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 
