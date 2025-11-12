@@ -191,8 +191,8 @@ if __name__ == "__main__":
                 pbar.set_postfix_str("   ".join(postfix_parts))
                 hdf5.attrs['max_gpu_usage'] = gm.max_summary() if gm._max_summary else ""
                 
-                if i == 10:
-                    break # Early exit for debugging
+                # if i == 10:
+                #     break # Early exit for debugging
         
             hdf5.attrs['completed_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
             hdf5.attrs['elapsed_time'] = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
