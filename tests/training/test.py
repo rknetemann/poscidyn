@@ -38,7 +38,7 @@ import optax
 # ----------------------------
 # Configuration
 # ----------------------------
-FILENAME = "/home/raymo/Projects/parameter-identification-nanomechanical-resonators/batch_2025-08-14_15:16:59_0.hdf5"  # <- change if needed
+FILENAME = "/home/raymo/Downloads/batch_1_2025-11-13_11-38-54.hdf5"  # <- change if needed
 RNG_SEED = 0
 BATCH_SIZE = 8192
 EPOCHS = 50

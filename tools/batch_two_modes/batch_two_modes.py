@@ -14,6 +14,7 @@ from utils.gpu_monitor import GpuMonitor
 import oscidyn
 import argparse
 
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.9'
 N_FWHM = 4.0
 
 SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
@@ -21,8 +22,8 @@ MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_res
 SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
-Q_values = np.linspace(1.1, 10.0, 5)  
-omega_0_values = np.linspace(0.9, 5.0, 5)
+Q_values = np.linspace(10.0, 20.0, 5)  
+omega_0_values = np.linspace(0.9, 4.0, 5)
 gamma_values = np.linspace(0.0, 0.005, 5)
 
 # Generate all combinations of parameters for the two modes
@@ -31,7 +32,7 @@ for Q_1 in Q_values:
     for Q_2 in Q_values:
         for omega_0_1 in omega_0_values:
             for omega_0_2 in omega_0_values:
-                if omega_0_2 >= omega_0_1:  # Ensure the second mode's resonance frequency is not lower
+                if omega_0_2 > omega_0_1:  # Ensure the second mode's resonance frequency is not lower
                     for gamma_1 in gamma_values:
                         for gamma_2 in gamma_values:
                             params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2])
@@ -93,7 +94,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_parallel_sim",
         type=int,
-        default=6,
+        default=4,
         nargs="?",
         help="Amount of simulations to run in parallel (default: 2)"
     )
@@ -158,10 +159,16 @@ if __name__ == "__main__":
                 start_idx = i * n_parallel_sim
                 end_idx = min(start_idx + n_parallel_sim, n_sim)
 
+                # if i==0:
+                #     jax.profiler.start_trace(f"profiling/sub_batch_{n_parallel_sim}_in_parallel")
+
                 batch_params = task_param[start_idx:end_idx]
                 t0 = time.time()
                 batch_sweeps = simulate_sub_batch(batch_params)
                 elapsed = time.time() - t0
+                
+                # if i==0:
+                #     jax.profiler.stop_trace()
 
                 n_in_batch = batch_params.shape[0]
                 sim_width = len(str(n_sim - 1)) if n_sim > 1 else 1
