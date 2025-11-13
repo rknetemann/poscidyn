@@ -93,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_parallel_sim",
         type=int,
-        default=2,
+        default=6,
         nargs="?",
         help="Amount of simulations to run in parallel (default: 2)"
     )
