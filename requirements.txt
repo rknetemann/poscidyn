@@ -2,6 +2,7 @@ jax[cuda12]==0.8.0
 diffrax==0.7.0
 h5py==3.14.0
 equinox==0.13.2
+tqdm==4.67.1 
 
 # For profiling
 # tensorboard==2.20.0
