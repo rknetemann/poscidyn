@@ -25,6 +25,7 @@ PRECISION = oscidyn.Precision.SINGLE
 Q_values = np.linspace(10.0, 20.0, 5)  
 omega_0_values = np.linspace(0.9, 4.0, 5)
 gamma_values = np.linspace(0.0, 0.005, 5)
+modal_force_values = np.linspace(0.1, 1.0, 5)
 
 # Generate all combinations of parameters for the two modes
 params = []
@@ -35,7 +36,10 @@ for Q_1 in Q_values:
                 if omega_0_2 > omega_0_1:  # Ensure the second mode's resonance frequency is not lower
                     for gamma_1 in gamma_values:
                         for gamma_2 in gamma_values:
-                            params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2])
+                            for modal_force_1 in modal_force_values:
+                                for modal_force_2 in modal_force_values:
+                                    if modal_force_2 <= modal_force_1:  # Ensure the second mode's modal force is not greater
+                                        params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2])
 
 # Convert the list of parameters to a NumPy array
 params = np.array(params)
