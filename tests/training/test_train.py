@@ -1,5 +1,4 @@
 import os; os.environ['JAX_PLATFORM_NAME'] = 'cpu'
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Tuple
 
@@ -18,7 +17,11 @@ except ImportError:
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_HDF5 = REPO_ROOT / "batch_2025-11-13_12:34:28_0.hdf5"
-FILENAME = Path(os.environ.get("OSC_TRAIN_HDF5", DEFAULT_HDF5))
+# FILENAME = Path(os.environ.get("OSC_TRAIN_HDF5", DEFAULT_HDF5))
+FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-13_15-54-52.hdf5") #Newer
+#FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-13_11-38-54.hdf5") #Older
+DEFAULT_STATE_PATH = REPO_ROOT / "results" / "test_train_state.eqx"
+MODEL_STATE_PATH = Path(os.environ.get("OSC_TRAIN_STATE", DEFAULT_STATE_PATH))
 N_FREQS = 300
 EXTRA_FEATURES = 3  # max amplitude per sweep + min/max driving frequency
 INPUT_SHAPE = (N_FREQS + EXTRA_FEATURES,)
@@ -26,7 +29,7 @@ OUTPUT_DIM = 6  # [Q1, Q2, omega01, omega02, gamma1, gamma2]
 SEED = 42
 LEARNING_RATE = 3e-4
 BATCH_SIZE = 256
-EPOCHS = 1000
+EPOCHS = 150
 PRINT_EVERY = 100  # steps
 
 # ----------------------
@@ -145,8 +148,7 @@ def _build_target_vector(attrs: h5py.AttributeManager) -> np.ndarray:
         raise ValueError(f"Constructed target has shape {target.shape}; expected length {OUTPUT_DIM}.")
     return target
 
-@dataclass
-class DatasetNormalizer:
+class DatasetNormalizer(eqx.Module):
     x_mean: jnp.ndarray
     x_std: jnp.ndarray
     y_mean: jnp.ndarray
@@ -168,6 +170,37 @@ class DatasetNormalizer:
 
     def denorm_Y(self, Y: jnp.ndarray) -> jnp.ndarray:
         return Y * self.y_std + self.y_mean
+
+
+class TrainingArtifacts(eqx.Module):
+    model: MLP
+    normalizer: DatasetNormalizer
+
+
+def _empty_normalizer() -> DatasetNormalizer:
+    zeros_x = jnp.zeros((1, INPUT_SHAPE[0]), dtype=jnp.float32)
+    zeros_y = jnp.zeros((1, OUTPUT_DIM), dtype=jnp.float32)
+    return DatasetNormalizer(
+        x_mean=zeros_x,
+        x_std=jnp.ones_like(zeros_x),
+        y_mean=zeros_y,
+        y_std=jnp.ones_like(zeros_y),
+    )
+
+
+def create_artifact_template(key: jax.random.PRNGKey) -> TrainingArtifacts:
+    return TrainingArtifacts(model=MLP(key), normalizer=_empty_normalizer())
+
+
+def save_training_state(path: Path, artifacts: TrainingArtifacts) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    eqx.tree_serialise_leaves(path, artifacts)
+
+
+def load_training_state(path: Path, key: jax.random.PRNGKey) -> TrainingArtifacts:
+    template = create_artifact_template(key)
+    return eqx.tree_deserialise_leaves(path, template)
 
 
 def load_hdf5_xy(filename: Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -425,47 +458,65 @@ def plot_prediction_stats(preds: np.ndarray, truths: np.ndarray) -> None:
         ax.grid(alpha=0.2)
     fig_err.tight_layout()
     plt.show()
-# ----------------------
-# Demo / run
-# ----------------------
-key = jax.random.PRNGKey(SEED)
-key, subkey = jax.random.split(key, 2)
-model = MLP(subkey)
+def main() -> None:
+    key = jax.random.PRNGKey(SEED)
+    key, subkey = jax.random.split(key, 2)
+    model = MLP(subkey)
 
-# Quick sanity check on shapes with random data
-test_x = jax.random.normal(key, (28, INPUT_SHAPE[0]))
-test_y = jax.random.normal(key, (28, OUTPUT_DIM))
-pred_y = jax.vmap(model)(test_x)
-print("Predicted y (first sample):", pred_y[0])
-value, grads = eqx.filter_value_and_grad(mse_loss)(model, test_x, test_y)
-print("Initial MSE (random):", float(value))
+    # Quick sanity check on shapes with random data
+    test_x = jax.random.normal(key, (28, INPUT_SHAPE[0]))
+    test_y = jax.random.normal(key, (28, OUTPUT_DIM))
+    pred_y = jax.vmap(model)(test_x)
+    print("Predicted y (first sample):", pred_y[0])
+    value, _ = eqx.filter_value_and_grad(mse_loss)(model, test_x, test_y)
+    print("Initial MSE (random):", float(value))
 
-# Load your actual data
-try:
-    X_np, Y_np, sim_ids = load_hdf5_xy(FILENAME)
-except Exception as e:
-    # Helpful fallback so the script still runs; remove once your file layout is recognized
-    print(f"Warning: {e}\nUsing synthetic data as a fallback.")
-    N = 5000
-    X = jax.random.normal(key, (N, INPUT_SHAPE[0]))
-    # Some synthetic regression target
-    W = jax.random.normal(key, (INPUT_SHAPE[0], OUTPUT_DIM))
-    Y = jnp.tanh(X @ W) + 0.05 * jax.random.normal(key, (N, OUTPUT_DIM))
-    sim_ids = np.arange(N) // 50
-    X_np = np.array(X, dtype=np.float32)
-    Y_np = np.array(Y, dtype=np.float32)
+    # Load your actual data
+    try:
+        X_np, Y_np, sim_ids = load_hdf5_xy(FILENAME)
+    except Exception as e:
+        # Helpful fallback so the script still runs; remove once your file layout is recognized
+        print(f"Warning: {e}\nUsing synthetic data as a fallback.")
+        N = 5000
+        X = jax.random.normal(key, (N, INPUT_SHAPE[0]))
+        # Some synthetic regression target
+        W = jax.random.normal(key, (INPUT_SHAPE[0], OUTPUT_DIM))
+        Y = jnp.tanh(X @ W) + 0.05 * jax.random.normal(key, (N, OUTPUT_DIM))
+        sim_ids = np.arange(N) // 50
+        X_np = np.array(X, dtype=np.float32)
+        Y_np = np.array(Y, dtype=np.float32)
 
-Xtr_np, Ytr_np, Xte_np, Yte_np = simulation_train_test_split(X_np, Y_np, sim_ids, test_frac=0.2, seed=SEED)
-normalizer = DatasetNormalizer.from_data(Xtr_np, Ytr_np)
-Xtr = normalizer.norm_X(Xtr_np)
-Ytr = normalizer.norm_Y(Ytr_np)
-Xte = normalizer.norm_X(Xte_np)
-Yte = normalizer.norm_Y(Yte_np)
+    Xtr_np, Ytr_np, Xte_np, Yte_np = simulation_train_test_split(
+        X_np, Y_np, sim_ids, test_frac=0.2, seed=SEED
+    )
+    normalizer = DatasetNormalizer.from_data(Xtr_np, Ytr_np)
+    Xtr = normalizer.norm_X(Xtr_np)
+    Ytr = normalizer.norm_Y(Ytr_np)
+    Xte = normalizer.norm_X(Xte_np)
+    Yte = normalizer.norm_Y(Yte_np)
 
-# Train
-model = train(model, Xtr, Ytr, Xte, Yte, normalizer, epochs=EPOCHS, batch_size=BATCH_SIZE, print_every=PRINT_EVERY)
-pred_samples, true_samples = print_sample_predictions(model, Xte, Yte, normalizer, n_samples=5, seed=SEED)
-if plt is not None:
-    preds_all = np.array(normalizer.denorm_Y(jax.vmap(model)(Xte)))
-    truths_all = np.array(normalizer.denorm_Y(Yte))
-    plot_prediction_stats(preds_all, truths_all)
+    # Train
+    model = train(
+        model,
+        Xtr,
+        Ytr,
+        Xte,
+        Yte,
+        normalizer,
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE,
+        print_every=PRINT_EVERY,
+    )
+    print_sample_predictions(model, Xte, Yte, normalizer, n_samples=5, seed=SEED)
+    if plt is not None:
+        preds_all = np.array(normalizer.denorm_Y(jax.vmap(model)(Xte)))
+        truths_all = np.array(normalizer.denorm_Y(Yte))
+        plot_prediction_stats(preds_all, truths_all)
+
+    artifacts = TrainingArtifacts(model=model, normalizer=normalizer)
+    save_training_state(MODEL_STATE_PATH, artifacts)
+    print(f"Saved trained model state to {MODEL_STATE_PATH}")
+
+
+if __name__ == "__main__":
+    main()

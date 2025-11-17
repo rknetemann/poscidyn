@@ -14,7 +14,7 @@ from utils.gpu_monitor import GpuMonitor
 import oscidyn
 import argparse
 
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.9'
+jax.config.update("jax_platform_name", "gpu")
 N_FWHM = 4.0
 
 SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
@@ -23,8 +23,8 @@ SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbo
 PRECISION = oscidyn.Precision.SINGLE
 
 Q_values = np.linspace(10.0, 20.0, 5)  
-omega_0_values = np.linspace(0.9, 4.0, 5)
-gamma_values = np.linspace(0.0, 0.005, 5)
+omega_0_values = np.linspace(1.0, 4.0, 5)
+gamma_values = np.linspace(-0.005, 0.005, 11)
 modal_force_values = np.linspace(0.1, 1.0, 5)
 
 # Generate all combinations of parameters for the two modes
@@ -32,24 +32,25 @@ params = []
 for Q_1 in Q_values:
     for Q_2 in Q_values:
         for omega_0_1 in omega_0_values:
-            for omega_0_2 in omega_0_values:
-                if omega_0_2 > omega_0_1:  # Ensure the second mode's resonance frequency is not lower
-                    for gamma_1 in gamma_values:
-                        for gamma_2 in gamma_values:
-                            for modal_force_1 in modal_force_values:
-                                for modal_force_2 in modal_force_values:
-                                    if modal_force_2 <= modal_force_1:  # Ensure the second mode's modal force is not greater
-                                        params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2])
+            if omega_0_1 == 1.0:
+                for omega_0_2 in omega_0_values:
+                    if omega_0_2 > omega_0_1:  # Ensure the second mode's resonance frequency is not lower
+                        for gamma_1 in gamma_values:
+                            for gamma_2 in gamma_values:
+                                for modal_force_1 in modal_force_values:
+                                    for modal_force_2 in modal_force_values:
+                                        params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2, modal_force_1, modal_force_2])
 
 # Convert the list of parameters to a NumPy array
 params = np.array(params)
+print(f"Total parameter combinations: {params.shape[0]}")
 
 # Sort the parameters by Q_1 and then Q_2 in descending order
 params = params[np.lexsort((-params[:, 1], -params[:, 0]))]
 
 @filter_jit
 def simulate(params): # params: (n_params,)
-    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, gamma_1_val, gamma_2_val = params
+    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, gamma_1_val, gamma_2_val, modal_force_1_val, modal_force_2_val = params
     
     Q_val = jnp.array([Q_1_val, Q_2_val])
     omega_0_val = jnp.array([omega_0_1_val, omega_0_2_val])
@@ -68,7 +69,7 @@ def simulate(params): # params: (n_params,)
         300
     )
     drive_amp = jnp.linspace(0.01, 1.0, 10)
-    excitation = oscidyn.OneToneExcitation(drive_frequencies=drive_freq, drive_amplitudes=drive_amp, modal_forces=np.array([1.0, 0.5]))
+    excitation = oscidyn.OneToneExcitation(drive_frequencies=drive_freq, drive_amplitudes=drive_amp, modal_forces=jnp.array([modal_force_1_val, modal_force_2_val]))
 
     return oscidyn.frequency_sweep(
         model=model,
@@ -193,6 +194,7 @@ if __name__ == "__main__":
                     sim_grp.attrs['Q'] = np.asarray(batch_sweeps.Q[j])
                     sim_grp.attrs['omega_0'] = np.asarray(batch_sweeps.omega_0[j])
                     sim_grp.attrs['gamma'] = np.asarray(batch_sweeps.gamma[j])
+                    sim_grp.attrs['modal_forces'] = np.asarray(batch_sweeps.modal_forces[j])
 
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 

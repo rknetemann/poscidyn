@@ -209,12 +209,12 @@ def build_drive_frequency_grid(omega_0, fwhm, n_points=300, dense_multiplier=4.0
 
 # 2 modes:
 Q, omega_0, alpha, gamma = np.array([30.0, 30.0]), np.array([2.00, 5.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 5.00e-3 * 0.001 * 0
-gamma[1,1,1,1] = 5.00e-3 * 0.001 * 10
+gamma[0,0,0,0] = 2.50e-3 * 0.001
+gamma[1,1,1,1] = 5.00e-3 * 0
 
 FWHM = omega_0 / Q
 N_FWHM = 4.0
-TARGET_FREQ_POINTS = 200
+TARGET_FREQ_POINTS = 100
 DENSE_MULTIPLIER = 1.0
 MIN_DRIVE_FREQ = 0.1
 
@@ -229,8 +229,7 @@ DRIVING_FREQUENCY = build_drive_frequency_grid(
 )
 print(f"Generated {DRIVING_FREQUENCY.size} drive frequencies for the sweep.")
 print(DRIVING_FREQUENCY)
-DRIVING_FREQUENCY = np.linspace(4.5, 5.5, 100)
-DRIVING_AMPLITUDE = np.linspace(10.0, 380.337, 3)
+DRIVING_AMPLITUDE = np.linspace(10.0, 100.0, 10)
 EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 0.5]))
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
 SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)

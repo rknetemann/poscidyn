@@ -153,6 +153,7 @@ class TimeIntegrationSolver(AbstractSolver):
         result = FrequencySweepResult(
             f_omegas=excitor.f_omegas,
             f_amps=excitor.f_amps,
+            modal_forces=excitor.modal_forces,
             Q=self.model.Q,
             omega_0=self.model.omega_0,
             alpha=self.model.alpha,
