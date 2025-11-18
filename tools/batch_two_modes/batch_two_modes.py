@@ -22,31 +22,56 @@ MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_res
 SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
-Q_values = np.linspace(10.0, 20.0, 5)  
-omega_0_values = np.linspace(1.0, 4.0, 5)
-gamma_values = np.linspace(-0.005, 0.005, 11)
-modal_force_values = np.linspace(0.1, 1.0, 5)
+TOTAL_SIMULATIONS = 50_000
 
-# Generate all combinations of parameters for the two modes
-params = []
-for Q_1 in Q_values:
-    for Q_2 in Q_values:
-        for omega_0_1 in omega_0_values:
-            if omega_0_1 == 1.0:
-                for omega_0_2 in omega_0_values:
-                    if omega_0_2 > omega_0_1:  # Ensure the second mode's resonance frequency is not lower
-                        for gamma_1 in gamma_values:
-                            for gamma_2 in gamma_values:
-                                for modal_force_1 in modal_force_values:
-                                    for modal_force_2 in modal_force_values:
-                                        params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2, modal_force_1, modal_force_2])
+Q_1_range = np.array([5.0, 20.0])
+Q_2_range = np.array([5.0, 20.0])
+omega_0_1_range = np.array([1.0, 1.0])
+omega_0_2_range = np.array([1.0, 4.0])
+gamma_1_range = np.array([-0.005, 0.005])
+gamma_2_range = np.array([-0.005, 0.005])
+modal_force_1_range = np.array([0.1, 1.0])
+modal_force_2_range = np.array([0.1, 1.0])
 
-# Convert the list of parameters to a NumPy array
-params = np.array(params)
-print(f"Total parameter combinations: {params.shape[0]}")
+# Generate random parameter sets
+params = np.zeros((TOTAL_SIMULATIONS, 8))
+params[:, 0] = np.random.uniform(Q_1_range[0], Q_1_range[1], TOTAL_SIMULATIONS)
+params[:, 1] = np.random.uniform(Q_2_range[0], Q_2_range[1], TOTAL_SIMULATIONS)
+params[:, 2] = np.random.uniform(omega_0_1_range[0], omega_0_1_range[1], TOTAL_SIMULATIONS)
+params[:, 3] = np.random.uniform(omega_0_2_range[0], omega_0_2_range[1], TOTAL_SIMULATIONS)
+params[:, 4] = np.random.uniform(gamma_1_range[0], gamma_1_range[1], TOTAL_SIMULATIONS)
+params[:, 5] = np.random.uniform(gamma_2_range[0], gamma_2_range[1], TOTAL_SIMULATIONS)
+params[:, 6] = np.random.uniform(modal_force_1_range[0], modal_force_1_range[1], TOTAL_SIMULATIONS)
+params[:, 7] = np.random.uniform(modal_force_2_range[0], modal_force_2_range[1], TOTAL_SIMULATIONS)
 
-# Sort the parameters by Q_1 and then Q_2 in descending order
-params = params[np.lexsort((-params[:, 1], -params[:, 0]))]
+print(f"Generated {TOTAL_SIMULATIONS} random parameter sets.")
+
+
+# Q_values = np.linspace(1.1, 5.0, 5)  
+# omega_0_values = np.linspace(1.0, 4.0, 5)
+# gamma_values = np.linspace(-0.005, 0.005, 11)
+# modal_force_values = np.linspace(0.1, 1.0, 5)
+
+# # Generate all combinations of parameters for the two modes
+# params = []
+# for Q_1 in Q_values:
+#     for Q_2 in Q_values:
+#         for omega_0_1 in omega_0_values:
+#             if omega_0_1 == 1.0:
+#                 for omega_0_2 in omega_0_values:
+#                     if omega_0_2 > omega_0_1:  # Ensure the second mode's resonance frequency is not lower
+#                         for gamma_1 in gamma_values:
+#                             for gamma_2 in gamma_values:
+#                                 for modal_force_1 in modal_force_values:
+#                                     for modal_force_2 in modal_force_values:
+#                                         params.append([Q_1, Q_2, omega_0_1, omega_0_2, gamma_1, gamma_2, modal_force_1, modal_force_2])
+
+# # Convert the list of parameters to a NumPy array
+# params = np.array(params)
+# print(f"Total parameter combinations: {params.shape[0]}")
+
+# # Sort the parameters by Q_1 and then Q_2 in descending order
+# params = params[np.lexsort((-params[:, 1], -params[:, 0]))]
 
 @filter_jit
 def simulate(params): # params: (n_params,)
@@ -99,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_parallel_sim",
         type=int,
-        default=4,
+        default=2,
         nargs="?",
         help="Amount of simulations to run in parallel (default: 2)"
     )

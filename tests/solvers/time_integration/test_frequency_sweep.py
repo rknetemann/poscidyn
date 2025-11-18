@@ -229,11 +229,11 @@ DRIVING_FREQUENCY = build_drive_frequency_grid(
 )
 print(f"Generated {DRIVING_FREQUENCY.size} drive frequencies for the sweep.")
 print(DRIVING_FREQUENCY)
-DRIVING_FREQUENCY = np.linspace(4.5, 5.5, 100)
-DRIVING_AMPLITUDE = np.linspace(10.0, 380.337, 3)
+#DRIVING_FREQUENCY = np.linspace(4.5, 5.5, 150)
+DRIVING_AMPLITUDE = np.linspace(10.0, 380.337, 10)
 EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 0.5]))
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*3, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
