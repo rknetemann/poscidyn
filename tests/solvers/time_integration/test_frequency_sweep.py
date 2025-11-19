@@ -113,127 +113,21 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     else:
         ax.add_artist(legend1)
 
-
-def _merge_intervals(intervals, eps=1e-9):
-    if not intervals:
-        return []
-
-    sorted_intervals = sorted(intervals, key=lambda pair: pair[0])
-    merged = [list(sorted_intervals[0])]
-    for start, end in sorted_intervals[1:]:
-        if start - merged[-1][1] <= eps:
-            merged[-1][1] = max(merged[-1][1], end)
-        else:
-            merged.append([start, end])
-
-    return [(start, end) for start, end in merged if end - start > eps]
-
-
-def build_drive_frequency_grid(omega_0, fwhm, n_points=300, dense_multiplier=4.0, n_fwhm=4.0, min_freq=0.1):
-    omega_0 = np.asarray(omega_0, dtype=float)
-    fwhm = np.asarray(fwhm, dtype=float)
-    if omega_0.size == 0:
-        raise ValueError("omega_0 must contain at least one resonant frequency.")
-
-    freq_min = max(min_freq, float(np.min(omega_0 - n_fwhm * fwhm)))
-    freq_max = float(np.max(omega_0 + n_fwhm * fwhm))
-    if freq_max <= freq_min:
-        freq_max = freq_min + 1.0
-
-    dense_multiplier = max(1.0, float(dense_multiplier))
-
-    raw_windows = []
-    for center, width in zip(omega_0, fwhm):
-        start = max(freq_min, center - n_fwhm * width)
-        end = min(freq_max, center + n_fwhm * width)
-        if end > start:
-            raw_windows.append((start, end))
-
-    dense_segments = _merge_intervals(raw_windows)
-
-    breakpoints = {freq_min, freq_max}
-    for start, end in dense_segments:
-        breakpoints.add(start)
-        breakpoints.add(end)
-
-    breakpoints = np.array(sorted(breakpoints))
-    gaps = np.diff(breakpoints) > 1e-9
-    if not np.any(gaps):
-        return np.linspace(freq_min, freq_max, n_points)
-
-    segment_starts = breakpoints[:-1][gaps]
-    segment_ends = breakpoints[1:][gaps]
-    segment_lengths = segment_ends - segment_starts
-
-    def _is_dense(midpoint: float) -> bool:
-        for start, end in dense_segments:
-            if start - 1e-9 <= midpoint <= end + 1e-9:
-                return True
-        return False
-
-    segment_weights = np.array(
-        [
-            dense_multiplier if _is_dense(0.5 * (lo + hi)) else 1.0
-            for lo, hi in zip(segment_starts, segment_ends)
-        ]
-    )
-
-    weighted_lengths = segment_lengths * segment_weights
-    cdf = np.concatenate(([0.0], np.cumsum(weighted_lengths)))
-    total_weighted = cdf[-1]
-    if total_weighted <= 0:
-        return np.linspace(freq_min, freq_max, n_points)
-
-    targets = np.linspace(0.0, total_weighted, n_points)
-    segment_indices = np.searchsorted(cdf[1:], targets, side="right")
-    segment_indices = np.clip(segment_indices, 0, segment_lengths.size - 1)
-    seg_offsets = targets - cdf[segment_indices]
-
-    with np.errstate(divide="ignore", invalid="ignore"):
-        local_param = np.divide(
-            seg_offsets,
-            weighted_lengths[segment_indices],
-            out=np.zeros_like(seg_offsets),
-            where=weighted_lengths[segment_indices] > 0,
-        )
-
-    drive_freqs = segment_starts[segment_indices] + local_param * segment_lengths[segment_indices]
-    drive_freqs[0] = freq_min
-    drive_freqs[-1] = freq_max
-    return drive_freqs
-
-
 # 1 mode:
-# Q, omega_0, alpha, gamma = np.array([80.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-# gamma[0,0,0,0] = 0.0123
+Q, omega_0, alpha, gamma = np.array([100.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+gamma[0,0,0,0] = 5.00e-2
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([30.0, 30.0]), np.array([2.00, 5.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 5.00e-3 * 0.001 * 0
-gamma[1,1,1,1] = 5.00e-3 * 0.001 * 10
-
-FWHM = omega_0 / Q
-N_FWHM = 4.0
-TARGET_FREQ_POINTS = 200
-DENSE_MULTIPLIER = 1.0
-MIN_DRIVE_FREQ = 0.1
+# Q, omega_0, alpha, gamma = np.array([30.0, 30.0]), np.array([2.00, 5.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+# gamma[0,0,0,0] = 5.00e-3 * 0.001 * 0
+# gamma[1,1,1,1] = 5.00e-3 * 0.001 * 10
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-DRIVING_FREQUENCY = build_drive_frequency_grid(
-    omega_0=omega_0,
-    fwhm=FWHM,
-    n_points=TARGET_FREQ_POINTS,
-    dense_multiplier=DENSE_MULTIPLIER,
-    n_fwhm=N_FWHM,
-    min_freq=MIN_DRIVE_FREQ,
-)
-print(f"Generated {DRIVING_FREQUENCY.size} drive frequencies for the sweep.")
-print(DRIVING_FREQUENCY)
-#DRIVING_FREQUENCY = np.linspace(4.5, 5.5, 150)
-DRIVING_AMPLITUDE = np.linspace(10.0, 380.337, 10)
-EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 0.5]))
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*3, verbose=True, throw=False, rtol=1e-3, atol=1e-7)
+DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 250)
+DRIVING_AMPLITUDE = np.linspace(0.01,  0.0732, 10)
+EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0]))
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*20, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
