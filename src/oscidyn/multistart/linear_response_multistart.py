@@ -25,6 +25,7 @@ class LinearResponseMultistart(AbstractMultistart):
             x0s_grid = jnp.outer(jnp.linspace(
                 -1.0, 1.0, n_x0s
             ), max_displacement_per_mode)
+
         else:
             x0s_grid = jnp.zeros((1, n_modes))
 
