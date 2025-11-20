@@ -15,21 +15,23 @@ import oscidyn
 import argparse
 
 jax.config.update("jax_platform_name", "gpu")
-N_FWHM = 4.0
+N_FWHM = 5.0
 
 SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=50, max_steps=4096*3, verbose=False, throw=False, rtol=1e-4, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
-TOTAL_SIMULATIONS = 50_000
+TOTAL_SIMULATIONS = 100_000
 
 Q_1_range = np.array([5.0, 20.0])
 Q_2_range = np.array([5.0, 20.0])
 omega_0_1_range = np.array([1.0, 1.0])
-omega_0_2_range = np.array([1.0, 4.0])
-gamma_1_range = np.array([-0.005, 0.005])
-gamma_2_range = np.array([-0.005, 0.005])
+omega_0_2_range = np.array([1.0, 3.0])
+# gamma_1_range = np.array([-0.005, 0.005])
+# gamma_2_range = np.array([-0.005, 0.005])
+eta_1_range = np.array([0.01, 1.0])
+eta_2_range = np.array([0.01, 1.0])
 modal_force_1_range = np.array([0.1, 1.0])
 modal_force_2_range = np.array([0.1, 1.0])
 
@@ -39,13 +41,12 @@ params[:, 0] = np.random.uniform(Q_1_range[0], Q_1_range[1], TOTAL_SIMULATIONS)
 params[:, 1] = np.random.uniform(Q_2_range[0], Q_2_range[1], TOTAL_SIMULATIONS)
 params[:, 2] = np.random.uniform(omega_0_1_range[0], omega_0_1_range[1], TOTAL_SIMULATIONS)
 params[:, 3] = np.random.uniform(omega_0_2_range[0], omega_0_2_range[1], TOTAL_SIMULATIONS)
-params[:, 4] = np.random.uniform(gamma_1_range[0], gamma_1_range[1], TOTAL_SIMULATIONS)
-params[:, 5] = np.random.uniform(gamma_2_range[0], gamma_2_range[1], TOTAL_SIMULATIONS)
+params[:, 4] = np.random.uniform(eta_1_range[0], eta_1_range[1], TOTAL_SIMULATIONS)
+params[:, 5] = np.random.uniform(eta_2_range[0], eta_2_range[1], TOTAL_SIMULATIONS)
 params[:, 6] = np.random.uniform(modal_force_1_range[0], modal_force_1_range[1], TOTAL_SIMULATIONS)
 params[:, 7] = np.random.uniform(modal_force_2_range[0], modal_force_2_range[1], TOTAL_SIMULATIONS)
 
 print(f"Generated {TOTAL_SIMULATIONS} random parameter sets.")
-
 
 # Q_values = np.linspace(1.1, 5.0, 5)  
 # omega_0_values = np.linspace(1.0, 4.0, 5)
@@ -74,16 +75,20 @@ print(f"Generated {TOTAL_SIMULATIONS} random parameter sets.")
 # params = params[np.lexsort((-params[:, 1], -params[:, 0]))]
 
 @filter_jit
+def gamma_activating_nonlinearity(Q, omega_0, f, eta):
+    return (4 * eta * (1 + eta) / 3) * (omega_0**4 / (f**2 * Q**2))
+
+@filter_jit
 def simulate(params): # params: (n_params,)
-    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, gamma_1_val, gamma_2_val, modal_force_1_val, modal_force_2_val = params
+    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, eta_1_val, eta_2_val, modal_force_1_val, modal_force_2_val = params
     
     Q_val = jnp.array([Q_1_val, Q_2_val])
     omega_0_val = jnp.array([omega_0_1_val, omega_0_2_val])
     
     alpha_val = jnp.zeros((2, 2, 2))
     gamma_val = jnp.zeros((2, 2, 2, 2))
-    gamma_val = gamma_val.at[0, 0, 0, 0].set(gamma_1_val)
-    gamma_val = gamma_val.at[1, 1, 1, 1].set(gamma_2_val)
+    gamma_val = gamma_val.at[0, 0, 0, 0].set(gamma_activating_nonlinearity(Q_1_val, omega_0_1_val, modal_force_1_val, eta_1_val))
+    gamma_val = gamma_val.at[1, 1, 1, 1].set(gamma_activating_nonlinearity(Q_2_val, omega_0_2_val, modal_force_2_val, eta_2_val))
 
     full_width_half_maxs = omega_0_val / Q_val
 
@@ -91,9 +96,10 @@ def simulate(params): # params: (n_params,)
     drive_freq = jnp.linspace(
         jnp.maximum(omega_0_val[0] - N_FWHM * full_width_half_maxs[0], 0.1),
         jnp.maximum(omega_0_val[1] + N_FWHM * full_width_half_maxs[1], 0.1),
-        300
+        200
     )
-    drive_amp = jnp.linspace(0.01, 1.0, 10)
+    #drive_amp = jnp.linspace(0.01, 1.0, 10)
+    drive_amp = jnp.array([1.0])
     excitation = oscidyn.OneToneExcitation(drive_frequencies=drive_freq, drive_amplitudes=drive_amp, modal_forces=jnp.array([modal_force_1_val, modal_force_2_val]))
 
     return oscidyn.frequency_sweep(
@@ -208,19 +214,42 @@ if __name__ == "__main__":
 
                     sim_grp = grp.create_group(sim_id)
 
-                    sweeped_periodic_solutions = sim_grp.create_dataset("sweeped_periodic_solutions", data=np.asarray(batch_sweeps.sweeped_periodic_solutions['forward'][j]))
-                    ds_x_max_total = sim_grp.create_dataset("x_max_total", data=np.asarray(batch_sweeps.periodic_solutions['max_x_total'][j]))
-                    ds_x_max_modes = sim_grp.create_dataset("x_max_modes", data=np.asarray(batch_sweeps.periodic_solutions['max_x_modes'][j]))
+                    max_forward_sweep = jnp.max(batch_sweeps.sweeped_periodic_solutions['forward'][j])
+                    max_backward_sweep = jnp.max(batch_sweeps.sweeped_periodic_solutions['backward'][j])
+
+                    normalized_forward_sweep = np.asarray(batch_sweeps.sweeped_periodic_solutions['forward'][j]) / max_forward_sweep
+                    normalized_backward_sweep = np.asarray(batch_sweeps.sweeped_periodic_solutions['backward'][j]) / max_backward_sweep
+
+                    forward_sweep = sim_grp.create_dataset("forward_sweep", data=normalized_forward_sweep)
+                    backward_sweep = sim_grp.create_dataset("backward_sweep", data=normalized_backward_sweep)
+                    ds_x_max_total = sim_grp.create_dataset("unsweeped_total", data=np.asarray(batch_sweeps.periodic_solutions['max_x_total'][j]))
+                    ds_x_max_modes = sim_grp.create_dataset("unsweeped_modes", data=np.asarray(batch_sweeps.periodic_solutions['max_x_modes'][j]))
                     #ds_x0 = sim_grp.create_dataset("x0", data=np.asarray(batch_sweeps.periodic_solutions['x0'][j]))
                     #ds_v0 = sim_grp.create_dataset("v0", data=np.asarray(batch_sweeps.periodic_solutions['v0'][j]))
 
-                    sim_grp.attrs['f_omegas'] = np.asarray(batch_sweeps.f_omegas[j])
-                    sim_grp.attrs['f_amps'] = np.asarray(batch_sweeps.f_amps[j])
-                    sim_grp.attrs['Q'] = np.asarray(batch_sweeps.Q[j])
-                    sim_grp.attrs['omega_0'] = np.asarray(batch_sweeps.omega_0[j])
-                    sim_grp.attrs['gamma'] = np.asarray(batch_sweeps.gamma[j])
-                    sim_grp.attrs['modal_forces'] = np.asarray(batch_sweeps.modal_forces[j])
+                    forward_sweep.attrs['reference_displacement'] = float(max_forward_sweep)
+                    backward_sweep.attrs['reference_displacement'] = float(max_backward_sweep)
 
+                    f_omegas = np.asarray(batch_sweeps.f_omegas[j])
+                    f_amps = np.asarray(batch_sweeps.f_amps[j])
+                    Q = np.asarray(batch_sweeps.Q[j])
+                    omega_0 = np.asarray(batch_sweeps.omega_0[j])
+                    gamma = np.asarray(batch_sweeps.gamma[j])
+                    modal_forces = np.asarray(batch_sweeps.modal_forces[j])
+
+                    gamma_ndim_forward = max_forward_sweep**2 * gamma
+                    gamma_ndim_backward = max_backward_sweep**2 * gamma
+
+                    sim_grp.attrs['f_omegas'] = f_omegas
+                    sim_grp.attrs['f_amps'] = f_amps
+                    sim_grp.attrs['Q'] = Q
+                    sim_grp.attrs['omega_0'] = omega_0
+                    sim_grp.attrs['modal_forces'] = modal_forces
+
+                    forward_sweep.attrs['gamma_ndim'] = gamma_ndim_forward
+                    backward_sweep.attrs['gamma_ndim'] = gamma_ndim_backward
+
+                    
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 
                 postfix_parts = [f"{secs_per_sim:.2f}s/sim"]

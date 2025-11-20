@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def required_gamma(Q, omega_0, f_target, eta):
-    """Return the nonlinear coefficient needed to reach the target force."""
+def gamma_activating_nonlinearity(Q, omega_0, f_target, eta):
     return (4 * eta * (1 + eta) / 3) * (omega_0**4 / (f_target**2 * Q**2))
 
 
@@ -11,7 +10,7 @@ def fwhm(omega_0, Q):
     return omega_0 / (2 * Q)
 
 
-omega_0 = 1.0
+omega_0 = 3.0
 f_target = 1.0
 eta_values = np.linspace(0.01, 1.0, num=30)
 colormap = plt.cm.viridis
@@ -54,7 +53,7 @@ cbar_q = fig1.colorbar(sm_q, ax=ax1, pad=0.02)
 cbar_q.set_label("Q value", rotation=270, labelpad=15)
 
 # Figure 2: eta sweep at fixed Q
-fixed_Q = 100.0
+fixed_Q = 20.0
 fig2, ax2 = plt.subplots(figsize=(10, 6))
 responses_eta = required_gamma(fixed_Q, omega_0, f_target, eta_values)
 
