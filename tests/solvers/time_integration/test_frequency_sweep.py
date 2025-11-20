@@ -5,6 +5,25 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+# 1 mode:
+Q, omega_0, alpha, gamma = np.array([100.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+gamma[0,0,0,0] = 0.0000888
+
+# 2 modes:
+# Q, omega_0, alpha, gamma = np.array([30.0, 30.0]), np.array([2.00, 5.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+# gamma[0,0,0,0] = 5.00e-3 * 0.001 * 0
+# gamma[1,1,1,1] = 5.00e-3 * 0.001 * 10
+
+REQUIRED_FORCE = 1.0
+
+MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 350)
+DRIVING_AMPLITUDE = np.linspace(0.1 * REQUIRED_FORCE, 1.0 * REQUIRED_FORCE, 10)
+EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0]))
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(11, 11), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
+PRECISION = oscidyn.Precision.SINGLE
 
 def _extract_gamma_diagonal(gamma: np.ndarray):
     arr = np.asarray(gamma)
@@ -41,6 +60,19 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions to plot.")
+    
+    max_forward = np.max(forward)
+    max_backward = np.max(backward)
+
+    max_value = max(
+        val for val in [max_forward, max_backward] if val is not None
+    )
+    print(f"Max value across forward and backward: {max_value}")
+
+    forward = forward / max_value
+    backward = backward / max_value
+
+    gamma_ndim = np.max(max_value**2 * gamma)
 
     drive_freqs = np.asarray(drive_freqs)
     drive_amps = np.asarray(drive_amps)
@@ -64,7 +96,10 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
                 linewidth=1.1,
             )
 
-    ax.set_title(f"Frequency sweep")
+    ax.set_title(
+        f"Frequency sweep\nMax displacement: {max_value:.2f}, "
+        f"Gamma (non-dimensional): {gamma_ndim:.2e}, "
+    )
     ax.set_xlabel("Drive frequency")
     ax.set_ylabel("Max displacement")
     ax.grid(alpha=0.25)
@@ -113,24 +148,6 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     else:
         ax.add_artist(legend1)
 
-# 1 mode:
-Q, omega_0, alpha, gamma = np.array([100.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = 5.00e-2
-
-# 2 modes:
-# Q, omega_0, alpha, gamma = np.array([30.0, 30.0]), np.array([2.00, 5.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-# gamma[0,0,0,0] = 5.00e-3 * 0.001 * 0
-# gamma[1,1,1,1] = 5.00e-3 * 0.001 * 10
-
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 250)
-DRIVING_AMPLITUDE = np.linspace(0.01,  0.0732, 10)
-EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0]))
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*20, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
-SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
-PRECISION = oscidyn.Precision.SINGLE
-
 start_time = time.time()
 
 frequency_sweep = oscidyn.frequency_sweep(
@@ -139,6 +156,7 @@ frequency_sweep = oscidyn.frequency_sweep(
     excitor=EXCITOR,
     solver = SOLVER,
     precision = PRECISION,
+    multistarter=MULTISTART,
 ) #n_freq, n_amp, n_init_disp, n_init_vel
 
 end_time = time.time()

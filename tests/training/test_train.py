@@ -20,6 +20,7 @@ DEFAULT_HDF5 = REPO_ROOT / "batch_2025-11-13_12:34:28_0.hdf5"
 # FILENAME = Path(os.environ.get("OSC_TRAIN_HDF5", DEFAULT_HDF5))
 FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-13_15-54-52.hdf5") #Newer
 #FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-13_11-38-54.hdf5") #Older
+FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-17_17-03.hdf5")
 DEFAULT_STATE_PATH = REPO_ROOT / "results" / "test_train_state.eqx"
 MODEL_STATE_PATH = Path(os.environ.get("OSC_TRAIN_STATE", DEFAULT_STATE_PATH))
 N_FREQS = 300
@@ -458,6 +459,7 @@ def plot_prediction_stats(preds: np.ndarray, truths: np.ndarray) -> None:
         ax.grid(alpha=0.2)
     fig_err.tight_layout()
     plt.show()
+    
 def main() -> None:
     key = jax.random.PRNGKey(SEED)
     key, subkey = jax.random.split(key, 2)
