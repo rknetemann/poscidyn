@@ -17,15 +17,32 @@ except ImportError:
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_HDF5 = REPO_ROOT / "batch_2025-11-13_12:34:28_0.hdf5"
-# FILENAME = Path(os.environ.get("OSC_TRAIN_HDF5", DEFAULT_HDF5))
-FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-13_15-54-52.hdf5") #Newer
-#FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-13_11-38-54.hdf5") #Older
-FILENAME = Path("/home/raymo/Downloads/batch_0_2025-11-17_17-03.hdf5")
+
+def _resolve_hdf5_files(defaults: Iterable[Path]) -> list[Path]:
+    """
+    Allows specifying multiple training files via OSC_TRAIN_HDF5 (os.pathsep-separated).
+    Falls back to the provided defaults if the env var is not set.
+    """
+    env_value = os.environ.get("OSC_TRAIN_HDF5")
+    if env_value:
+        candidates = [Path(part.strip()) for part in env_value.split(os.pathsep) if part.strip()]
+        if candidates:
+            return candidates
+    return [Path(p) for p in defaults]
+
+# Add or remove entries here to train on multiple batches when no env var is set.
+DEFAULT_HDF5_FILES = [
+    Path("/home/raymo/Downloads/2025-11-20/batch_0_2025-11-20_17-26.hdf5"), 
+    Path("/home/raymo/Downloads/2025-11-20/batch_1_2025-11-20_17-27.hdf5"),
+    Path("/home/raymo/Downloads/2025-11-20/batch_2_2025-11-20_17-27.hdf5"),
+    Path("/home/raymo/Downloads/2025-11-20/batch_3_2025-11-20_17-37.hdf5")
+]
+HDF5_FILES = _resolve_hdf5_files(DEFAULT_HDF5_FILES or [DEFAULT_HDF5])
 DEFAULT_STATE_PATH = REPO_ROOT / "results" / "test_train_state.eqx"
 MODEL_STATE_PATH = Path(os.environ.get("OSC_TRAIN_STATE", DEFAULT_STATE_PATH))
-N_FREQS = 300
-EXTRA_FEATURES = 3  # max amplitude per sweep + min/max driving frequency
-INPUT_SHAPE = (N_FREQS + EXTRA_FEATURES,)
+N_FREQS = 200  # single-force sweep contains 200 frequency samples
+INPUT_DIM = N_FREQS  # each sweep row flattens to 200 scalars
+TRAIN_SWEEP_DIRECTIONS = ("forward", "backward")  # choose subset of ("forward", "backward")
 OUTPUT_DIM = 6  # [Q1, Q2, omega01, omega02, gamma1, gamma2]
 SEED = 42
 LEARNING_RATE = 3e-4
@@ -42,7 +59,7 @@ class MLP(eqx.Module):
     def __init__(self, key):
         k1, k2, k3, k4 = jax.random.split(key, 4)
         self.layers = [
-            eqx.nn.Linear(INPUT_SHAPE[0], 128, key=k1),
+            eqx.nn.Linear(INPUT_DIM, 128, key=k1),
             jax.nn.relu,
             eqx.nn.Linear(128, 128, key=k2),
             jax.nn.relu,
@@ -55,19 +72,19 @@ class MLP(eqx.Module):
             eqx.nn.Linear(64, OUTPUT_DIM, key=k4),
         ]
 
-    def __call__(self, x: Float[Array, "303"]) -> Float[Array, "6"]:
+    def __call__(self, x: Float[Array, "input_dim"]) -> Float[Array, "6"]:
         for layer in self.layers:
             x = layer(x)
         return x
 
-def mse_loss(model: MLP, x: Float[Array, "batch 303"], y: Float[Array, "batch 6"]) -> Float[Array, ""]:
+def mse_loss(model: MLP, x: Float[Array, "batch input_dim"], y: Float[Array, "batch 6"]) -> Float[Array, ""]:
     preds = jax.vmap(model)(x)  # (batch, OUTPUT_DIM)
     return jnp.mean(jnp.sum((preds - y) ** 2, axis=-1))  # MSE over outputs
 
 mse_loss = eqx.filter_jit(mse_loss)
 
 @eqx.filter_jit
-def mae_metric(model: MLP, x: Float[Array, "batch 303"], y: Float[Array, "batch 6"]) -> Float[Array, ""]:
+def mae_metric(model: MLP, x: Float[Array, "batch input_dim"], y: Float[Array, "batch 6"]) -> Float[Array, ""]:
     preds = jax.vmap(model)(x)
     return jnp.mean(jnp.abs(preds - y))
 
@@ -82,18 +99,6 @@ def _as_jnp(x) -> jnp.ndarray:
     elif x.dtype != np.float32:
         x = x.astype(np.float32)
     return jnp.array(x)
-
-def normalize_rows_inplace(a: np.ndarray, use_abs: bool = True, eps: float = 1e-8) -> None:
-    """
-    Normalizes each row of 'a' by its max (optionally abs max) value.
-    Operates in-place. Rows whose max <= eps are left unchanged.
-    """
-    if use_abs:
-        row_max = np.max(np.abs(a), axis=1, keepdims=True)
-    else:
-        row_max = np.max(a, axis=1, keepdims=True)
-    scale = np.maximum(row_max, eps)
-    a /= scale
 
 def _pad_or_trim(vec: np.ndarray, length: int, fill: float = 0.0) -> np.ndarray:
     out = np.full((length,), fill, dtype=np.float32)
@@ -134,12 +139,18 @@ def _prepare_sweep_matrix(raw: np.ndarray, n_freqs: int) -> np.ndarray:
         )
     return sweeps.astype(np.float32)
 
-def _build_target_vector(attrs: h5py.AttributeManager) -> np.ndarray:
-    if "Q" not in attrs or "gamma" not in attrs or "omega_0" not in attrs:
-        raise ValueError("Each simulation must provide 'Q', 'omega_0', and 'gamma' attributes.")
+def _build_target_vector(attrs: h5py.AttributeManager, gamma_override=None) -> np.ndarray:
+    if "Q" not in attrs or "omega_0" not in attrs:
+        raise ValueError("Each simulation must provide 'Q' and 'omega_0' attributes.")
     q_vals = np.asarray(attrs["Q"], dtype=np.float32).reshape(-1)
     omega_vals = np.asarray(attrs["omega_0"], dtype=np.float32).reshape(-1)
-    gamma_diag = extract_gamma_diagonal(attrs["gamma"])
+    if gamma_override is None:
+        if "gamma" not in attrs:
+            raise ValueError("Missing 'gamma' attribute for targets.")
+        gamma_source = attrs["gamma"]
+    else:
+        gamma_source = gamma_override
+    gamma_diag = extract_gamma_diagonal(gamma_source)
     target = np.concatenate([
         _pad_or_trim(q_vals, 2),
         _pad_or_trim(omega_vals, 2),
@@ -179,7 +190,7 @@ class TrainingArtifacts(eqx.Module):
 
 
 def _empty_normalizer() -> DatasetNormalizer:
-    zeros_x = jnp.zeros((1, INPUT_SHAPE[0]), dtype=jnp.float32)
+    zeros_x = jnp.zeros((1, INPUT_DIM), dtype=jnp.float32)
     zeros_y = jnp.zeros((1, OUTPUT_DIM), dtype=jnp.float32)
     return DatasetNormalizer(
         x_mean=zeros_x,
@@ -204,84 +215,99 @@ def load_training_state(path: Path, key: jax.random.PRNGKey) -> TrainingArtifact
     return eqx.tree_deserialise_leaves(path, template)
 
 
-def load_hdf5_xy(filename: Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _load_single_hdf5_file(filename: Path, sweep_dataset_names: list[str], n_freqs: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    HDF5 layout:
-      - group 'simulations' with either datasets (legacy layout) or nested groups per simulation.
-      - new layout stores datasets such as 'sweeped_periodic_solutions' and 'x_max_total' inside each simulation group.
-      - each simulation provides attrs: 'Q' (length-2), 'omega_0' (length-2), 'gamma' (>=2 diag entries).
-    Returns:
-      X: (N, INPUT_SHAPE[0]) float32, i.e. sweep samples + max amplitude channel
-      Y: (N, 6)   float32, columns [Q1, Q2, omega01, omega02, gamma1, gamma2]
+    HDF5 layout per file:
+      - group 'simulations' with directional sweeps ('forward_sweep'/'backward_sweep').
+      - each sweep dataset stores normalized amplitudes (n_freqs, n_forces) and has gamma_ndim attrs.
+      - simulation attributes include 'Q' and 'omega_0'.
+    Returns data for a single file.
     """
     with h5py.File(filename, "r") as f:
         if "simulations" not in f or not isinstance(f["simulations"], h5py.Group):
-            raise ValueError("Expected a 'simulations' group in the HDF5 file.")
+            raise ValueError(f"Expected a 'simulations' group in the HDF5 file '{filename}'.")
         sims_grp: h5py.Group = f["simulations"]
 
-        n_freqs = N_FREQS
         sim_names = sorted(sims_grp.keys())
         if not sim_names:
-            raise ValueError("No simulations found in the provided HDF5 file.")
+            raise ValueError(f"No simulations found in HDF5 file '{filename}'.")
         X_list, Y_list, sim_id_list = [], [], []
 
         for sim_idx, nm in enumerate(sim_names):
-            obj = sims_grp[nm]
+            sim_grp = sims_grp[nm]
+            if not isinstance(sim_grp, h5py.Group):
+                raise TypeError(
+                    f"Simulation '{nm}' must be stored as a group with directional sweeps. "
+                    f"Found {type(sim_grp)}."
+                )
 
-            if isinstance(obj, h5py.Dataset):
-                sweeps = _prepare_sweep_matrix(obj[...], n_freqs)
-                attrs = obj.attrs
-            elif isinstance(obj, h5py.Group):
-                if "sweeped_periodic_solutions" in obj:
-                    raw = obj["sweeped_periodic_solutions"][...]
-                elif "x_max_total" in obj:
-                    raw = np.asarray(obj["x_max_total"][...])
-                    raw = np.nanmax(raw, axis=(-2, -1))  # collapse seed axes -> (n_freqs, n_amp)
-                else:
+            samples_added = 0
+            for sweep_name in sweep_dataset_names:
+                if sweep_name not in sim_grp:
+                    continue
+                dataset = sim_grp[sweep_name]
+                sweeps = _prepare_sweep_matrix(dataset[...], n_freqs)
+                if sweeps.shape[1] != n_freqs:
                     raise ValueError(
-                        f"Simulation '{nm}' missing a recognizable dataset "
-                        "(expected 'sweeped_periodic_solutions' or 'x_max_total')."
+                        f"Sweep '{sweep_name}' in simulation '{nm}' has width {sweeps.shape[1]}; expected {n_freqs}."
                     )
-                sweeps = _prepare_sweep_matrix(raw, n_freqs)
-                attrs = obj.attrs
-            else:
-                raise TypeError(f"Unsupported object type {type(obj)} for '{nm}'.")
+                sweeps = sweeps.astype(np.float32)
+                target_vec = _build_target_vector(sim_grp.attrs, gamma_override=dataset.attrs.get("gamma_ndim"))
+                Y_sim = np.repeat(target_vec[None, :], sweeps.shape[0], axis=0)
 
-            row_scale = np.max(np.abs(sweeps), axis=1, keepdims=True)
-            row_scale = np.maximum(row_scale, 1e-8)
-            scale_feature = np.log1p(row_scale)
-            if "f_omegas" not in attrs:
-                raise ValueError(f"Simulation '{nm}' missing 'f_omegas' attribute for feature construction.")
-            freqs = np.asarray(attrs["f_omegas"], dtype=np.float32).reshape(-1)
-            freq_pair = np.array([float(np.min(freqs)), float(np.max(freqs))], dtype=np.float32)
-            freq_features = np.repeat(freq_pair[None, :], sweeps.shape[0], axis=0)
+                X_list.append(sweeps)
+                Y_list.append(Y_sim)
+                sim_id_list.append(np.full((sweeps.shape[0],), sim_idx, dtype=np.int32))
+                samples_added += sweeps.shape[0]
 
-            normalize_rows_inplace(sweeps, use_abs=True, eps=1e-8)
-            features = np.concatenate(
-                [sweeps.astype(np.float32), scale_feature.astype(np.float32), freq_features.astype(np.float32)],
-                axis=1,
-            )
-            if features.shape[1] != INPUT_SHAPE[0]:
-                raise ValueError(f"Expected input width {INPUT_SHAPE[0]}, got {features.shape[1]} for '{nm}'.")
-
-            target_vec = _build_target_vector(attrs)
-            Y_sim = np.repeat(target_vec[None, :], features.shape[0], axis=0)
-
-            X_list.append(features)
-            Y_list.append(Y_sim)
-            sim_id_list.append(np.full((features.shape[0],), sim_idx, dtype=np.int32))
+            if samples_added == 0:
+                raise ValueError(
+                    f"Simulation '{nm}' in file '{filename}' did not contain any of {sweep_dataset_names}."
+                )
 
         X = np.concatenate(X_list, axis=0)  # (total_samples, input_dim)
         Y = np.concatenate(Y_list, axis=0)  # (total_samples, OUTPUT_DIM)
         sim_ids = np.concatenate(sim_id_list, axis=0)
 
-        # final checks
-        if X.ndim != 2 or X.shape[1] != INPUT_SHAPE[0]:
-            raise ValueError(f"X must be (N, {INPUT_SHAPE[0]}). Got {X.shape}")
+        if X.ndim != 2 or X.shape[1] != INPUT_DIM:
+            raise ValueError(f"X must be (N, {INPUT_DIM}). Got {X.shape} from '{filename}'")
         if Y.ndim != 2 or Y.shape[1] != OUTPUT_DIM or Y.shape[0] != X.shape[0]:
-            raise ValueError(f"Y must be (N, {OUTPUT_DIM}) with same N as X. Got {Y.shape}, X={X.shape}")
+            raise ValueError(f"Y must be (N, {OUTPUT_DIM}) matching X. Got {Y.shape} from '{filename}'")
 
         return X.astype(np.float32), Y.astype(np.float32), sim_ids
+
+
+def load_hdf5_xy(filenames: Iterable[Path] | Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Provides concatenated training data from one or more HDF5 files.
+    """
+    if isinstance(filenames, (str, os.PathLike, Path)):
+        file_list = [Path(filenames)]
+    else:
+        file_list = [Path(f) for f in filenames]
+    if not file_list:
+        raise ValueError("No HDF5 files specified.")
+    if not TRAIN_SWEEP_DIRECTIONS:
+        raise ValueError("TRAIN_SWEEP_DIRECTIONS must contain at least one sweep direction.")
+    valid_dirs = {"forward", "backward"}
+    invalid = [d for d in TRAIN_SWEEP_DIRECTIONS if d not in valid_dirs]
+    if invalid:
+        raise ValueError(f"Invalid sweep direction(s): {invalid}. Allowed: {sorted(valid_dirs)}")
+    sweep_dataset_names = [f"{direction}_sweep" for direction in TRAIN_SWEEP_DIRECTIONS]
+
+    X_parts, Y_parts, sim_id_parts = [], [], []
+    sim_offset = 0
+    for path in file_list:
+        Xf, Yf, sim_ids_f = _load_single_hdf5_file(path, sweep_dataset_names, N_FREQS)
+        X_parts.append(Xf)
+        Y_parts.append(Yf)
+        sim_id_parts.append(sim_ids_f + sim_offset)
+        sim_offset += int(sim_ids_f.max()) + 1
+
+    X = np.concatenate(X_parts, axis=0)
+    Y = np.concatenate(Y_parts, axis=0)
+    sim_ids = np.concatenate(sim_id_parts, axis=0)
+    return X, Y, sim_ids
 
 def simulation_train_test_split(
     X: np.ndarray,
@@ -312,22 +338,22 @@ def batch_iter(X: jnp.ndarray, Y: jnp.ndarray, batch_size: int, shuffle: bool, s
         yield X[sl], Y[sl]
 
 # ----------------------
-# Evaluation
+# Evaluation utilities
 # ----------------------
-def evaluate(model: MLP, X: jnp.ndarray, Y: jnp.ndarray, normalizer: DatasetNormalizer, batch_size: int = 1024) -> Tuple[float, float]:
-    total_mse, total_mae, total_n = 0.0, 0.0, 0
-    for xb, yb in batch_iter(X, Y, batch_size, shuffle=False, seed=0):
-        bsz = xb.shape[0]
-        preds = jax.vmap(model)(xb)
-        preds_raw = normalizer.denorm_Y(preds)
-        yb_raw = normalizer.denorm_Y(yb)
-        diff = preds_raw - yb_raw
-        batch_mse = jnp.mean(jnp.sum(diff ** 2, axis=-1))
-        batch_mae = jnp.mean(jnp.abs(diff))
-        total_mse += float(batch_mse) * bsz
-        total_mae += float(batch_mae) * bsz
-        total_n += bsz
-    return total_mse / total_n, total_mae / total_n
+@eqx.filter_jit
+def predict_denorm(model: MLP, X: jnp.ndarray, normalizer: DatasetNormalizer) -> jnp.ndarray:
+    preds = jax.vmap(model)(X)
+    return normalizer.denorm_Y(preds)
+
+
+@eqx.filter_jit
+def evaluate(model: MLP, X: jnp.ndarray, Y: jnp.ndarray, normalizer: DatasetNormalizer) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    preds_raw = predict_denorm(model, X, normalizer)
+    y_raw = normalizer.denorm_Y(Y)
+    diff = preds_raw - y_raw
+    mse = jnp.mean(jnp.sum(diff ** 2, axis=-1))
+    mae = jnp.mean(jnp.abs(diff))
+    return mse, mae
 
 # ----------------------
 # Train step
@@ -349,17 +375,17 @@ def train(model: MLP, Xtr: jnp.ndarray, Ytr: jnp.ndarray, Xte: jnp.ndarray, Yte:
         for xb, yb in batch_iter(Xtr, Ytr, batch_size, shuffle=True, seed=SEED+epoch):
             model, opt_state, train_loss = train_step(model, opt_state, xb, yb)
             if (step % print_every) == 0:
-                tr_mse, tr_mae = evaluate(model, Xtr, Ytr, normalizer, batch_size=batch_size)
-                te_mse, te_mae = evaluate(model, Xte, Yte, normalizer, batch_size=batch_size)
+                tr_mse, tr_mae = evaluate(model, Xtr, Ytr, normalizer)
+                te_mse, te_mae = evaluate(model, Xte, Yte, normalizer)
                 print(
                     f"epoch={epoch:02d} step={step:05d}  "
-                    f"train_mse={tr_mse:.6f}  train_mae={tr_mae:.6f}  "
-                    f"test_mse={te_mse:.6f}  test_mae={te_mae:.6f}"
+                    f"train_mse={float(tr_mse):.6f}  train_mae={float(tr_mae):.6f}  "
+                    f"test_mse={float(te_mse):.6f}  test_mae={float(te_mae):.6f}"
                 )
             step += 1
     # final metrics
-    te_mse, te_mae = evaluate(model, Xte, Yte, normalizer, batch_size=batch_size)
-    print(f"[final] test_mse={te_mse:.6f}  test_mae={te_mae:.6f}")
+    te_mse, te_mae = evaluate(model, Xte, Yte, normalizer)
+    print(f"[final] test_mse={float(te_mse):.6f}  test_mae={float(te_mae):.6f}")
     return model
 
 def print_sample_predictions(
@@ -375,8 +401,7 @@ def print_sample_predictions(
     indices = rng.choice(X.shape[0], size=n_samples, replace=False)
     xb = X[indices]
     yb = Y[indices]
-    preds = jax.vmap(model)(xb)
-    preds_raw = np.array(normalizer.denorm_Y(preds))
+    preds_raw = np.array(predict_denorm(model, xb, normalizer))
     yb_raw = np.array(normalizer.denorm_Y(yb))
     for i, (pred_vec, true_vec) in enumerate(zip(preds_raw, yb_raw), start=1):
         print(f"\n[Example {i}]")
@@ -466,7 +491,7 @@ def main() -> None:
     model = MLP(subkey)
 
     # Quick sanity check on shapes with random data
-    test_x = jax.random.normal(key, (28, INPUT_SHAPE[0]))
+    test_x = jax.random.normal(key, (28, INPUT_DIM))
     test_y = jax.random.normal(key, (28, OUTPUT_DIM))
     pred_y = jax.vmap(model)(test_x)
     print("Predicted y (first sample):", pred_y[0])
@@ -475,14 +500,14 @@ def main() -> None:
 
     # Load your actual data
     try:
-        X_np, Y_np, sim_ids = load_hdf5_xy(FILENAME)
+        X_np, Y_np, sim_ids = load_hdf5_xy(HDF5_FILES)
     except Exception as e:
         # Helpful fallback so the script still runs; remove once your file layout is recognized
         print(f"Warning: {e}\nUsing synthetic data as a fallback.")
         N = 5000
-        X = jax.random.normal(key, (N, INPUT_SHAPE[0]))
+        X = jax.random.normal(key, (N, INPUT_DIM))
         # Some synthetic regression target
-        W = jax.random.normal(key, (INPUT_SHAPE[0], OUTPUT_DIM))
+        W = jax.random.normal(key, (INPUT_DIM, OUTPUT_DIM))
         Y = jnp.tanh(X @ W) + 0.05 * jax.random.normal(key, (N, OUTPUT_DIM))
         sim_ids = np.arange(N) // 50
         X_np = np.array(X, dtype=np.float32)
@@ -511,7 +536,7 @@ def main() -> None:
     )
     print_sample_predictions(model, Xte, Yte, normalizer, n_samples=5, seed=SEED)
     if plt is not None:
-        preds_all = np.array(normalizer.denorm_Y(jax.vmap(model)(Xte)))
+        preds_all = np.array(predict_denorm(model, Xte, normalizer))
         truths_all = np.array(normalizer.denorm_Y(Yte))
         plot_prediction_stats(preds_all, truths_all)
 
