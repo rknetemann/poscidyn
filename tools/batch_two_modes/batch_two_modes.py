@@ -227,8 +227,8 @@ if __name__ == "__main__":
                     #ds_x0 = sim_grp.create_dataset("x0", data=np.asarray(batch_sweeps.periodic_solutions['x0'][j]))
                     #ds_v0 = sim_grp.create_dataset("v0", data=np.asarray(batch_sweeps.periodic_solutions['v0'][j]))
 
-                    forward_sweep.attrs['reference_displacement'] = float(max_forward_sweep)
-                    backward_sweep.attrs['reference_displacement'] = float(max_backward_sweep)
+                    forward_sweep.attrs['reference_displacement'] = np.float32(max_forward_sweep)
+                    backward_sweep.attrs['reference_displacement'] = np.float32(max_backward_sweep)
 
                     f_omegas = np.asarray(batch_sweeps.f_omegas[j])
                     f_amps = np.asarray(batch_sweeps.f_amps[j])
