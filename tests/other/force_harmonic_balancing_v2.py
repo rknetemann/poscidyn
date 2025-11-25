@@ -11,7 +11,7 @@ def fwhm(omega_0, Q):
 
 
 omega_0 = 1.0
-gamma = 1.0e-20
+gamma = 0.0267
 eta_values = np.linspace(0.01, 1.0, num=30)
 colormap = plt.cm.viridis
 
@@ -49,7 +49,7 @@ cbar_q = fig1.colorbar(sm_q, ax=ax1, pad=0.02)
 cbar_q.set_label("Q value", rotation=270, labelpad=15)
 
 # Figure 2: eta sweep at fixed Q
-fixed_Q = 20.0
+fixed_Q = 10.0
 fig2, ax2 = plt.subplots(figsize=(10, 6))
 responses_eta = f(fixed_Q, omega_0, gamma, eta_values)
 

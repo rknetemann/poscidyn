@@ -44,7 +44,7 @@ ax1.set_ylabel(r"$\gamma$")
 ax1.set_title(
     r"Gamma required to activate nonlinear term ($\eta$ = {:.2f}, f = {:.2e})".format(
         eta_fixed, f_target
-    )
+    
 )
 ax1.grid(True, alpha=0.3, which="both", linestyle="--", linewidth=0.5)
 sm_q = plt.cm.ScalarMappable(cmap=colormap, norm=q_norm)

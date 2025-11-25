@@ -1,10 +1,7 @@
 from jax import tree_util
 
-from ..model.abstract_model import AbstractModel
-from ..excitation.abstract_excitation import AbstractExcitation
-
 class FrequencySweepResult:
-    def __init__(self, f_omegas, f_amps, modal_forces, Q, omega_0, alpha, gamma, periodic_solutions, sweeped_periodic_solutions):
+    def __init__(self, f_omegas, f_amps, modal_forces, Q, omega_0, alpha, gamma, periodic_solutions, sweeped_periodic_solutions, n_successful, n_total, success_rate):
         self.f_omegas = f_omegas
         self.f_amps = f_amps
         self.modal_forces = modal_forces
@@ -14,15 +11,57 @@ class FrequencySweepResult:
         self.gamma = gamma
         self.periodic_solutions = periodic_solutions
         self.sweeped_periodic_solutions = sweeped_periodic_solutions
+        self.n_successful = n_successful
+        self.n_total = n_total
+        self.success_rate = success_rate
 
 # Register FrequencySweepResult as a pytree
 def _tree_flatten(obj):
-    leaves = (obj.f_omegas, obj.f_amps, obj.modal_forces,obj.Q, obj.omega_0, obj.alpha, obj.gamma, obj.periodic_solutions, obj.sweeped_periodic_solutions)
+    leaves = (
+        obj.f_omegas,
+        obj.f_amps,
+        obj.modal_forces,
+        obj.Q,
+        obj.omega_0,
+        obj.alpha,
+        obj.gamma,
+        obj.periodic_solutions,
+        obj.sweeped_periodic_solutions,
+        obj.n_successful,
+        obj.n_total,
+        obj.success_rate,
+    )
     return leaves, None
 
 def _tree_unflatten(aux_data, leaves):
-    f_omegas, f_amps, modal_forces, Q, omega_0, alpha, gamma, periodic_solutions, sweeped_periodic_solutions = leaves
-    return FrequencySweepResult(f_omegas, f_amps, modal_forces, Q, omega_0, alpha, gamma, periodic_solutions, sweeped_periodic_solutions)
+    (
+        f_omegas,
+        f_amps,
+        modal_forces,
+        Q,
+        omega_0,
+        alpha,
+        gamma,
+        periodic_solutions,
+        sweeped_periodic_solutions,
+        n_successful,
+        n_total,
+        success_rate,
+    ) = leaves
+    return FrequencySweepResult(
+        f_omegas,
+        f_amps,
+        modal_forces,
+        Q,
+        omega_0,
+        alpha,
+        gamma,
+        periodic_solutions,
+        sweeped_periodic_solutions,
+        n_successful,
+        n_total,
+        success_rate,
+    )
 
 tree_util.register_pytree_node(
     FrequencySweepResult, _tree_flatten, _tree_unflatten

@@ -147,6 +147,11 @@ class TimeIntegrationSolver(AbstractSolver):
             lambda leaf: leaf.reshape(shape[:-1] + leaf.shape[1:]),
             flat_solutions
         )
+
+        successful_mask = periodic_solutions["successful"]
+        n_successful = int(jnp.count_nonzero(successful_mask))
+        n_total = int(successful_mask.size)
+        success_rate = float(n_successful / n_total) if n_total else 0.0
         
         sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
                 
@@ -159,7 +164,10 @@ class TimeIntegrationSolver(AbstractSolver):
             alpha=self.model.alpha,
             gamma=self.model.gamma,
             periodic_solutions=periodic_solutions,
-            sweeped_periodic_solutions=sweeped_periodic_solutions
+            sweeped_periodic_solutions=sweeped_periodic_solutions,
+            n_successful=n_successful,
+            n_total=n_total,
+            success_rate=success_rate,
         )
 
         return result
