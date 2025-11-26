@@ -46,13 +46,13 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
             self.n_time_steps = n_time_steps
 
-        T = jnp.max(2.0 * jnp.pi / f_omega)
+        T = jnp.max(2.0 * jnp.pi / f_omega) * 4.0
         t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol))
         t0 = 0.0
         t1 = t_ss + T
 
         if kwargs.get("only_save_steady_state"):
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps)
+            ts = jnp.linspace(t_ss, t1, self.n_time_steps * 4)
         else:
             n_periods = (t1 - t0) / T
             ts = jnp.linspace(t0, t1, self.n_time_steps * int(jnp.ceil(n_periods)))
@@ -83,12 +83,12 @@ class TimeIntegrationSolver(AbstractSolver):
             v0 = jnp.full((self.model.n_modes,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
-            T = jnp.max(2.0 * jnp.pi / f_omega) * const.N_PERIODS_TO_RETAIN
+            T = jnp.max(2.0 * jnp.pi / f_omega) * const.N_PERIODS_TO_RETAIN * 40.0
             t_ss = self.model.t_steady_state(f_omega, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE
             
             t0 = 0.0
             t1 = t_ss + T
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps)
+            ts = jnp.linspace(t_ss, t1, self.n_time_steps * 40)
             
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
