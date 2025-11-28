@@ -53,7 +53,7 @@ class NearestNeighbourSweep(AbstractSweep):
                 start_choice_idx = jnp.where(
                     finite_mask.any(),
                     jnp.argmax(jnp.where(finite_mask, start_cands, -jnp.inf)),
-                    0,
+                    -1,
                 )
 
                 def body(carry, freq_idx):
@@ -63,13 +63,16 @@ class NearestNeighbourSweep(AbstractSweep):
                     diffs = jnp.abs(cands - prev_val)
 
                     # ignore NaNs/Infs by giving them infinite distance
-                    diffs = jnp.where(jnp.isfinite(cands), diffs, jnp.inf)
+                    finite_mask = jnp.isfinite(cands)
+                    diffs = jnp.where(finite_mask, diffs, jnp.inf)
 
                     k = jnp.argmin(diffs)
-                    chosen = cands[k]
+                    no_valid = jnp.logical_not(jnp.any(finite_mask))
+                    chosen = jnp.where(no_valid, prev_val, cands[k])
+                    chosen_idx = jnp.where(no_valid, -1, k)
 
                     out_vals = out_vals.at[freq_idx].set(chosen)
-                    out_idx = out_idx.at[freq_idx].set(k)
+                    out_idx = out_idx.at[freq_idx].set(chosen_idx)
                     return (chosen, out_vals, out_idx), None
 
                 init_vals = jnp.full((n_freq,), jnp.nan)
