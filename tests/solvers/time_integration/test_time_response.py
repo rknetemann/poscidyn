@@ -13,9 +13,9 @@ alpha[0,0,1] = 1.01e0
 alpha[1,0,0] = 5.07e-1
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, rtol=1e-4, atol=1e-7, verbose=True)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=1000, rtol=1e-4, atol=1e-7, verbose=True)
 DRIVING_FREQUENCY = 0.5
-DRIVING_AMPLITUDE = 1.0
+DRIVING_AMPLITUDE = 2.0
 INITIAL_DISPLACEMENT = np.array([16, 0.0])
 INITIAL_VELOCITY = np.array([0.0, 0.0])
 PRECISION = oscidyn.Precision.SINGLE
@@ -38,52 +38,75 @@ num_modes = xs.shape[-1]
 total_xs = xs.sum(axis=1)
 total_vs = vs.sum(axis=1)
 
-plt.figure(figsize=(10, 6))
+# plt.figure(figsize=(10, 6))
 
-# Plot individual modes first
-for mode in range(num_modes):
-    plt.subplot(num_modes + 1, 1, mode + 1)
-    plt.plot(ts, xs[:, mode], label=f'Displacement')
-    plt.plot(ts, vs[:, mode], label=f'Velocity')
-    plt.xlabel('Time')
-    plt.ylabel('Response')
-    plt.title(f"Time Response (Mode {mode + 1})")
-    plt.legend()
-    plt.grid()
+# # Plot individual modes first
+# for mode in range(num_modes):
+#     plt.subplot(num_modes + 1, 1, mode + 1)
+#     plt.plot(ts, xs[:, mode], label=f'Displacement')
+#     plt.plot(ts, vs[:, mode], label=f'Velocity')
+#     plt.xlabel('Time')
+#     plt.ylabel('Response')
+#     plt.title(f"Time Response (Mode {mode + 1})")
+#     plt.legend()
+#     plt.grid()
 
-# Plot total response at the end
-plt.subplot(num_modes + 1, 1, num_modes + 1)
-plt.plot(ts, total_xs, label='Displacement')
-plt.plot(ts, total_vs, label='Velocity')
-plt.xlabel('Time')
-plt.ylabel('Response')
-plt.title("Time Response (Total)")
+# # Plot total response at the end
+# plt.subplot(num_modes + 1, 1, num_modes + 1)
+# plt.plot(ts, total_xs, label='Displacement')
+# plt.plot(ts, total_vs, label='Velocity')
+# plt.xlabel('Time')
+# plt.ylabel('Response')
+# plt.title("Time Response (Total)")
+# plt.legend()
+# plt.grid()
+
+# plt.tight_layout()
+# plt.show()
+
+# # Phase portrait: displacement vs velocity for each mode
+# for mode in range(num_modes):
+#     plt.figure(figsize=(8, 6))
+#     plt.plot(xs[:, mode], vs[:, mode], label=f"Mode {mode + 1}")
+#     plt.xlabel("Displacement")
+#     plt.ylabel("Velocity")
+#     plt.title(f"Phase Portrait (Mode {mode + 1})")
+#     plt.legend()
+#     plt.grid()
+#     plt.tight_layout()
+#     plt.show()
+
+# Phase portrait for total response
+plt.figure(figsize=(8, 6))
+plt.plot(total_xs, total_vs, label="Total", linewidth=2, color="k")
+plt.xlabel("Displacement")
+plt.ylabel("Velocity")
+plt.title(f"Phase Space Time Response (F={DRIVING_AMPLITUDE})")
 plt.legend()
 plt.grid()
-
 plt.tight_layout()
 plt.show()
 
-# FFT of total response
-dt = ts[1] - ts[0]
-freqs = np.fft.rfftfreq(len(ts), dt)
-fft_total_xs = np.fft.rfft(total_xs)
-fft_total_vs = np.fft.rfft(total_vs)
+# # FFT of total response
+# dt = ts[1] - ts[0]
+# freqs = np.fft.rfftfreq(len(ts), dt)
+# fft_total_xs = np.fft.rfft(total_xs)
+# fft_total_vs = np.fft.rfft(total_vs)
 
-plt.figure(figsize=(10, 6))
-plt.subplot(2, 1, 1)
-plt.plot(freqs, np.abs(fft_total_xs), label='|X(f)|')
-plt.xlabel('Frequency')
-plt.ylabel('Amplitude')
-plt.title("FFT of Total Displacement")
-plt.grid()
+# plt.figure(figsize=(10, 6))
+# plt.subplot(2, 1, 1)
+# plt.plot(freqs, np.abs(fft_total_xs), label='|X(f)|')
+# plt.xlabel('Frequency')
+# plt.ylabel('Amplitude')
+# plt.title("FFT of Total Displacement")
+# plt.grid()
 
-plt.subplot(2, 1, 2)
-plt.plot(freqs, np.abs(fft_total_vs), label='|V(f)|', color='orange')
-plt.xlabel('Frequency')
-plt.ylabel('Amplitude')
-plt.title("FFT of Total Velocity")
-plt.grid()
+# plt.subplot(2, 1, 2)
+# plt.plot(freqs, np.abs(fft_total_vs), label='|V(f)|', color='orange')
+# plt.xlabel('Frequency')
+# plt.ylabel('Amplitude')
+# plt.title("FFT of Total Velocity")
+# plt.grid()
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()

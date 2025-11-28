@@ -46,13 +46,13 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
             self.n_time_steps = n_time_steps
 
-        T = jnp.max(2.0 * jnp.pi / f_omega) * 4.0
+        T = jnp.max(2.0 * jnp.pi / f_omega) * 10.0
         t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol))
         t0 = 0.0
         t1 = t_ss + T
 
         if kwargs.get("only_save_steady_state"):
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps * 4)
+            ts = jnp.linspace(t_ss, t1, self.n_time_steps * 10)
         else:
             n_periods = (t1 - t0) / T
             ts = jnp.linspace(t0, t1, self.n_time_steps * int(jnp.ceil(n_periods)))
