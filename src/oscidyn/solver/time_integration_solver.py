@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 from equinox import filter_jit
 import diffrax
+from jax import core as jax_core
 
 from .abstract_solver import AbstractSolver
 from ..model.abstract_model import AbstractModel
@@ -26,6 +27,11 @@ class TimeIntegrationSolver(AbstractSolver):
 
         self.model: AbstractModel = None
         self.multistarter: AbstractMultistart = None
+
+    @staticmethod
+    def _is_tracer(value) -> bool:
+        """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
+        return isinstance(value, jax_core.Tracer)
     
     def _max_steps_budget(self, t_span: float, period: float, safety_factor: float = 2.0) -> int:
         """Infer a max_steps large enough for the requested horizon.
@@ -36,6 +42,11 @@ class TimeIntegrationSolver(AbstractSolver):
         guard on long, low-frequency runs.
         """
         if self.n_time_steps is None:
+            return self.max_steps
+
+        # When traced (e.g. under vmap/jit), fall back to the configured cap
+        # instead of trying to convert tracers to Python scalars.
+        if self._is_tracer(t_span) or self._is_tracer(period):
             return self.max_steps
 
         steps_per_period = max(int(self.n_time_steps), 1) * const.MAXIMUM_ORDER_SUPERHARMONICS
@@ -51,20 +62,22 @@ class TimeIntegrationSolver(AbstractSolver):
                  f_amp: jax.Array, 
                  x0: jax.Array,  
                  v0: jax.Array,
-                 **kwargs
+                **kwargs
                 ):
 
         y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
-        if self.n_time_steps is None:
+        if self.n_time_steps is None and not self._is_tracer(f_omega):
             rtol = 0.01
-            max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * f_omega.item()
+            max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * jnp.max(f_omega)
             
             one_period = 2.0 * jnp.pi / max_frequency_component
             sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
             
-            n_time_steps = int(jnp.ceil(one_period * sampling_frequency))
+            n_time_steps = int(math.ceil(float(one_period * sampling_frequency)))
             self.n_time_steps = n_time_steps
+        elif self.n_time_steps is None:
+            raise ValueError("n_time_steps must be set before calling time_response when tracing.")
 
         period = jnp.max(2.0 * jnp.pi / f_omega)
         periods_to_retain = const.N_PERIODS_TO_RETAIN
@@ -77,9 +90,13 @@ class TimeIntegrationSolver(AbstractSolver):
             ts = jnp.linspace(t_ss, t1, self.n_time_steps * 10)
         else:
             n_periods = (t1 - t0) / T
-            ts = jnp.linspace(t0, t1, self.n_time_steps * int(jnp.ceil(n_periods)))
+            if self._is_tracer(n_periods):
+                n_time_steps_total = self.n_time_steps * periods_to_retain
+            else:
+                n_time_steps_total = self.n_time_steps * int(math.ceil(float(n_periods)))
+            ts = jnp.linspace(t0, t1, n_time_steps_total)
 
-        max_steps_budget = self._max_steps_budget(float(t1 - t0), float(period))
+        max_steps_budget = self._max_steps_budget(t1 - t0, period)
 
         sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
@@ -178,18 +195,20 @@ class TimeIntegrationSolver(AbstractSolver):
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
+            if self._is_tracer(f_omegas):
+                raise ValueError("n_time_steps must be set before calling frequency_sweep when tracing.")
             rtol = 0.01
             max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * jnp.max(f_omegas)
             
             one_period = 2.0 * jnp.pi / max_frequency_component
             sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
 
-            n_time_steps = jnp.ceil(one_period * sampling_frequency).astype(int)
+            n_time_steps = int(math.ceil(float(one_period * sampling_frequency)))
             self.n_time_steps = n_time_steps
         
         f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.model, f_omegas, f_amps)
-        longest_period = float(jnp.max(2.0 * jnp.pi / f_omegas))
-        t_ss_estimate = float(jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE))
+        longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
+        t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE)
         t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
         max_steps_budget = self._max_steps_budget(t_span_estimate, longest_period)
 
@@ -201,9 +220,13 @@ class TimeIntegrationSolver(AbstractSolver):
         )
 
         successful_mask = periodic_solutions["successful"]
-        n_successful = int(jnp.count_nonzero(successful_mask))
-        n_total = int(successful_mask.size)
-        success_rate = float(n_successful / n_total) if n_total else 0.0
+        n_successful = jnp.count_nonzero(successful_mask)
+        n_total = successful_mask.size
+        success_rate = jnp.where(n_total > 0, n_successful / n_total, 0.0)
+        if not self._is_tracer(n_successful):
+            n_successful = int(n_successful)
+        if not self._is_tracer(success_rate):
+            success_rate = float(success_rate)
         
         sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
                 

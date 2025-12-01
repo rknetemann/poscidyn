@@ -15,7 +15,7 @@ import oscidyn
 import argparse
 
 jax.config.update("jax_platform_name", "gpu")
-N_FWHM = 5.0
+N_FWHM = 10.0
 
 SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
@@ -28,8 +28,8 @@ Q_1_range = np.array([5.0, 20.0])
 Q_2_range = np.array([5.0, 20.0])
 omega_0_1_range = np.array([1.0, 1.0])
 omega_0_2_range = np.array([1.0, 3.0])
-# gamma_1_range = np.array([-0.005, 0.005])
-# gamma_2_range = np.array([-0.005, 0.005])
+gamma_1_multiplier_range = np.array([-1.0, 1.0])
+gamma_2_multiplier_range = np.array([-1.0, 1.0])
 eta_1_range = np.array([0.01, 1.0])
 eta_2_range = np.array([0.01, 1.0])
 modal_force_1_range = np.array([0.1, 1.0])
@@ -37,7 +37,7 @@ modal_force_2_range = np.array([0.0, 1.0])
 alpha_range = np.array([0.0, 1.0])
 
 # Generate random parameter sets
-params = np.zeros((TOTAL_SIMULATIONS, 9))
+params = np.zeros((TOTAL_SIMULATIONS, 11))
 params[:, 0] = np.random.uniform(Q_1_range[0], Q_1_range[1], TOTAL_SIMULATIONS)
 params[:, 1] = np.random.uniform(Q_2_range[0], Q_2_range[1], TOTAL_SIMULATIONS)
 params[:, 2] = np.random.uniform(omega_0_1_range[0], omega_0_1_range[1], TOTAL_SIMULATIONS)
@@ -47,6 +47,8 @@ params[:, 5] = np.random.uniform(eta_2_range[0], eta_2_range[1], TOTAL_SIMULATIO
 params[:, 6] = np.random.uniform(modal_force_1_range[0], modal_force_1_range[1], TOTAL_SIMULATIONS)
 params[:, 7] = np.random.uniform(modal_force_2_range[0], modal_force_2_range[1], TOTAL_SIMULATIONS)
 params[:, 8] = np.random.uniform(alpha_range[0], alpha_range[1], TOTAL_SIMULATIONS)
+params[:, 9] = np.random.uniform(gamma_1_multiplier_range[0], gamma_1_multiplier_range[1], TOTAL_SIMULATIONS)
+params[:, 10] = np.random.uniform(gamma_2_multiplier_range[0], gamma_2_multiplier_range[1], TOTAL_SIMULATIONS)
 
 print(f"Generated {TOTAL_SIMULATIONS} random parameter sets.")
 
@@ -82,15 +84,15 @@ def gamma_activating_nonlinearity(Q, omega_0, f, eta):
 
 @filter_jit
 def simulate(params): # params: (n_params,)
-    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, eta_1_val, eta_2_val, modal_force_1_val, modal_force_2_val, alpha_param = params
+    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, eta_1_val, eta_2_val, modal_force_1_val, modal_force_2_val, alpha_param, gamma_1_multiplier, gamma_2_multiplier = params
     
     Q_val = jnp.array([Q_1_val, Q_2_val])
     omega_0_val = jnp.array([omega_0_1_val, omega_0_2_val])
     
     alpha_val = jnp.zeros((2, 2, 2))
     gamma_val = jnp.zeros((2, 2, 2, 2))
-    gamma_val = gamma_val.at[0, 0, 0, 0].set(gamma_activating_nonlinearity(Q_1_val, omega_0_1_val, modal_force_1_val, eta_1_val))
-    gamma_val = gamma_val.at[1, 1, 1, 1].set(gamma_activating_nonlinearity(Q_2_val, omega_0_2_val, modal_force_2_val, eta_2_val))
+    gamma_val = gamma_val.at[0, 0, 0, 0].set(gamma_activating_nonlinearity(Q_1_val, omega_0_1_val, modal_force_1_val, eta_1_val) * gamma_1_multiplier)
+    gamma_val = gamma_val.at[1, 1, 1, 1].set(gamma_activating_nonlinearity(Q_2_val, omega_0_2_val, modal_force_2_val, eta_2_val) * gamma_2_multiplier)
     alpha_val = alpha_val.at[0, 0, 1].set(alpha_param)
     alpha_val = alpha_val.at[1, 0, 0].set(alpha_param)
 
@@ -240,20 +242,29 @@ if __name__ == "__main__":
                     omega_0 = np.asarray(batch_sweeps.omega_0[j])
                     gamma = np.asarray(batch_sweeps.gamma[j])
                     modal_forces = np.asarray(batch_sweeps.modal_forces[j])
+                    alpha = np.asarray(batch_sweeps.alpha[j])
+
+                    success_rate = batch_sweeps.success_rate[j]
 
                     gamma_ndim_forward = max_forward_sweep**2 * gamma
                     gamma_ndim_backward = max_backward_sweep**2 * gamma
+
+                    alpha_ndim_forward = max_forward_sweep * alpha
+                    alpha_ndim_backward = max_backward_sweep * alpha
 
                     sim_grp.attrs['f_omegas'] = f_omegas
                     sim_grp.attrs['f_amps'] = f_amps
                     sim_grp.attrs['Q'] = Q
                     sim_grp.attrs['omega_0'] = omega_0
                     sim_grp.attrs['modal_forces'] = modal_forces
+                    sim_grp.attrs['success_rate'] = success_rate
 
                     forward_sweep.attrs['gamma_ndim'] = gamma_ndim_forward
                     backward_sweep.attrs['gamma_ndim'] = gamma_ndim_backward
+                    forward_sweep.attrs['alpha_ndim'] = alpha_ndim_forward
+                    backward_sweep.attrs['alpha_ndim'] = alpha_ndim_backward
 
-                    
+
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 
                 postfix_parts = [f"{secs_per_sim:.2f}s/sim"]
