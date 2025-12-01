@@ -10,11 +10,11 @@ from matplotlib.lines import Line2D
 # gamma[0,0,0,0] = 0.00666
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 3.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 0.0267
-gamma[1,1,1,1] = 0.540
-alpha[0,0,1] = 7.48e-1
-alpha[1,0,0] = 3.74e-1
+Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+gamma[0,0,0,0] = 0.0266
+gamma[1,1,1,1] = 0.0
+alpha[0,0,1] = 0.2
+alpha[1,0,0] = 0.1
 
 REQUIRED_FORCE = 1.0
 

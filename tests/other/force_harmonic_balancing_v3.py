@@ -10,7 +10,7 @@ def fwhm(omega_0, Q):
     return omega_0 / (2 * Q)
 
 
-omega_0 = 3.0
+omega_0 = 1.0
 f_target = 1.0
 eta_values = np.linspace(0.01, 1.0, num=30)
 colormap = plt.cm.viridis
@@ -24,7 +24,7 @@ Q_values = np.logspace(exp_min, exp_max, num=num_q)
 fig1, ax1 = plt.subplots(figsize=(10, 6))
 eta_fixed = 1.0
 q_norm = plt.Normalize(Q_values.min(), Q_values.max())
-responses_q = required_gamma(Q_values, omega_0, f_target, eta_fixed)
+responses_q = gamma_activating_nonlinearity(Q_values, omega_0, f_target, eta_fixed)
 
 print(f"[Q sweep] Summary statistics (eta fixed at {eta_fixed:.2f}, f={f_target:.2e})")
 print(
@@ -45,7 +45,7 @@ ax1.set_title(
     r"Gamma required to activate nonlinear term ($\eta$ = {:.2f}, f = {:.2e})".format(
         eta_fixed, f_target
     
-)
+))
 ax1.grid(True, alpha=0.3, which="both", linestyle="--", linewidth=0.5)
 sm_q = plt.cm.ScalarMappable(cmap=colormap, norm=q_norm)
 sm_q.set_array([])
@@ -53,9 +53,9 @@ cbar_q = fig1.colorbar(sm_q, ax=ax1, pad=0.02)
 cbar_q.set_label("Q value", rotation=270, labelpad=15)
 
 # Figure 2: eta sweep at fixed Q
-fixed_Q = 20.0
+fixed_Q = 10.0
 fig2, ax2 = plt.subplots(figsize=(10, 6))
-responses_eta = required_gamma(fixed_Q, omega_0, f_target, eta_values)
+responses_eta = gamma_activating_nonlinearity(fixed_Q, omega_0, f_target, eta_values)
 
 print(f"[eta sweep] Summary statistics (Q fixed at {fixed_Q:.0f}, f={f_target:.2e})")
 print(

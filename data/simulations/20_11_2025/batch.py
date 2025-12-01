@@ -33,11 +33,10 @@ omega_0_2_range = np.array([1.0, 3.0])
 eta_1_range = np.array([0.01, 1.0])
 eta_2_range = np.array([0.01, 1.0])
 modal_force_1_range = np.array([0.1, 1.0])
-modal_force_2_range = np.array([0.0, 1.0])
-alpha_range = np.array([0.0, 1.0])
+modal_force_2_range = np.array([0.1, 1.0])
 
 # Generate random parameter sets
-params = np.zeros((TOTAL_SIMULATIONS, 9))
+params = np.zeros((TOTAL_SIMULATIONS, 8))
 params[:, 0] = np.random.uniform(Q_1_range[0], Q_1_range[1], TOTAL_SIMULATIONS)
 params[:, 1] = np.random.uniform(Q_2_range[0], Q_2_range[1], TOTAL_SIMULATIONS)
 params[:, 2] = np.random.uniform(omega_0_1_range[0], omega_0_1_range[1], TOTAL_SIMULATIONS)
@@ -46,11 +45,10 @@ params[:, 4] = np.random.uniform(eta_1_range[0], eta_1_range[1], TOTAL_SIMULATIO
 params[:, 5] = np.random.uniform(eta_2_range[0], eta_2_range[1], TOTAL_SIMULATIONS)
 params[:, 6] = np.random.uniform(modal_force_1_range[0], modal_force_1_range[1], TOTAL_SIMULATIONS)
 params[:, 7] = np.random.uniform(modal_force_2_range[0], modal_force_2_range[1], TOTAL_SIMULATIONS)
-params[:, 8] = np.random.uniform(alpha_range[0], alpha_range[1], TOTAL_SIMULATIONS)
 
 print(f"Generated {TOTAL_SIMULATIONS} random parameter sets.")
 
-# Q_values = np.linspace(1.1, 5.0, 5)  
+# Q_values = np.linspace(1.1, 5.0, 5)
 # omega_0_values = np.linspace(1.0, 4.0, 5)
 # gamma_values = np.linspace(-0.005, 0.005, 11)
 # modal_force_values = np.linspace(0.1, 1.0, 5)
@@ -82,17 +80,15 @@ def gamma_activating_nonlinearity(Q, omega_0, f, eta):
 
 @filter_jit
 def simulate(params): # params: (n_params,)
-    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, eta_1_val, eta_2_val, modal_force_1_val, modal_force_2_val, alpha_param = params
-    
+    Q_1_val, Q_2_val, omega_0_1_val, omega_0_2_val, eta_1_val, eta_2_val, modal_force_1_val, modal_force_2_val = params
+
     Q_val = jnp.array([Q_1_val, Q_2_val])
     omega_0_val = jnp.array([omega_0_1_val, omega_0_2_val])
-    
+
     alpha_val = jnp.zeros((2, 2, 2))
     gamma_val = jnp.zeros((2, 2, 2, 2))
     gamma_val = gamma_val.at[0, 0, 0, 0].set(gamma_activating_nonlinearity(Q_1_val, omega_0_1_val, modal_force_1_val, eta_1_val))
     gamma_val = gamma_val.at[1, 1, 1, 1].set(gamma_activating_nonlinearity(Q_2_val, omega_0_2_val, modal_force_2_val, eta_2_val))
-    alpha_val = alpha_val.at[0, 0, 1].set(alpha_param)
-    alpha_val = alpha_val.at[1, 0, 0].set(alpha_param)
 
     full_width_half_maxs = omega_0_val / Q_val
 
@@ -114,7 +110,7 @@ def simulate(params): # params: (n_params,)
         multistarter=MULTISTART,
         precision=PRECISION,
     )
-    
+
 simulate_sub_batch = jax.vmap(simulate) # input args: (n_parallel_sim, n_params)
 
 if __name__ == "__main__":
@@ -178,9 +174,9 @@ if __name__ == "__main__":
 
     n_sim = len(task_param)
     n_batches = math.ceil(n_sim / (n_parallel_sim)) # Example: 1001 simulations, 10 simulations in parallel -> 101 sub-batches
-    
+
     print(f"Total simulations: {n_sim}, Parallel simulations: {n_parallel_sim}, Batches: {n_batches}")
-    
+
     with h5py.File(file_name, 'w') as hdf5:
         hdf5.create_dataset('params', data=np.asarray(task_param))
         hdf5.attrs['task_id'] = task_id
@@ -189,7 +185,7 @@ if __name__ == "__main__":
         hdf5.attrs['n_batches'] = n_batches
         hdf5.attrs['started_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
         hdf5.attrs['completed_at'] = ""
-        
+
         grp = hdf5.create_group('simulations')
 
         with GpuMonitor(interval=0.5) as gm:
@@ -206,7 +202,7 @@ if __name__ == "__main__":
                 t0 = time.time()
                 batch_sweeps = simulate_sub_batch(batch_params)
                 elapsed = time.time() - t0
-                
+
                 # if i==0:
                 #     jax.profiler.stop_trace()
 
@@ -253,7 +249,7 @@ if __name__ == "__main__":
                     forward_sweep.attrs['gamma_ndim'] = gamma_ndim_forward
                     backward_sweep.attrs['gamma_ndim'] = gamma_ndim_backward
 
-                    
+
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 
                 postfix_parts = [f"{secs_per_sim:.2f}s/sim"]
@@ -263,10 +259,10 @@ if __name__ == "__main__":
 
                 pbar.set_postfix_str("   ".join(postfix_parts))
                 hdf5.attrs['max_gpu_usage'] = gm.max_summary() if gm._max_summary else ""
-                
+
                 # if i == 10:
                 #     break # Early exit for debugging
-        
+
             hdf5.attrs['completed_at'] = time.strftime("%Y-%m-%d %H:%M:%S")
             hdf5.attrs['elapsed_time'] = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
             hdf5.attrs['n_simulations_per_second'] = n_sim / (time.time() - start_time)
