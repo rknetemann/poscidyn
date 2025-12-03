@@ -11,3 +11,9 @@
 - Frequency-domain identification (deep learning model)
 
 ---
+
+Install locally: 
+```
+python -m pip install -e .
+```
+

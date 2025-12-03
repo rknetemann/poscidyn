@@ -5,8 +5,9 @@ import oscidyn
 # 1 mode: 
 Q, omega_0, alpha, gamma = np.array([20.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
 gamma[0,0,0,0] = 1.0
+
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 3.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
 gamma[0,0,0,0] = 0.0267
 gamma[1,1,1,1] = 0.540
 alpha[0,0,1] = 1.01e0
