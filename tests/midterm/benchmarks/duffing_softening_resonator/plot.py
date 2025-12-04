@@ -5,18 +5,9 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-# 1 mode:
 Q, omega_0, alpha, gamma = np.array([25.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
 gamma[0,0,0,0] = -1.13
 modal_forces = np.array([1.0])
-
-# 2 modes:
-# Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-# gamma[0,0,0,0] = 2.67e-02
-# gamma[1,1,1,1] = 5.40e-01
-# alpha[0,0,1] = 7.48e-01
-# alpha[1,0,0] = 3.74e-01
-# modal_forces = np.array([1.0, 0.5])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 250)
@@ -29,17 +20,23 @@ SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbos
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
-def _extract_gamma_diagonal(gamma: np.ndarray):
-    arr = np.asarray(gamma)
-    if arr.ndim < 4:
-        return arr.ravel().tolist()[: arr.size]
+start_time = time.time()
 
-    diag = []
-    max_modes = min(2, arr.shape[0], arr.shape[1], arr.shape[2], arr.shape[3])
-    for i in range(max_modes):
-        diag.append(float(arr[i, i, i, i]))
-    return diag
+frequency_sweep = oscidyn.frequency_sweep(
+    model = MODEL,
+    sweeper=SWEEPER,
+    excitor=EXCITOR,
+    solver = SOLVER,
+    precision = PRECISION,
+    multistarter=MULTISTART,
+)
 
+end_time = time.time()
+print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
+print(
+    f"Successful periodic solutions: {frequency_sweep.n_successful}/{frequency_sweep.n_total} "
+    f"({frequency_sweep.success_rate:.1%})"
+)
 
 def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
     arr = np.asarray(gamma)
@@ -102,11 +99,6 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     )
     print(f"Max value across forward and backward: {max_value}")
 
-    forward = forward / max_value
-    backward = backward / max_value
-
-    gamma_ndim = np.max(max_value**2 * gamma)
-
     drive_freqs = np.asarray(drive_freqs)
     drive_amps = np.asarray(drive_amps)
     colors = plt.cm.viridis(np.linspace(0, 1, drive_amps.size))
@@ -130,11 +122,10 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
             )
 
     ax.set_title(
-        f"Frequency sweep\nMax displacement: {max_value:.2f}, "
-        f"Gamma (non-dimensional): {gamma_ndim:.2e}, "
+        f"Frequency sweep"
     )
     ax.set_xlabel("Drive frequency")
-    ax.set_ylabel("Max displacement")
+    ax.set_ylabel("Amplitude")
     ax.grid(alpha=0.25)
 
     if param_text:
@@ -180,25 +171,6 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
         ax.add_artist(legend1)
     else:
         ax.add_artist(legend1)
-
-start_time = time.time()
-
-frequency_sweep = oscidyn.frequency_sweep(
-    model = MODEL,
-    sweeper=SWEEPER,
-    excitor=EXCITOR,
-    solver = SOLVER,
-    precision = PRECISION,
-    multistarter=MULTISTART,
-) #n_freq, n_amp, n_init_disp, n_init_vel
-
-end_time = time.time()
-print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
-print(
-    f"Successful periodic solutions: {frequency_sweep.n_successful}/{frequency_sweep.n_total} "
-    f"({frequency_sweep.success_rate:.1%})"
-)
-
 
 fig, ax = plt.subplots(figsize=(10, 6))
 plot_sweep(
