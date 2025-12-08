@@ -1,11 +1,5 @@
-frequency_sweep = oscidyn.frequency_sweep(
-    model = MODEL,
-    sweeper=SWEEPER,
-    excitor=EXCITOR,
-    solver = SOLVER,
-    precision = PRECISION,
-    multistarter=MULTISTART,
-)
+import oscidyn
+import numpy as np
 
 Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
 gamma[0,0,0,0] = 2.67e-02
@@ -19,3 +13,12 @@ modal_forces = np.array([1.0, 0.0])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+
+frequency_sweep = oscidyn.frequency_sweep(
+    model = MODEL,
+    excitor=EXCITOR
+)
+
+
+
+
