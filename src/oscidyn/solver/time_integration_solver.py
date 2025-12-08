@@ -100,7 +100,7 @@ class TimeIntegrationSolver(AbstractSolver):
 
         sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
-                solver=diffrax.Kvaerno5(),
+                solver=diffrax.Tsit5(),
                 t0=t0, t1=t1, dt0=None, max_steps=max_steps_budget,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
