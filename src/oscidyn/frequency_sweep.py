@@ -22,7 +22,7 @@ def frequency_sweep(
     sweeper: AbstractSweep = NearestNeighbourSweep(),
     solver: AbstractSolver = TimeIntegrationSolver(),
     multistarter: AbstractMultistart = LinearResponseMultistart(),
-    precision: const.Precision = const.Precision.DOUBLE,
+    precision: const.Precision = const.Precision.SINGLE,
 ) -> FrequencySweepResult:
             
     if precision == const.Precision.DOUBLE:
