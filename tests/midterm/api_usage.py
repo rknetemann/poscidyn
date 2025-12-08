@@ -19,6 +19,12 @@ frequency_sweep = oscidyn.frequency_sweep(
     excitor=EXCITOR
 )
 
-
-
+time_response = oscidyn.time_response(
+    model = MODEL,
+    driving_frequency = 1.0,
+    driving_amplitude = 1.0,
+    initial_displacement= 0.0,
+    initial_velocity = 0.0,
+    only_save_steady_state = True
+)
 

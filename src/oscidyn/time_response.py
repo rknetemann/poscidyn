@@ -5,6 +5,7 @@ import time
 
 from .model.abstract_model import AbstractModel
 from .solver.abstract_solver import AbstractSolver
+from .solver.time_integration_solver import TimeIntegrationSolver
 from . import constants as const
 
 
@@ -14,7 +15,7 @@ def time_response(
     driving_amplitude: jax.Array, # Shape: (n_modes,)
     initial_displacement: jax.Array, # Shape: (n_modes,)
     initial_velocity: jax.Array, # Shape: (n_modes,)
-    solver: AbstractSolver,
+    solver: AbstractSolver = TimeIntegrationSolver(),
     precision: const.Precision = const.Precision.DOUBLE,
     **kwargs
 ) -> tuple:
