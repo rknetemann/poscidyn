@@ -14,17 +14,12 @@ modal_forces = np.array([1.0, 0.0])
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 
-frequency_sweep = oscidyn.frequency_sweep(
-    model = MODEL,
-    excitor=EXCITOR
-)
-
 time_response = oscidyn.time_response(
     model = MODEL,
     driving_frequency = 1.0,
     driving_amplitude = 1.0,
-    initial_displacement= 0.0,
-    initial_velocity = 0.0,
+    initial_displacement= np.array([0.0, 0.0]),
+    initial_velocity = np.array([0.0, 0.0]),
     only_save_steady_state = True
 )
 
