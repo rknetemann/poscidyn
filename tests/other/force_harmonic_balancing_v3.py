@@ -53,7 +53,7 @@ cbar_q = fig1.colorbar(sm_q, ax=ax1, pad=0.02)
 cbar_q.set_label("Q value", rotation=270, labelpad=15)
 
 # Figure 2: eta sweep at fixed Q
-fixed_Q = 10.0
+fixed_Q = 1000.0
 fig2, ax2 = plt.subplots(figsize=(10, 6))
 responses_eta = gamma_activating_nonlinearity(fixed_Q, omega_0, f_target, eta_values)
 

@@ -6,25 +6,25 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 # 1 mode:
-Q, omega_0, alpha, gamma = np.array([25.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = -1.13
+Q, omega_0, alpha, gamma = np.array([10000.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+#gamma[0,0,0,0] = 2.667e-6
 modal_forces = np.array([1.0])
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 2.67e-02
-gamma[1,1,1,1] = 5.40e-01
-alpha[0,0,1] = 7.48e-01
-alpha[1,0,0] = 3.74e-01
+# Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+# gamma[0,0,0,0] = 2.67e-02
+# gamma[1,1,1,1] = 5.40e-01
+# alpha[0,0,1] = 7.48e-01
+# alpha[1,0,0] = 3.74e-01
 
-driving_frequency = np.linspace(0.1, 2.0, 150)
-driving_amplitude = np.linspace(0.1, 1.0, 10)
-modal_forces = np.array([1.0, 0.0])
+driving_frequency = np.linspace(0.9999, 1.0001, 150)
+driving_amplitude = np.linspace(0.1, 0.5, 10)
+modal_forces = np.array([1.0])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 

@@ -58,7 +58,7 @@ def simulate(params):
         n_time_steps=50,
         verbose=False,
         throw=False,
-        rtol=1e-3,
+        rtol=1e-4,
         atol=1e-7,
     )
 

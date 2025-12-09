@@ -23,8 +23,7 @@ def simulate(params):
     delta = 1e-3 * params  # small variation per simulation
 
     # Base parameters (use jnp so everything lives on the device)
-    Q, omega_0, alpha, gamma = jnp.array([25.0]) * (1.0 + delta), jnp.array([1.0]), jnp.zeros((1,1,1)), jnp.zeros((1,1,1,1))
-    gamma = gamma.at[0,0,0,0].set(-1.13)
+    Q, omega_0, alpha, gamma = jnp.array([1000.0]) * (1.0 + delta), jnp.array([1.0]), jnp.zeros((1,1,1)), jnp.zeros((1,1,1,1))
     modal_forces = jnp.array([1.0])
 
     MODEL = oscidyn.BaseDuffingOscillator(
@@ -35,7 +34,7 @@ def simulate(params):
     )
 
     DRIVING_FREQUENCY = jnp.linspace(0.1, 2.0, 150)
-    MAX_FORCE = 0.02
+    MAX_FORCE = 1.0
     DRIVING_AMPLITUDE = jnp.linspace(0.1 * MAX_FORCE, 1.0 * MAX_FORCE, 10)
     # DRIVING_AMPLITUDE = jnp.array([MAX_FORCE])
 
@@ -51,11 +50,11 @@ def simulate(params):
     )
 
     SOLVER = oscidyn.TimeIntegrationSolver(
-        max_steps=4096,
+        max_steps=4096*10,
         n_time_steps=50,
         verbose=False,
         throw=False,
-        rtol=1e-3,
+        rtol=1e-4,
         atol=1e-7,
     )
 
