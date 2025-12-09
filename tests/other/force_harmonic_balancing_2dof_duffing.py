@@ -1,30 +1,24 @@
-import numpy as np
+import math
 
-Q = np.array([10.0, 20.0])
-omega_0 = np.array([1.0, 2.0])
-gamma = np.array([1.0e-3, 1.0e-3])
-alpha = 1.0e-4
+def f(Qx, omega, omega0x, omega0y, alpha, eta1, eta2, gamma):
+    radicand = (
+        16 * Qx**2 * omega**4
+        - 32 * Qx**2 * omega**2 * omega0x**2
+        - 16 * Qx**2 * alpha**2 * eta1 * omega**2 * omega0x**2
+        + 16 * Qx**2 * omega0x**4
+        + 16 * Qx**2 * alpha**2 * eta1 * omega0x**4
+        + 4 * Qx**2 * alpha**4 * eta1**2 * omega0x**4
+        - (12 * math.sqrt(2) * Qx**2 * gamma * math.sqrt(eta1 * eta2)
+           * omega**2 * omega0x * omega0y) / alpha
+        + (12 * math.sqrt(2) * Qx**2 * gamma * math.sqrt(eta1 * eta2)
+           * omega0x**3 * omega0y) / alpha
+        + 6 * math.sqrt(2) * Qx**2 * alpha * gamma * eta1 \
+          * math.sqrt(eta1 * eta2) * omega0x**3 * omega0y
+        + (9 * Qx**2 * gamma**2 * eta1 * eta2 * omega0x**2 * omega0y**2)
+          / (2 * alpha**2)
+        + (8 * eta1 * eta2 * omega0x**6 * omega0y**2) / alpha**2
+    )
 
-eta = np.array([1.0, 1.0])
+    return (1.0 / (4.0 * Qx)) * math.sqrt(radicand)
 
-omega = np.linspace(0.1, 3.0, 200)
-omega = 1.0
-
-t = np.linspace(0, 400, 1000)
-
-Ax = 4/3 * (eta[0]*omega_0[0]**2 / gamma[0])
-Ay = 4/3 * (eta[1]*omega_0[1]**2 / gamma[1])
-
-x = Ax * np.cos(omega * t)
-x_dot = -omega * Ax * np.sin(omega * t)
-x_ddot = -omega**2 * Ax * np.cos(omega * t)
-
-y = Ay * np.cos(omega * t)
-y_dot = -omega * Ay * np.sin(omega * t)
-y_ddot = -omega**2 * Ay * np.cos(omega * t)
-
-fx = (x_ddot + (omega_0[0] / Q[0]) * x_dot + omega_0[0]**2 * x + gamma[0] * x**3) / np.cos(omega * t)
-fy = (y_ddot + (omega_0[1] / Q[1]) * y_dot + omega_0[1]**2 * y + gamma[1] * y**3) / np.cos(omega * t)
-
-print(np.max(fx))
-print(np.max(fy))
+print(f(10, 1.0, 1.0, 1.5, 3.74e-01, 1.0, 1.0, 2.67e-02))
