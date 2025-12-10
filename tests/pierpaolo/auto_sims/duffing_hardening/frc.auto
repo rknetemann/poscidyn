@@ -1,0 +1,21 @@
+#==============
+# AUTO frc system
+#==============
+
+clean()
+
+frc = load('frc')
+
+ 
+aaa = run( frc,PAR={1:0.05,3:0.00}, RL0=0,RL1=1.8)
+
+
+aaa2 = run( frc,PAR={1:0.25,3:0.00}, RL0=0,RL1=1.8)
+
+
+# Plotting q1 maximum vs omega
+p1 = plot(aaa+aaa2)
+#p1.config(bifurcation_x = ['omega'], bifurcation_y = ['MAX q1'])
+
+
+
