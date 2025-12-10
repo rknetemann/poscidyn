@@ -6,8 +6,8 @@ import jax.numpy as jnp
 from equinox import filter_jit
 import oscidyn
 
-BATCH_SIZE = 8
-TOTAL_SINGLE_RUNS = 50
+BATCH_SIZE = 16
+TOTAL_SINGLE_RUNS = 5
 TOTAL_BATCH_RUNS = 5
 
 @filter_jit
