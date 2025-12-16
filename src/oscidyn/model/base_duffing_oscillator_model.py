@@ -17,34 +17,23 @@ class BaseDuffingOscillator(AbstractModel):
     alpha: jax.Array
     gamma: jax.Array
 
-    # Reference parameters for non-dimensionalization
-    omega_ref: Optional[jax.Array] = None
-    x_ref: Optional[jax.Array] = None
-    
     def __post_init__(self):
-        if self.omega_ref is None:
-            self.omega_ref = jnp.max(self.omega_0)
-            self.omega_ref = 1.0
-        if self.x_ref is None:
-            self.x_ref = jnp.max(self.Q) / (self.omega_ref**2)
-            self.x_ref = 1.0
-
         jnp.asarray(self.Q)
         jnp.asarray(self.omega_0)
         jnp.asarray(self.alpha)
         jnp.asarray(self.gamma)
-        jnp.asarray(self.omega_ref)
-        jnp.asarray(self.x_ref)
 
-    def f(self, tau, state, args):
+    def f(self, tau, state, args, omega_ref=1.0, x_ref=1.0):
         q, dq_dtau   = jnp.split(state, 2)
         f_amp, f_omega = [jnp.asarray(v).squeeze(()) for v in args]
 
-        damping_term = (self.omega_0/self.omega_ref) * 1/self.Q * dq_dtau
-        linear_stiffness_term = (1/self.omega_ref**2) * self.omega_0**2 * q
-        quadratic_stiffness_term = (self.x_ref / self.omega_ref**2) * jnp.einsum("ijk,j,k->i", self.alpha, q, q)
-        cubic_stiffness_term = (self.x_ref**2 / self.omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
-        forcing_term = f_amp / (self.omega_ref**2 * self.x_ref) * jnp.cos(f_omega/self.omega_ref * tau)
+        #omega_ref = f_omega[0]
+
+        damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dtau
+        linear_stiffness_term = (1/omega_ref**2) * self.omega_0**2 * q
+        quadratic_stiffness_term = (x_ref / omega_ref**2) * jnp.einsum("ijk,j,k->i", self.alpha, q, q)
+        cubic_stiffness_term = (x_ref**2 / omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
+        forcing_term = f_amp / (omega_ref**2 * x_ref) * jnp.cos(f_omega/omega_ref * tau)
 
         d2q_dtau2 = (
             - damping_term
@@ -80,6 +69,7 @@ class BaseDuffingOscillator(AbstractModel):
         Calculates the settling time for a given Q-factor and driving frequency.
         Equation from Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
         '''
+        #driving_frequency = 1.0
         t_steady_state = jnp.max(-2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / (driving_frequency))).reshape(())
 
         return t_steady_state

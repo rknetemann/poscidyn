@@ -41,22 +41,29 @@ print(f"Netto scaling range: {min_netto_scaling:.2e} to {max_netto_scaling:.2e} 
 netto_scaling = np.logspace(np.log10(min_netto_scaling), np.log10(max_netto_scaling), num=10)
 print("Netto scaling values:", netto_scaling)
 
-gamma0000 = gamma0000_table * netto_scaling
-gamma1111 = gamma1111_table * netto_scaling
-gamma0011 = gamma0011_table * netto_scaling
-gamma1001 = gamma1001_table * netto_scaling
-print("Gamma 0000 values:", gamma0000)
-print("Gamma 1111 values:", gamma1111)
-print("Gamma 0011 values:", gamma0011)
-print("Gamma 1001 values:", gamma1001)
+gamma0000 = gamma0000_table / mass0_table * netto_scaling
+gamma1111 = gamma1111_table / mass1_table * netto_scaling
+gamma0011 = gamma0011_table / mass0_table * netto_scaling
+gamma1001 = gamma1001_table / mass1_table * netto_scaling
+# print("Gamma 0000 values:", gamma0000)
+# print("Gamma 1111 values:", gamma1111)
+# print("Gamma 0011 values:", gamma0011)
+# print("Gamma 1001 values:", gamma1001)
+
+# print(f"Gamma 0000 range: {gamma0000.min():.2e} to {gamma0000.max():.2e}")
+# print(f"Gamma 1111 range: {gamma1111.min():.2e} to {gamma1111.max():.2e}")
+# print(f"Gamma 0011 range: {gamma0011.min():.2e} to {gamma0011.max():.2e}")
+# print(f"Gamma 1001 range: {gamma1001.min():.2e} to {gamma1001.max():.2e}")
 
 def F (c, omega_0, Q, gamma):
-    omega_max = (omega_0 + c * omega_0 / Q)
+    omega_max = np.sqrt(omega_0**2 + c * omega_0**2)
     return np.sqrt(((omega_max**2 * omega_0**2) / Q**2) * ((omega_max**2 - omega_0**2)**2 / (3/4 * gamma)))
 
-c = 100
+def F_alt (c, omega_0, Q, gamma):
+    return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (c + c**2))
 
-F0000 = F(c, 1.0, 200.0, gamma0000)
+def F_alt2 (c, omega_0, Q, gamma):
+    return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (c + 1 / (2*Q**2)) * (1 + c + 1 / (4 * Q **2)))
 
 ###### FREQUENCY SWEEPING ########
 
@@ -67,20 +74,29 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-Q, omega_0, alpha, gamma = np.array([200.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = gamma0000[5] 
-modal_forces = np.array([1.0])
+index = 5
+Q, omega_0, alpha, gamma = np.array([50.0, 50.0]), np.array([1.0, 1.73]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+gamma[0,0,0,0] = gamma0000[index] 
+#gamma[0,0,1,1] = gamma0011[index] 
+gamma[1,1,1,1] = gamma1111[index] 
+#gamma[1,0,0,1] = gamma1001[index]
+modal_forces = np.array([1.0, 1.0])
 
-fwhm = omega_0 / Q
+f0000 = F(0.5, omega_0[0], Q[0], gamma0000[index])
+f0000_alt = F_alt(0.5, omega_0[0], Q[0], gamma0000[index])
+f0000_alt2 = F_alt2(0.5, omega_0[0], Q[0], gamma0000[index])
 
-driving_frequency = np.linspace(1.0 - 150 * fwhm, 1.0 + 150 * fwhm, 200)
-driving_amplitude = np.linspace(0.1, 1.0, 10) * F0000[5]
+print(f"Estimated force amplitude for c=0.5: {f0000:.2e} (alt: {f0000_alt:.2e}, alt2: {f0000_alt2:.2e})")
+
+driving_frequency = np.linspace(0.75, 2.25, 201)
+driving_amplitude = np.linspace(0.1, 1.0, 10) * f0000_alt2
+# driving_amplitude = np.array([1.0]) * f0000_alt2
 modal_forces = np.array([1.0])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(7, 7), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(11, 11), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
@@ -142,7 +158,7 @@ def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, ga
     return "\n".join(parts)
 
 
-def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) -> None:
+def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str, use_responsivity: bool = True) -> None:
     forward = sweeped_solutions.get("forward")
     backward = sweeped_solutions.get("backward")
 
@@ -165,16 +181,49 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
         frequency_at_max_forward = float(frequency_at_max_forward)
     print(f"Max forward at frequency: {frequency_at_max_forward}")
 
-    forward = forward / max_value
-    backward = backward / max_value
+    # Store original displacement before responsivity transformation
+    drive_amps_array = np.asarray(drive_amps)
+    original_forward = forward.copy() if forward is not None else None
+    original_backward = backward.copy() if backward is not None else None
 
-    gamma_ndim = np.max(max_value**2 * gamma)
+    # Calculate nondimensional parameters for each force amplitude using original displacement
+    gamma_ndim_per_force = []
+    force_ndim_per_force = []
+    
+    for idx in range(drive_amps_array.size):
+        # Get max displacement for this specific force amplitude (from original, not responsivity)
+        max_disp_forward = np.max(original_forward[:, idx]) if original_forward is not None else 0
+        max_disp_backward = np.max(original_backward[:, idx]) if original_backward is not None else 0
+        max_disp_this_force = max(max_disp_forward, max_disp_backward)
+        
+        # Calculate nondimensional gamma: gamma_ndim = x_max^2 * gamma
+        gamma_ndim = max_disp_this_force**2 * gamma[0,0,0,0]
+        gamma_ndim_per_force.append(gamma_ndim)
+        
+        # Calculate nondimensional force: force_ndim = force / x_max
+        force_ndim = drive_amps_array[idx] / max_disp_this_force if max_disp_this_force > 0 else 0
+        force_ndim_per_force.append(force_ndim)
+        
+        print(f"Force {idx}: F={drive_amps_array[idx]:.3e}, x_max={max_disp_this_force:.3e}, "
+              f"gamma_ndim={gamma_ndim:.3e}, force_ndim={force_ndim:.3e}")
+
+    # Calculate responsivity (displacement / driving force amplitude) if enabled
+    if use_responsivity:
+        if forward is not None:
+            forward = forward / drive_amps_array[np.newaxis, :]
+        if backward is not None:
+            backward = backward / drive_amps_array[np.newaxis, :]
+        ylabel = "Responsivity (Displacement / Force)"
+        title_suffix = "(Responsivity)"
+    else:
+        ylabel = "Max displacement"
+        title_suffix = ""
+
 
     drive_freqs = np.asarray(drive_freqs)
-    drive_amps = np.asarray(drive_amps)
-    colors = plt.cm.viridis(np.linspace(0, 1, drive_amps.size))
+    colors = plt.cm.viridis(np.linspace(0, 1, drive_amps_array.size))
 
-    for idx, (amp, color) in enumerate(zip(drive_amps, colors)):
+    for idx, (amp, color) in enumerate(zip(drive_amps_array, colors)):
         if forward is not None:
             ax.plot(
                 drive_freqs,
@@ -193,10 +242,10 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
             )
 
     ax.set_title(
-        f"Frequency sweep\nMax displacement: {max_value:.2f} (omega: {frequency_at_max_forward:.2f})"
+        f"Frequency sweep {title_suffix}\nMax displacement: {max_value:.2f} (omega: {frequency_at_max_forward:.2f})"
     )
     ax.set_xlabel("Drive frequency")
-    ax.set_ylabel("Max displacement")
+    ax.set_ylabel(ylabel)
     ax.grid(alpha=0.25)
 
     if param_text:
@@ -214,7 +263,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     amp_handles = [
         Line2D([0], [0], color=color, lw=1.8) for color in colors
     ]
-    amp_labels = [f"F={amp:.3f}" for amp in drive_amps]
+    amp_labels = [f"F={amp:.3f}" for amp in drive_amps_array]
     legend1 = ax.legend(
         amp_handles,
         amp_labels,
@@ -269,6 +318,7 @@ plot_sweep(
     drive_amps=EXCITOR.drive_amplitudes,
     sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
     param_text=_format_param_text(Q, omega_0, alpha, gamma, EXCITOR.modal_forces),
+    use_responsivity=True,  # Set to False to plot raw displacement
 )
 plt.tight_layout()
 plt.show()
