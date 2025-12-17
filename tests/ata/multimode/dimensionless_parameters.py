@@ -77,9 +77,9 @@ from matplotlib.lines import Line2D
 index = 5
 Q, omega_0, alpha, gamma = np.array([50.0, 50.0]), np.array([1.0, 1.73]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
 gamma[0,0,0,0] = gamma0000[index] 
-#gamma[0,0,1,1] = gamma0011[index] 
+gamma[0,0,1,1] = gamma0011[index] 
 gamma[1,1,1,1] = gamma1111[index] 
-#gamma[1,0,0,1] = gamma1001[index]
+gamma[1,0,0,1] = gamma1001[index]
 modal_forces = np.array([1.0, 1.0])
 
 f0000 = F(0.5, omega_0[0], Q[0], gamma0000[index])
@@ -88,7 +88,7 @@ f0000_alt2 = F_alt2(0.5, omega_0[0], Q[0], gamma0000[index])
 
 print(f"Estimated force amplitude for c=0.5: {f0000:.2e} (alt: {f0000_alt:.2e}, alt2: {f0000_alt2:.2e})")
 
-driving_frequency = np.linspace(0.75, 2.25, 201)
+driving_frequency = np.linspace(0.75, 1.25, 201)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * f0000_alt2
 # driving_amplitude = np.array([1.0]) * f0000_alt2
 modal_forces = np.array([1.0])
