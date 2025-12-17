@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 # 1 mode:
-Q, omega_0, alpha, gamma = np.array([10.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = 1.0e-6
+Q, omega_0, alpha, gamma = np.array([129.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+gamma[0,0,0,0] = 1.0e-5
 modal_forces = np.array([1.0])
 
 # 2 modes:
@@ -17,14 +17,14 @@ modal_forces = np.array([1.0])
 # alpha[0,0,1] = 7.48e-01
 # alpha[1,0,0] = 3.74e-01
 
-driving_frequency = np.linspace(0.5, 1.5, 300)
-driving_amplitude = np.linspace(0.1, 1.0, 10)
+driving_frequency = np.linspace(0.91, 1.09, 301)
+driving_amplitude = np.linspace(0.1, 1.0, 10) * 0.916
 modal_forces = np.array([1.0])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
