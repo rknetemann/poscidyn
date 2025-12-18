@@ -18,7 +18,7 @@ jax.config.update("jax_platform_name", "gpu")
 
 SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=50, max_steps=4096*1, verbose=False, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=50, max_steps=5*4096, verbose=False, throw=False, rtol=1e-4, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
 TOTAL_SIMULATIONS = 10_000
@@ -173,25 +173,28 @@ if __name__ == "__main__":
                 sim_width = len(str(n_sim - 1)) if n_sim > 1 else 1
                 for j in range(n_in_batch):
                     sim_index = start_idx + j
-                    sim_id = f"simulation_{sim_index:0{sim_width}d}"
 
-                    sim_grp = grp.create_group(sim_id)
+                    # Post-processing and normalization
+                    f_omegas = batch_sweeps.f_omegas[j]
 
-                    max_forward_sweep = jnp.max(batch_sweeps.sweeped_periodic_solutions['forward'][j])
-                    max_backward_sweep = jnp.max(batch_sweeps.sweeped_periodic_solutions['backward'][j])
+                    x_total = batch_sweeps.periodic_solutions['max_x_total'][j]
+                    x_modes = batch_sweeps.periodic_solutions['max_x_modes'][j]
 
-                    normalized_forward_sweep = np.asarray(batch_sweeps.sweeped_periodic_solutions['forward'][j]) / max_forward_sweep
-                    normalized_backward_sweep = np.asarray(batch_sweeps.sweeped_periodic_solutions['backward'][j]) / max_backward_sweep
+                    x_forward  = batch_sweeps.sweeped_periodic_solutions['forward'][j]
+                    x_backward = batch_sweeps.sweeped_periodic_solutions['backward'][j]
 
-                    forward_sweep = sim_grp.create_dataset("forward_sweep", data=normalized_forward_sweep)
-                    backward_sweep = sim_grp.create_dataset("backward_sweep", data=normalized_backward_sweep)
-                    ds_x_max_total = sim_grp.create_dataset("unsweeped_total", data=np.asarray(batch_sweeps.periodic_solutions['max_x_total'][j]))
-                    ds_x_max_modes = sim_grp.create_dataset("unsweeped_modes", data=np.asarray(batch_sweeps.periodic_solutions['max_x_modes'][j]))
-                    #ds_x0 = sim_grp.create_dataset("x0", data=np.asarray(batch_sweeps.periodic_solutions['x0'][j]))
-                    #ds_v0 = sim_grp.create_dataset("v0", data=np.asarray(batch_sweeps.periodic_solutions['v0'][j]))
+                    omega_0_0 = batch_sweeps.omega_0[j][0]
+                    
+                    ref_idx = jnp.argmin(jnp.abs(f_omegas - 0.9 * omega_0_0))
+                    
+                    omega_ref = f_omegas[ref_idx]
+                    x_ref_forward = x_forward[ref_idx, :]
+                    x_ref_backward = x_backward[ref_idx, :]
 
-                    forward_sweep.attrs['reference_displacement'] = np.float32(max_forward_sweep)
-                    backward_sweep.attrs['reference_displacement'] = np.float32(max_backward_sweep)
+                    normalized_x_forward = np.asarray(x_forward) / x_ref_forward
+                    normalized_x_backward = np.asarray(x_backward) / x_ref_backward
+
+                    normalized_omega = np.asarray(f_omegas) / omega_ref
 
                     f_omegas = np.asarray(batch_sweeps.f_omegas[j])
                     f_amps = np.asarray(batch_sweeps.f_amps[j])
@@ -203,11 +206,30 @@ if __name__ == "__main__":
 
                     success_rate = batch_sweeps.success_rate[j]
 
-                    gamma_ndim_forward = max_forward_sweep**2 * gamma
-                    gamma_ndim_backward = max_backward_sweep**2 * gamma
+                    norm_alpha_forward = (x_ref_forward / omega_ref**2)
+                    norm_alpha_backward = (x_ref_backward / omega_ref**2)
+                    norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)
+                    norm_gamma_backward = (x_ref_backward**2 / omega_ref**2)
+                    
+                    alpha_ndim_forward  = norm_alpha_forward[:, None, None, None] * alpha[None, :, :, :]         # (n_amp,2,2,2)
+                    alpha_ndim_backward = norm_alpha_backward[:, None, None, None] * alpha[None, :, :, :]
 
-                    alpha_ndim_forward = max_forward_sweep * alpha
-                    alpha_ndim_backward = max_backward_sweep * alpha
+                    gamma_ndim_forward  = norm_gamma_forward[:, None, None, None, None] * gamma[None, :, :, :, :] 
+                    gamma_ndim_backward = norm_gamma_backward[:, None, None, None, None] * gamma[None, :, :, :, :]  
+
+                    # Storing data in HDF5
+                    sim_id = f"simulation_{sim_index:0{sim_width}d}"
+                    sim_grp = grp.create_group(sim_id)
+
+                    forward_sweep = sim_grp.create_dataset("forward_sweep", data=normalized_x_forward)
+                    backward_sweep = sim_grp.create_dataset("backward_sweep", data=normalized_x_backward)
+                    ds_x_max_total = sim_grp.create_dataset("unsweeped_total", data=np.asarray(x_total))
+                    ds_x_max_modes = sim_grp.create_dataset("unsweeped_modes", data=np.asarray(x_modes))
+
+                    forward_sweep.attrs['reference_displacement'] = x_ref_forward
+                    backward_sweep.attrs['reference_displacement'] = x_ref_backward
+                    forward_sweep.attrs['reference_frequency'] = omega_ref
+                    backward_sweep.attrs['reference_frequency'] = omega_ref
 
                     sim_grp.attrs['f_omegas'] = f_omegas
                     sim_grp.attrs['f_amps'] = f_amps

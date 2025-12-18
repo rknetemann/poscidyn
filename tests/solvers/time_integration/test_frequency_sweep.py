@@ -14,7 +14,7 @@ gamma[0,0,0,0] = 2.55
 modal_forces = np.array([1.0])
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([47.51, 97.55]), np.array([1.0553, 1.5825]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+Q, omega_0, alpha, gamma = np.array([30, 30]), np.array([1.0553, 1.5825]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
 gamma[0,0,0,0] = 2.5688
 gamma[0,0,1,1] = 9.4687
 gamma[1,1,1,1] = 18.8525
@@ -41,12 +41,12 @@ print(f"Calculated F_max: {F_max_value:.4f}")
 
 driving_frequency = np.linspace(0.75, 3.0, 601)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
-modal_forces = np.array([0.120308, 0.130202])
+modal_forces = np.array([1.0, 1.0])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
@@ -114,27 +114,30 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions to plot.")
-    
-    max_forward = np.max(forward)
-    max_backward = np.max(backward)
 
-    max_value = max(
-        val for val in [max_forward, max_backward] if val is not None
-    )
-    print(f"Max value across forward and backward: {max_value}")
+    ref_idx = np.argmin(np.abs(drive_freqs - 0.9 * omega_0[0]))
 
-    arg_max_forward = np.unravel_index(np.argmax(forward), forward.shape) if forward is not None else None
-    arg_max_backward = np.unravel_index(np.argmax(backward), backward.shape) if backward is not None else None
+    omega_ref = drive_freqs[ref_idx]
+    x_ref_forward = forward[ref_idx, :]
+    x_ref_backward = backward[ref_idx, :]
+    print(f"Reference frequency: {omega_ref}")
+    print(f"Reference displacement forward: {x_ref_forward}, backward: {x_ref_backward}")
 
-    frequency_at_max_forward = drive_freqs[arg_max_forward[0]] if arg_max_forward is not None else None
-    print(f"Max forward at frequency: {frequency_at_max_forward}")
+    norm_alpha_forward = (x_ref_forward / omega_ref**2)
+    norm_alpha_backward = (x_ref_backward / omega_ref**2)
+    norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)
+    norm_gamma_backward = (x_ref_backward**2 / omega_ref**2)
 
-    forward = forward / max_value
-    backward = backward / max_value
+    alpha_ndim_forward  = norm_alpha_forward[:, None, None, None] * alpha[None, :, :, :] 
+    alpha_ndim_backward = norm_alpha_backward[:, None, None, None] * alpha[None, :, :, :]
 
-    gamma_ndim = np.max(max_value**2 * gamma)
+    gamma_ndim_forward  = norm_gamma_forward[:, None, None, None, None] * gamma[None, :, :, :, :] 
+    gamma_ndim_backward = norm_gamma_backward[:, None, None, None, None] * gamma[None, :, :, :, :]  
 
-    drive_freqs = np.asarray(drive_freqs)
+    forward = forward / x_ref_forward
+    backward = backward / x_ref_backward
+
+    drive_freqs = np.asarray(drive_freqs) / omega_ref
     drive_amps = np.asarray(drive_amps)
     colors = plt.cm.viridis(np.linspace(0, 1, drive_amps.size))
 
@@ -157,7 +160,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
             )
 
     ax.set_title(
-        f"Frequency sweep\nMax displacement: {max_value:.2f} (omega: {frequency_at_max_forward:.2f})"
+        f"Frequency sweep"
     )
     ax.set_xlabel("Drive frequency")
     ax.set_ylabel("Max displacement")
