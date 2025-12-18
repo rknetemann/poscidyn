@@ -171,21 +171,26 @@ if __name__ == "__main__":
 
                 n_in_batch = batch_params.shape[0]
                 sim_width = len(str(n_sim - 1)) if n_sim > 1 else 1
+
                 for j in range(n_in_batch):
                     sim_index = start_idx + j
 
-                    # Post-processing and normalization
-                    f_omegas = batch_sweeps.f_omegas[j]
+                    ## Post-processing and normalization ##
+                    f_omegas = np.asarray(batch_sweeps.f_omegas[j])
+                    f_amps = np.asarray(batch_sweeps.f_amps[j])
+                    Q = np.asarray(batch_sweeps.Q[j])
+                    omega_0 = np.asarray(batch_sweeps.omega_0[j])
+                    gamma = np.asarray(batch_sweeps.gamma[j])
+                    modal_forces = np.asarray(batch_sweeps.modal_forces[j])
+                    alpha = np.asarray(batch_sweeps.alpha[j])
 
                     x_total = batch_sweeps.periodic_solutions['max_x_total'][j]
                     x_modes = batch_sweeps.periodic_solutions['max_x_modes'][j]
 
                     x_forward  = batch_sweeps.sweeped_periodic_solutions['forward'][j]
                     x_backward = batch_sweeps.sweeped_periodic_solutions['backward'][j]
-
-                    omega_0_0 = batch_sweeps.omega_0[j][0]
                     
-                    ref_idx = jnp.argmin(jnp.abs(f_omegas - 0.9 * omega_0_0))
+                    ref_idx = jnp.argmin(jnp.abs(f_omegas - 0.9 * omega_0[0]))
                     
                     omega_ref = f_omegas[ref_idx]
                     x_ref_forward = x_forward[ref_idx, :]
@@ -195,27 +200,27 @@ if __name__ == "__main__":
                     normalized_x_backward = np.asarray(x_backward) / x_ref_backward
                     normalized_omega = np.asarray(f_omegas) / omega_ref
 
+                    norm_omega_0 = (omega_0[0] / omega_ref)
                     norm_alpha_forward = (x_ref_forward / omega_ref**2)
                     norm_alpha_backward = (x_ref_backward / omega_ref**2)
                     norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)
                     norm_gamma_backward = (x_ref_backward**2 / omega_ref**2)
+                    norm_f_omegas = (1 / omega_ref)
+                    norm_f_amps_forward = ( 1 / (x_ref_forward * omega_ref**2))
+                    norm_f_amps_backward = ( 1 / (x_ref_backward * omega_ref**2))
                     
-                    alpha_ndim_forward  = norm_alpha_forward[:, None, None, None] * alpha[None, :, :, :]         # (n_amp,2,2,2)
-                    alpha_ndim_backward = norm_alpha_backward[:, None, None, None] * alpha[None, :, :, :]
-                    gamma_ndim_forward  = norm_gamma_forward[:, None, None, None, None] * gamma[None, :, :, :, :] 
-                    gamma_ndim_backward = norm_gamma_backward[:, None, None, None, None] * gamma[None, :, :, :, :]  
-
-                    f_omegas = np.asarray(batch_sweeps.f_omegas[j])
-                    f_amps = np.asarray(batch_sweeps.f_amps[j])
-                    Q = np.asarray(batch_sweeps.Q[j])
-                    omega_0 = np.asarray(batch_sweeps.omega_0[j])
-                    gamma = np.asarray(batch_sweeps.gamma[j])
-                    modal_forces = np.asarray(batch_sweeps.modal_forces[j])
-                    alpha = np.asarray(batch_sweeps.alpha[j])
+                    scaled_omega_0 = norm_omega_0 * omega_0
+                    scaled_alpha_forward  = norm_alpha_forward[:, None, None, None] * alpha[None, :, :, :]
+                    scaled_alpha_backward = norm_alpha_backward[:, None, None, None] * alpha[None, :, :, :]
+                    scaled_gamma_forward  = norm_gamma_forward[:, None, None, None, None] * gamma[None, :, :, :, :] 
+                    scaled_gamma_backward = norm_gamma_backward[:, None, None, None, None] * gamma[None, :, :, :, :]  
+                    scaled_f_omegas = norm_f_omegas * f_omegas
+                    scaled_f_amps_forward = norm_f_amps_forward[:, None] * f_amps
+                    scaled_f_amps_backward = norm_f_amps_backward[:, None] * f_amps
 
                     success_rate = batch_sweeps.success_rate[j]
 
-                    # Storing data in HDF5
+                    ## Storing data in HDF5 ##
                     sim_id = f"simulation_{sim_index:0{sim_width}d}"
                     sim_grp = grp.create_group(sim_id)
 
@@ -223,11 +228,6 @@ if __name__ == "__main__":
                     backward_sweep = sim_grp.create_dataset("backward_sweep", data=normalized_x_backward)
                     ds_x_max_total = sim_grp.create_dataset("unsweeped_total", data=np.asarray(x_total))
                     ds_x_max_modes = sim_grp.create_dataset("unsweeped_modes", data=np.asarray(x_modes))
-
-                    forward_sweep.attrs['reference_displacement'] = x_ref_forward
-                    backward_sweep.attrs['reference_displacement'] = x_ref_backward
-                    forward_sweep.attrs['reference_frequency'] = omega_ref
-                    backward_sweep.attrs['reference_frequency'] = omega_ref
 
                     sim_grp.attrs['f_omegas'] = f_omegas
                     sim_grp.attrs['f_amps'] = f_amps
@@ -238,11 +238,23 @@ if __name__ == "__main__":
                     sim_grp.attrs['modal_forces'] = modal_forces
                     sim_grp.attrs['success_rate'] = success_rate
 
-                    forward_sweep.attrs['gamma_ndim'] = gamma_ndim_forward
-                    backward_sweep.attrs['gamma_ndim'] = gamma_ndim_backward
-                    forward_sweep.attrs['alpha_ndim'] = alpha_ndim_forward
-                    backward_sweep.attrs['alpha_ndim'] = alpha_ndim_backward
+                    forward_sweep.attrs['ref_idx'] = ref_idx
+                    backward_sweep.attrs['ref_idx'] = ref_idx
+                    forward_sweep.attrs['reference_displacement'] = x_ref_forward
+                    backward_sweep.attrs['reference_displacement'] = x_ref_backward
+                    forward_sweep.attrs['reference_frequency'] = omega_ref
+                    backward_sweep.attrs['reference_frequency'] = omega_ref
 
+                    forward_sweep.attrs['scaled_omega_0'] = scaled_omega_0
+                    backward_sweep.attrs['scaled_omega_0'] = scaled_omega_0
+                    forward_sweep.attrs['scaled_gamma'] = scaled_gamma_forward
+                    backward_sweep.attrs['scaled_gamma'] = scaled_gamma_backward
+                    forward_sweep.attrs['scaled_alpha'] = scaled_alpha_forward
+                    backward_sweep.attrs['scaled_alpha'] = scaled_alpha_backward
+                    forward_sweep.attrs['scaled_f_omegas'] = scaled_f_omegas
+                    backward_sweep.attrs['scaled_f_omegas'] = scaled_f_omegas
+                    forward_sweep.attrs['scaled_f_amps'] = scaled_f_amps_forward
+                    backward_sweep.attrs['scaled_f_amps'] = scaled_f_amps_backward
 
                 secs_per_sim = elapsed / max(n_in_batch, 1)
 

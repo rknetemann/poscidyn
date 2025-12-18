@@ -200,7 +200,7 @@ def format_param_text(attrs: h5py.AttributeManager) -> str:
 
 
 def plot_simulation(ax, sim_group: h5py.Group, sim_label: str) -> None:
-    sweeped = np.asarray(sim_group["sweeped_periodic_solutions"])
+    sweeped = np.asarray(sim_group["forward_sweep"])
     f_omegas = np.asarray(sim_group.attrs["f_omegas"])
     f_amps = np.asarray(sim_group.attrs["f_amps"])
 
