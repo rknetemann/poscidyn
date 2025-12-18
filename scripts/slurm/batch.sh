@@ -12,17 +12,21 @@
 #SBATCH --error logs/coupled_2_dof%A_%a.err
 #SBATCH --array=0-1
 
+module purge
+module load 2025
+module load miniconda3/4.12.0
+
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.99
 
 cd /home/rknetemann/projects/oscidyn
 
-source .venv/bin/activate
+conda activate oscidyn
 
 OUTDIR="results/raw"
 mkdir -p "$OUTDIR"
 
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
 
-srun python scripts/batch_simulation/coupled_2_dof.py --n_tasks=2 --task_id=$SLURM_ARRAY_TASK_ID --n_parallel_sim=64 --file_name="$OUTDIR/batch_${SLURM_ARRAY_TASK_ID}_${TIMESTAMP}.hdf5"
+python scripts/batch_simulation/coupled_2_dof.py --n_tasks=2 --task_id=$SLURM_ARRAY_TASK_ID --n_parallel_sim=64 --file_name="$OUTDIR/batch_${SLURM_ARRAY_TASK_ID}_${TIMESTAMP}.hdf5"
 
-deactivate
+conda deactivate

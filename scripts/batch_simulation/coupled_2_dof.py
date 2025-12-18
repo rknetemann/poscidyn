@@ -9,10 +9,10 @@ import time
 import h5py
 import numpy as np
 from equinox import filter_jit
+import argparse
 
 from utils.gpu_monitor import GpuMonitor
 import oscidyn
-import argparse
 
 jax.config.update("jax_platform_name", "gpu")
 
