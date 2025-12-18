@@ -193,8 +193,17 @@ if __name__ == "__main__":
 
                     normalized_x_forward = np.asarray(x_forward) / x_ref_forward
                     normalized_x_backward = np.asarray(x_backward) / x_ref_backward
-
                     normalized_omega = np.asarray(f_omegas) / omega_ref
+
+                    norm_alpha_forward = (x_ref_forward / omega_ref**2)
+                    norm_alpha_backward = (x_ref_backward / omega_ref**2)
+                    norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)
+                    norm_gamma_backward = (x_ref_backward**2 / omega_ref**2)
+                    
+                    alpha_ndim_forward  = norm_alpha_forward[:, None, None, None] * alpha[None, :, :, :]         # (n_amp,2,2,2)
+                    alpha_ndim_backward = norm_alpha_backward[:, None, None, None] * alpha[None, :, :, :]
+                    gamma_ndim_forward  = norm_gamma_forward[:, None, None, None, None] * gamma[None, :, :, :, :] 
+                    gamma_ndim_backward = norm_gamma_backward[:, None, None, None, None] * gamma[None, :, :, :, :]  
 
                     f_omegas = np.asarray(batch_sweeps.f_omegas[j])
                     f_amps = np.asarray(batch_sweeps.f_amps[j])
@@ -205,17 +214,6 @@ if __name__ == "__main__":
                     alpha = np.asarray(batch_sweeps.alpha[j])
 
                     success_rate = batch_sweeps.success_rate[j]
-
-                    norm_alpha_forward = (x_ref_forward / omega_ref**2)
-                    norm_alpha_backward = (x_ref_backward / omega_ref**2)
-                    norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)
-                    norm_gamma_backward = (x_ref_backward**2 / omega_ref**2)
-                    
-                    alpha_ndim_forward  = norm_alpha_forward[:, None, None, None] * alpha[None, :, :, :]         # (n_amp,2,2,2)
-                    alpha_ndim_backward = norm_alpha_backward[:, None, None, None] * alpha[None, :, :, :]
-
-                    gamma_ndim_forward  = norm_gamma_forward[:, None, None, None, None] * gamma[None, :, :, :, :] 
-                    gamma_ndim_backward = norm_gamma_backward[:, None, None, None, None] * gamma[None, :, :, :, :]  
 
                     # Storing data in HDF5
                     sim_id = f"simulation_{sim_index:0{sim_width}d}"
