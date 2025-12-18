@@ -21,7 +21,7 @@ MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_res
 SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=50, max_steps=4096*1, verbose=False, throw=False, rtol=1e-4, atol=1e-7)
 PRECISION = oscidyn.Precision.SINGLE
 
-TOTAL_SIMULATIONS = 1_000
+TOTAL_SIMULATIONS = 10_000
 ETA = 0.2
 
 Q_1_range = np.array([5.0, 100.0])
@@ -213,6 +213,8 @@ if __name__ == "__main__":
                     sim_grp.attrs['f_amps'] = f_amps
                     sim_grp.attrs['Q'] = Q
                     sim_grp.attrs['omega_0'] = omega_0
+                    sim_grp.attrs['gamma'] = gamma
+                    sim_grp.attrs['alpha'] = alpha
                     sim_grp.attrs['modal_forces'] = modal_forces
                     sim_grp.attrs['success_rate'] = success_rate
 

@@ -14,39 +14,39 @@ gamma[0,0,0,0] = 2.55
 modal_forces = np.array([1.0])
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([100.0, 100.0]), np.array([1.00, 1.73]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 2.55
-gamma[0,0,1,1] = 8.61
-gamma[1,1,1,1] = 18.7
-gamma[1,0,0,1] = 8.57
+Q, omega_0, alpha, gamma = np.array([47.51, 97.55]), np.array([1.0553, 1.5825]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+gamma[0,0,0,0] = 2.5688
+gamma[0,0,1,1] = 9.4687
+gamma[1,1,1,1] = 18.8525
+gamma[1,0,0,1] = 7.8156
 
 # 3 modes:
-Q, omega_0, alpha, gamma = np.array([100.0, 100.0, 100.0]), np.array([1.00, 1.73, 2.59]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
-gamma[0,0,0,0] = 2.55
-gamma[0,0,1,1] = 8.61
-gamma[0,0,0,2] = 0.942
-gamma[0,0,1,2] = -0.143
-gamma[0,0,2,2] = 9.88
-gamma[1,1,1,1] = 18.7
-gamma[1,0,0,1] = 8.57
-gamma[1,0,0,2] = -0.000283
-gamma[1,0,1,2] = -11.8
-gamma[1,0,2,2] = 0.000849
-gamma[1,1,1,2] = -0.00272
-gamma[1,1,2,2] = 45.2
-gamma[2,2,2,2] = -0.00144
+# Q, omega_0, alpha, gamma = np.array([100.0, 100.0, 100.0]), np.array([1.00, 1.73, 2.59]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
+# gamma[0,0,0,0] = 2.55
+# gamma[0,0,1,1] = 8.61
+# gamma[0,0,0,2] = 0.942
+# gamma[0,0,1,2] = -0.143
+# gamma[0,0,2,2] = 9.88
+# gamma[1,1,1,1] = 18.7
+# gamma[1,0,0,1] = 8.57
+# gamma[1,0,0,2] = -0.000283
+# gamma[1,0,1,2] = -11.8
+# gamma[1,0,2,2] = 0.000849
+# gamma[1,1,1,2] = -0.00272
+# gamma[1,1,2,2] = 45.2
+# gamma[2,2,2,2] = -0.00144
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0,0,0,0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
 driving_frequency = np.linspace(0.75, 3.0, 601)
-driving_amplitude = np.linspace(0.1, 1.0, 5) * F_max_value
-modal_forces = np.array([1.0, 1.0, 1.0])
+driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
+modal_forces = np.array([0.120308, 0.130202])
 
 MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(7, 7), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
+MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
+SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
 PRECISION = oscidyn.Precision.SINGLE
 
