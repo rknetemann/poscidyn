@@ -1,0 +1,9 @@
+{
+  "early_stopping": {
+    "best_epoch": 12,
+    "best_val_loss": 0.09067775309085846,
+    "epochs_since_improvement": 8
+  },
+  "epoch": 20,
+  "global_step": 25000
+}
