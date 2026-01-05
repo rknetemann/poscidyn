@@ -30,6 +30,8 @@ INIT_LEARNING_RATE = 3e-4
 EPOCHS = 50
 PRINT_EVERY_EPOCHS = 1
 SEED = 5678
+SWEEP_REG_STRENGTH = 0.1  # additional weight on high sweep-difference samples
+SWEEP_WEIGHT_CLIP = 5.0   # cap to prevent a few sweeps from dominating
 
 # Early stopping
 EARLY_STOPPING = True
@@ -64,9 +66,17 @@ dataloader = oscidynn.DataLoader(DATAFILES, params=params)
 
 
 def mean_squared_error(
-    y: Float[Array, "batch output_dim"], pred_y: Float[Array, "batch output_dim"]
+    y: Float[Array, "batch output_dim"], pred_y: Float[Array, "batch output_dim"], sweep_difference: Float[Array, "batch"]
 ) -> Float[Array, ""]:
-    return jnp.mean((pred_y - y) ** 2)
+    squared_error = (pred_y - y) ** 2
+    base_mse = jnp.mean(squared_error)
+
+    # Regularize the last 4 parameters with sweep_difference without letting them dominate
+    sweep_weight = sweep_difference / (jnp.mean(sweep_difference) + 1e-8)
+    sweep_weight = jnp.clip(sweep_weight, 0.0, SWEEP_WEIGHT_CLIP)
+    sweep_term = jnp.mean(sweep_weight[:, None] * squared_error[:, 4:])
+
+    return base_mse + SWEEP_REG_STRENGTH * sweep_term
 
 
 def loss(
@@ -74,11 +84,12 @@ def loss(
     normalizer: DatasetNormalizer,
     x: Float[Array, "batch input_dim"],
     y: Float[Array, "batch output_dim"],
+    sweep_difference: Float[Array, "batch"],
 ) -> Float[Array, ""]:
     x = normalizer.norm_X(x)
     y = normalizer.norm_Y(y)
     pred_y = jax.vmap(model)(x)
-    return mean_squared_error(y, pred_y)
+    return mean_squared_error(y, pred_y, sweep_difference)
 
 
 loss = eqx.filter_jit(loss)
@@ -99,11 +110,12 @@ def evaluate_full_batch(
     normalizer: DatasetNormalizer,
     x: jnp.ndarray,
     y: jnp.ndarray,
+    sweep_difference: jnp.ndarray,
 ):
     x_n = normalizer.norm_X(x)
     y_n = normalizer.norm_Y(y)
     pred_y_n = jax.vmap(model)(x_n)
-    return mean_squared_error(y_n, pred_y_n), r2_score(y_n, pred_y_n)
+    return mean_squared_error(y_n, pred_y_n, sweep_difference), r2_score(y_n, pred_y_n)
 
 
 def batch_index_iterator(rng: np.random.Generator, n: int, batch_size: int):
@@ -280,9 +292,10 @@ def train(
         raise RuntimeError("Training split has no simulations.")
 
     # Validation split as full batch (NumPy -> JAX)
-    x_val_np, y_val_np = dataloader.load_data(1, "all")
+    x_val_np, y_val_np, sweep_difference_val_np = dataloader.load_data(1, "all")
     x_val = jnp.asarray(x_val_np)
     y_val = jnp.asarray(y_val_np)
+    sweep_difference_val = jnp.asarray(sweep_difference_val_np)
 
     steps_per_epoch = int(np.ceil(n_train / batch_size))
     if MAX_STEPS_PER_EPOCH is not None:
@@ -296,8 +309,9 @@ def train(
         opt_state: PyTree,
         x: Float[Array, "batch input_dim"],
         y: Float[Array, "batch output_dim"],
+        sweep_difference: Float[Array, "batch"],
     ):
-        loss_value, grads = eqx.filter_value_and_grad(loss)(model, normalizer, x, y)
+        loss_value, grads = eqx.filter_value_and_grad(loss)(model, normalizer, x, y, sweep_difference)
         updates, opt_state = optim.update(grads, opt_state, eqx.filter(model, eqx.is_array))
         model = eqx.apply_updates(model, updates)
         return model, opt_state, loss_value
@@ -330,11 +344,12 @@ def train(
 
         for _ in range(steps_per_epoch):
             batch_indices = next(batch_iter)
-            x_batch_np, y_batch_np = dataloader.load_data(0, batch_indices.tolist())
+            x_batch_np, y_batch_np, sweep_difference_batch_np = dataloader.load_data(0, batch_indices.tolist())
             x_batch = jnp.asarray(x_batch_np)
             y_batch = jnp.asarray(y_batch_np)
+            sweep_difference_batch = jnp.asarray(sweep_difference_batch_np)
 
-            model, opt_state, train_loss = make_step(model, opt_state, x_batch, y_batch)
+            model, opt_state, train_loss = make_step(model, opt_state, x_batch, y_batch, sweep_difference_batch)
 
             running_loss += float(train_loss)
             n_batches += 1
@@ -342,7 +357,7 @@ def train(
 
         train_loss_epoch = running_loss / max(1, n_batches)
 
-        val_loss, val_r2 = evaluate_full_batch(model, normalizer, x_val, y_val)
+        val_loss, val_r2 = evaluate_full_batch(model, normalizer, x_val, y_val, sweep_difference_val)
         val_loss_f = float(val_loss)
         val_r2_f = float(val_r2)
 
@@ -411,7 +426,7 @@ def print_example_prediction(
     example_idx: int = 0,
     max_items: int = 30,
 ) -> None:
-    x_np, y_np = dataloader.load_data(split_idx, [example_idx])
+    x_np, y_np, sweep_difference_np = dataloader.load_data(split_idx, [example_idx])
     x = jnp.asarray(x_np)
     y_true = jnp.asarray(y_np)
 
@@ -444,7 +459,7 @@ def print_example_prediction(
 
 
 # ---- Initialize model from a small batch (NumPy -> JAX) ----
-x_init_np, y_init_np = dataloader.load_data(0, [0, 1])
+x_init_np, y_init_np, sweep_difference_init_np = dataloader.load_data(0, [0, 1])
 x_init = jnp.asarray(x_init_np)
 y_init = jnp.asarray(y_init_np)
 

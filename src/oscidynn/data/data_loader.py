@@ -98,6 +98,7 @@ class DataLoader:
 
         x_batch = np.empty((len(requested_idxs), self.x_dim), dtype=dtype)
         y_batch = np.empty((len(requested_idxs), self.y_dim), dtype=dtype)
+        sweep_difference_batch = np.empty((len(requested_idxs),), dtype=dtype)
 
         for row, split_sim_idx in enumerate(requested_idxs):
             file_idx, file_sim_idx = split_sims_idxs[split_sim_idx]
@@ -106,6 +107,8 @@ class DataLoader:
             sim_name = sim_names[file_sim_idx]
             forward_sweep = file["forward_sweeps"][sim_name]
             backward_sweep = file["backward_sweeps"][sim_name]
+
+            sweep_difference = np.sum(np.abs(forward_sweep[:] - backward_sweep[:]))
 
             # TO DO: Use backwards sweeps as well
             if not (isinstance(forward_sweep, h5py.Dataset) and isinstance(backward_sweep, h5py.Dataset)):
@@ -156,7 +159,9 @@ class DataLoader:
             x_batch[row, :] = x
             y_batch[row, :] = y
 
-        return x_batch, y_batch
+            sweep_difference_batch[row] = sweep_difference
+
+        return x_batch, y_batch, sweep_difference_batch
 
     def close(self):
         opened = getattr(self, "_opened_files", None)

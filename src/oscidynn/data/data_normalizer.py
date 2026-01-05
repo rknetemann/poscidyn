@@ -116,7 +116,7 @@ def build_normalizer_from_dataloader(
 
     for start in range(0, n, batch_size):
         idxs = list(range(start, min(start + batch_size, n)))
-        x_np, y_np = dataloader.load_data(split_idx, idxs)
+        x_np, y_np, sweep_difference_np = dataloader.load_data(split_idx, idxs)
         x = jnp.asarray(x_np, dtype=dtype)
         y = jnp.asarray(y_np, dtype=dtype)
 

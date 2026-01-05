@@ -122,7 +122,7 @@ def evaluate_split(
     model: oscidynn.MultiLayerPerceptron,
     split_idx: int,
 ) -> tuple[dict, np.ndarray, np.ndarray]:
-    x_np, y_np = dataloader.load_data(split_idx, "all")
+    x_np, y_np, sweep_difference_np = dataloader.load_data(split_idx, "all")
     x = jnp.asarray(x_np)
     y = jnp.asarray(y_np)
 
