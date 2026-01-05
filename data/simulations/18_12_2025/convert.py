@@ -43,10 +43,12 @@ def main():
         n_forces = int(f_amps.shape[0])
 
         total_groups = n_sim * n_forces
-        sim_width = len(str(total_groups - 1)) if total_groups > 1 else 1
 
-
-        sims_out = f_out.create_group("simulations")
+        # Create root-level folders
+        forward_group = f_out.create_group("forward_sweeps")
+        backward_group = f_out.create_group("backward_sweeps")
+        unsweeped_modes_group = f_out.create_group("unsweeped_modes")
+        unsweeped_total_group = f_out.create_group("unsweeped_total")
 
         # Root-level stats updated to reflect expansion
         f_out.attrs["n_simulations_original"] = n_sim
@@ -97,64 +99,79 @@ def main():
 
             # Write expanded groups
             for k in range(n_forces):
-                out_index = orig_i * n_forces + k
-                sim_id = f"simulation_{out_index:0{sim_width}d}"
-                gout = sims_out.create_group(sim_id)
+                out_index = orig_i * n_forces + k + 1  # 1-based indexing in output folders
+                sim_id = f"simulation_{out_index}"
 
-                # Store 1D sweeps per force
-                ds_fwd = gout.create_dataset(
-                    "forward_sweep",
+                # Store 1D sweeps per force into their own root-level folders
+                ds_fwd = forward_group.create_dataset(
+                    sim_id,
                     data=fwd[:, k],
                     compression=comp,
                     compression_opts=comp_opts,
                     shuffle=True if comp in ("gzip", "lzf") else False,
                 )
-                ds_bwd = gout.create_dataset(
-                    "backward_sweep",
+                ds_bwd = backward_group.create_dataset(
+                    sim_id,
                     data=bwd[:, k],
                     compression=comp,
                     compression_opts=comp_opts,
                     shuffle=True if comp in ("gzip", "lzf") else False,
                 )
 
-                # Unsweeped per force
-                gout.create_dataset("unsweeped_total", data=np.asarray(x_total[k]))
-                gout.create_dataset("unsweeped_modes", data=np.asarray(x_modes[k, ...]))
+                # Unsweeped data per force
+                ds_unsweeped_total = unsweeped_total_group.create_dataset(sim_id, data=np.asarray(x_total[k]))
+                ds_unsweeped_modes = unsweeped_modes_group.create_dataset(sim_id, data=np.asarray(x_modes[k, ...]))
 
-                # Group attrs (rest stays same; f_amp is scalar now)
-                gout.attrs["f_omegas"] = f_omegas
-                gout.attrs["f_amp"] = np.asarray(f_amps[k, ...]) 
-                gout.attrs["Q"] = Q
-                gout.attrs["omega_0"] = omega_0
-                gout.attrs["gamma"] = gamma
-                gout.attrs["alpha"] = alpha
-                gout.attrs["modal_forces"] = modal_forces
-                gout.attrs["success_rate"] = success_rate
+                common_attrs = {
+                    "f_omegas": f_omegas,
+                    "f_amp": np.asarray(f_amps[k, ...]),
+                    "Q": Q,
+                    "omega_0": omega_0,
+                    "gamma": gamma,
+                    "alpha": alpha,
+                    "modal_forces": modal_forces,
+                    "success_rate": success_rate,
+                    "scaled_omega_0": scaled_omega_0,
+                    "scaled_f_omegas": scaled_f_omegas,
+                }
+
+                def set_attrs(ds, extra_attrs):
+                    for name, value in {**common_attrs, **extra_attrs}.items():
+                        ds.attrs[name] = value
 
                 # Forward/backward dataset attrs, sliced appropriately
-                ds_fwd.attrs["ref_idx"] = ref_idx
-                ds_bwd.attrs["ref_idx"] = ref_idx
+                set_attrs(
+                    ds_fwd,
+                    {
+                        "ref_idx": ref_idx,
+                        "ref_frequency": omega_ref,
+                        "ref_displacement": float(x_ref_forward[k]),
+                        "scaled_gamma": scaled_gamma_forward[k, ...],
+                        "scaled_alpha": scaled_alpha_forward[k, ...],
+                        "scaled_f_amp": np.asarray(scaled_f_amps_forward[k, ...]),
+                    },
+                )
+                set_attrs(
+                    ds_bwd,
+                    {
+                        "ref_idx": ref_idx,
+                        "ref_frequency": omega_ref,
+                        "ref_displacement": float(x_ref_backward[k]),
+                        "scaled_gamma": scaled_gamma_backward[k, ...],
+                        "scaled_alpha": scaled_alpha_backward[k, ...],
+                        "scaled_f_amp": np.asarray(scaled_f_amps_backward[k, ...]),
+                    },
+                )
 
-                ds_fwd.attrs["reference_frequency"] = omega_ref
-                ds_bwd.attrs["reference_frequency"] = omega_ref
-
-                ds_fwd.attrs["reference_displacement"] = float(x_ref_forward[k])
-                ds_bwd.attrs["reference_displacement"] = float(x_ref_backward[k])
-
-                ds_fwd.attrs["scaled_omega_0"] = scaled_omega_0
-                ds_bwd.attrs["scaled_omega_0"] = scaled_omega_0
-
-                ds_fwd.attrs["scaled_gamma"] = scaled_gamma_forward[k, ...]
-                ds_bwd.attrs["scaled_gamma"] = scaled_gamma_backward[k, ...]
-
-                ds_fwd.attrs["scaled_alpha"] = scaled_alpha_forward[k, ...]
-                ds_bwd.attrs["scaled_alpha"] = scaled_alpha_backward[k, ...]
-
-                ds_fwd.attrs["scaled_f_omegas"] = scaled_f_omegas
-                ds_bwd.attrs["scaled_f_omegas"] = scaled_f_omegas
-
-                ds_fwd.attrs["scaled_f_amp"] = np.asarray(scaled_f_amps_forward[k, ...])
-                ds_bwd.attrs["scaled_f_amp"] = np.asarray(scaled_f_amps_backward[k, ...])
+                # Unsweeped datasets
+                set_attrs(
+                    ds_unsweeped_total,
+                    {},
+                )
+                set_attrs(
+                    ds_unsweeped_modes,
+                    {},
+                )
 
     print(f"Done. Wrote expanded file: {args.output}")
 

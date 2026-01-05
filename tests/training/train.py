@@ -22,7 +22,7 @@ from oscidynn.data.data_normalizer import (
 )
 
 DATAFILES = Path(
-    "/home/raymo/Projects/parameter-identification-nanomechanical-resonators/data/simulations/18_12_2025"
+    "/home/raymo/Projects/oscidyn/data/simulations/18_12_2025/converted"
 )
 
 BATCH_SIZE = 64
@@ -422,6 +422,15 @@ def print_example_prediction(
     y_true_1d = np.asarray(y_true[0])
     y_pred_1d = np.asarray(y_pred[0])
 
+    # If gamma was log-transformed for training, exponentiate for human-readable output
+    gamma_slice = getattr(dataloader, "y_slices", {}).get("gamma") if hasattr(dataloader, "y_slices") else None
+    if getattr(dataloader, "log_gamma", False) and gamma_slice is not None:
+        eps = getattr(dataloader, "gamma_log_eps", 0.0)
+        y_true_1d = y_true_1d.copy()
+        y_pred_1d = y_pred_1d.copy()
+        y_true_1d[gamma_slice] = np.exp(y_true_1d[gamma_slice]) - eps
+        y_pred_1d[gamma_slice] = np.exp(y_pred_1d[gamma_slice]) - eps
+
     n = y_true_1d.size
     show = min(max_items, n)
 
@@ -451,7 +460,9 @@ learning_rate = optax.exponential_decay(
     decay_rate=0.9,
     transition_steps=100,)
 
-optim = optax.adamw(INIT_LEARNING_RATE)
+learning_rate_schedule = optax.warmup_cosine_decay_schedule(init_value=INIT_LEARNING_RATE, peak_value=INIT_LEARNING_RATE * 10,
+                                                            warmup_steps=500, decay_steps=10000)
+optim = optax.adamw(learning_rate_schedule)
 
 try:
     normalizer = get_or_build_normalizer(resume=True)

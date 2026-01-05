@@ -8,11 +8,16 @@ HDF5_FILE_EXTENSIONS = [".hdf5", ".h5"]
 class DataLoader:
     def __init__(self, hdf5_files: list[str] | Path, 
                  split_ratios: tuple[float, ...] = (0.8, 0.1, 0.1),
-                 params: dict[str, list[tuple[int, ...]] | tuple] | None = None,):
+                 params: dict[str, list[tuple[int, ...]] | tuple] | None = None,
+                 *,
+                 log_gamma: bool = True,
+                 gamma_log_eps: float = 1e-12):
         
         self.hdf5_files: list[str] | Path = hdf5_files
         self.split_ratios: tuple[float, ...] = split_ratios
         self.params: dict[str, list[tuple[int, ...]] | None] | None = self._normalize_params_dict(params)
+        self.log_gamma = bool(log_gamma)
+        self.gamma_log_eps = float(gamma_log_eps)
 
         self.n_modes: int | None = None
         self.n_files: int | None = None
@@ -28,6 +33,7 @@ class DataLoader:
         self._gamma_indices: list[tuple[int, ...]] | None = None
         self._alpha_shape: tuple[int, ...] | None = None
         self._gamma_shape: tuple[int, ...] | None = None
+        self.y_slices: dict[str, slice] | None = None
 
         if isinstance(self.hdf5_files, Path):
             if self.hdf5_files.is_dir():
@@ -98,9 +104,8 @@ class DataLoader:
             file, sim_names = opened_files[file_idx]
 
             sim_name = sim_names[file_sim_idx]
-            sim_grp: h5py.Group = file["simulations"][sim_name]
-            forward_sweep = sim_grp["forward_sweep"]
-            backward_sweep = sim_grp["backward_sweep"]
+            forward_sweep = file["forward_sweeps"][sim_name]
+            backward_sweep = file["backward_sweeps"][sim_name]
 
             # TO DO: Use backwards sweeps as well
             if not (isinstance(forward_sweep, h5py.Dataset) and isinstance(backward_sweep, h5py.Dataset)):
@@ -116,12 +121,12 @@ class DataLoader:
                     np.asarray(forward_sweep[:]).reshape(-1).astype(dtype, copy=False),
                     np.array([np.min(effective_f_omegas)], dtype=np.float64),
                     np.array([np.max(effective_f_omegas)], dtype=np.float64)
-                ],               
+                ],
                 axis=0,
             ).astype(dtype, copy=False)
 
             # y = parameters
-            effective_Q = np.asarray(sim_grp.attrs["Q"]).reshape(-1)
+            effective_Q = np.asarray(forward_sweep.attrs["Q"]).reshape(-1)
             effective_omega_0 = np.asarray(forward_sweep.attrs["scaled_omega_0"]).reshape(-1)
             effective_alpha = self._select_parameters(
                 np.asarray(forward_sweep.attrs["scaled_alpha"]), self._alpha_indices, dtype
@@ -129,7 +134,9 @@ class DataLoader:
             effective_gamma = self._select_parameters(
                 np.asarray(forward_sweep.attrs["scaled_gamma"]), self._gamma_indices, dtype
             )
-            effective_modal_forces = np.asarray(sim_grp.attrs["modal_forces"]).reshape(-1)
+            if self.log_gamma:
+                effective_gamma = np.log(effective_gamma + self.gamma_log_eps).astype(dtype, copy=False)
+            effective_modal_forces = np.asarray(forward_sweep.attrs["modal_forces"]).reshape(-1)
 
             y = np.concatenate(
                 [
@@ -171,8 +178,8 @@ class DataLoader:
             # after _get_files_info(), self.hdf5_files is list[(Path, n_sims)]
             for hdf5_file_path, _ in self.hdf5_files:
                 file_obj = h5py.File(hdf5_file_path, "r")
-                sims_grp: h5py.Group = file_obj["simulations"]
-                sim_names = sorted(sims_grp.keys())
+                forward_grp: h5py.Group = file_obj["forward_sweeps"]
+                sim_names = sorted(forward_grp.keys())
                 self._opened_files.append((file_obj, sim_names))
         return self._opened_files
 
@@ -231,31 +238,48 @@ class DataLoader:
         for file in self.hdf5_files:
             file = Path(file)
             with h5py.File(file, "r") as f:
-                if "simulations" not in f or not isinstance(f["simulations"], h5py.Group):
-                    raise ValueError(f"Expected a 'simulations' group in the HDF5 file '{file}'.")
+                if "forward_sweeps" not in f or not isinstance(f["forward_sweeps"], h5py.Group):
+                    raise ValueError(f"Expected a 'forward_sweeps' group in the HDF5 file '{file}'.")
+                if "backward_sweeps" not in f or not isinstance(f["backward_sweeps"], h5py.Group):
+                    raise ValueError(f"Expected a 'backward_sweeps' group in the HDF5 file '{file}'.")
+                if "unsweeped_modes" not in f or not isinstance(f["unsweeped_modes"], h5py.Group):
+                    raise ValueError(f"Expected an 'unsweeped_modes' group in '{file}'.")
+                if "unsweeped_total" not in f or not isinstance(f["unsweeped_total"], h5py.Group):
+                    raise ValueError(f"Expected an 'unsweeped_total' group in '{file}'.")
 
-                sims_grp: h5py.Group = f["simulations"]
-                sim_names = sorted(sims_grp.keys())
+                forward_grp: h5py.Group = f["forward_sweeps"]
+                backward_grp: h5py.Group = f["backward_sweeps"]
+                unsweeped_modes_grp: h5py.Group = f["unsweeped_modes"]
+                unsweeped_total_grp: h5py.Group = f["unsweeped_total"]
+
+                sim_names = sorted(forward_grp.keys())
                 if not sim_names:
                     raise ValueError(f"No simulations found in HDF5 file '{file}'.")
 
-                test_sim: h5py.Group = sims_grp[sim_names[0]]
-                test_forward = test_sim["forward_sweep"]
+                for grp_name, grp in [
+                    ("backward_sweeps", backward_grp),
+                    ("unsweeped_modes", unsweeped_modes_grp),
+                    ("unsweeped_total", unsweeped_total_grp),
+                ]:
+                    if sorted(grp.keys()) != sim_names:
+                        raise ValueError(
+                            f"Simulation names differ between 'forward_sweeps' and '{grp_name}' in '{file}'."
+                        )
+
+                test_forward = forward_grp[sim_names[0]]
 
                 shapes = {
                     "forward_sweep": test_forward.shape,
-                    "Q": test_sim.attrs["Q"].shape,
-                    "omega_0": test_sim.attrs["omega_0"].shape,
-                    "alpha": test_sim.attrs["alpha"].shape,
-                    "gamma": test_sim.attrs["gamma"].shape,
-                    "f_omegas": test_sim.attrs["f_omegas"].shape,
-                    "f_amp": test_sim.attrs["f_amp"].shape,
-                    "modal_forces": test_sim.attrs["modal_forces"].shape,
+                    "Q": np.asarray(test_forward.attrs["Q"]).shape,
+                    "omega_0": np.asarray(test_forward.attrs["omega_0"]).shape,
+                    "f_omegas": np.asarray(test_forward.attrs["f_omegas"]).shape,
+                    "f_amp": np.asarray(test_forward.attrs["f_amp"]).shape,
+                    "modal_forces": np.asarray(test_forward.attrs["modal_forces"]).shape,
                 }
                 self.parameter_shapes = shapes if self.parameter_shapes is None else self.parameter_shapes
 
-                current_alpha_shape = tuple(test_forward.attrs["scaled_alpha"].shape)
-                current_gamma_shape = tuple(test_forward.attrs["scaled_gamma"].shape)
+                current_alpha_shape = tuple(np.asarray(test_forward.attrs["scaled_alpha"]).shape)
+                current_gamma_shape = tuple(np.asarray(test_forward.attrs["scaled_gamma"]).shape)
 
                 if self._alpha_shape is None:
                     self._alpha_shape = current_alpha_shape
@@ -282,16 +306,22 @@ class DataLoader:
                     self.x_dim = sweep_len + 2
 
                     # y = [Q, omega0, alpha(sel), gamma(sel)]
-                    self.y_dim = (
-                        int(np.prod(test_sim.attrs["Q"].shape))
-                        + int(np.prod(test_forward.attrs["scaled_omega_0"].shape))
-                        + self._param_length(self._alpha_indices, current_alpha_shape)
-                        + self._param_length(self._gamma_indices, current_gamma_shape)
-                    )
+                    q_len = int(np.prod(np.asarray(test_forward.attrs["Q"]).shape))
+                    omega_len = int(np.prod(np.asarray(test_forward.attrs["scaled_omega_0"]).shape))
+                    alpha_len = self._param_length(self._alpha_indices, current_alpha_shape)
+                    gamma_len = self._param_length(self._gamma_indices, current_gamma_shape)
+
+                    self.y_dim = q_len + omega_len + alpha_len + gamma_len
+                    self.y_slices = {
+                        "Q": slice(0, q_len),
+                        "omega_0": slice(q_len, q_len + omega_len),
+                        "alpha": slice(q_len + omega_len, q_len + omega_len + alpha_len),
+                        "gamma": slice(q_len + omega_len + alpha_len, q_len + omega_len + alpha_len + gamma_len),
+                    }
                 else:
                     expected_y_dim = (
-                        int(np.prod(test_sim.attrs["Q"].shape))
-                        + int(np.prod(test_forward.attrs["scaled_omega_0"].shape))
+                        int(np.prod(np.asarray(test_forward.attrs["Q"]).shape))
+                        + int(np.prod(np.asarray(test_forward.attrs["scaled_omega_0"]).shape))
                         + self._param_length(self._alpha_indices, current_alpha_shape)
                         + self._param_length(self._gamma_indices, current_gamma_shape)
                     )
@@ -372,7 +402,7 @@ class DataLoader:
         if not isinstance(params, dict):
             raise TypeError(f"params must be a dict or None, received {type(params)}.")
 
-        allowed_keys = {"alpha", "gamma"}
+        allowed_keys = {"alpha", "gamma", "Q", "omega_0"}
         extra_keys = set(params.keys()) - allowed_keys
         if extra_keys:
             raise ValueError(f"Unsupported parameter keys in params: {sorted(extra_keys)}. Allowed keys: {sorted(allowed_keys)}.")

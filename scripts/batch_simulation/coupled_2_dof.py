@@ -24,6 +24,8 @@ PRECISION = oscidyn.Precision.SINGLE
 TOTAL_SIMULATIONS = 10_000
 ETA = 0.2
 
+REF_FREQ_FACTOR_OMEGA_0 = 0.9
+
 Q_1_range = np.array([5.0, 100.0])
 Q_2_range = np.array([5.0, 100.0])
 omega_0_multiplier_range = np.array([0.9, 1.1])
@@ -190,7 +192,7 @@ if __name__ == "__main__":
                     x_forward  = batch_sweeps.sweeped_periodic_solutions['forward'][j]
                     x_backward = batch_sweeps.sweeped_periodic_solutions['backward'][j]
                     
-                    ref_idx = jnp.argmin(jnp.abs(f_omegas - 0.9 * omega_0[0]))
+                    ref_idx = jnp.argmin(jnp.abs(f_omegas - REF_FREQ_FACTOR_OMEGA_0 * omega_0[0]))
                     
                     omega_ref = f_omegas[ref_idx]
                     x_ref_forward = x_forward[ref_idx, :]
@@ -202,8 +204,10 @@ if __name__ == "__main__":
 
                     norm_omega_0 = (omega_0[0] / omega_ref)
                     norm_alpha_forward = (x_ref_forward / omega_ref**2)
+                    print(norm_alpha_forward)
                     norm_alpha_backward = (x_ref_backward / omega_ref**2)
                     norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)
+                    print(norm_gamma_forward)
                     norm_gamma_backward = (x_ref_backward**2 / omega_ref**2)
                     norm_f_omegas = (1 / omega_ref)
                     norm_f_amps_forward = ( 1 / (x_ref_forward * omega_ref**2))
