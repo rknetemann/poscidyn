@@ -5,6 +5,11 @@ equinox==0.13.2
 tqdm==4.67.1 
 matplotlib==3.10.1
 
+# For documentation
+sphinx==8.2.3
+sphinx-autodoc-typehints==3.5.2
+sphinx-rtd-theme==3.0.2
+
 # For profiling
 # tensorboard==2.20.0
 # tensorboard_plugin_profile==2.20.6
