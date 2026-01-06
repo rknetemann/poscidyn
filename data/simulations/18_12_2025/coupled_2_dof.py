@@ -200,7 +200,7 @@ if __name__ == "__main__":
                     normalized_x_backward = np.asarray(x_backward) / x_ref_backward
                     normalized_omega = np.asarray(f_omegas) / omega_ref
 
-                    norm_omega_0 = (omega_0[0] / omega_ref)
+                    norm_omega_0 = (omega_0[0] / omega_ref) # This is wrong, but I fixed it in convert.py
                     norm_alpha_forward = (x_ref_forward / omega_ref**2)
                     norm_alpha_backward = (x_ref_backward / omega_ref**2)
                     norm_gamma_forward = (x_ref_forward**2 / omega_ref**2)

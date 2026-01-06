@@ -84,6 +84,7 @@ def main():
             x_ref_backward = np.asarray(gin["backward_sweep"].attrs["reference_displacement"]) # (n_forces,) expected
 
             scaled_omega_0 = np.asarray(gin["forward_sweep"].attrs["scaled_omega_0"])  # (2,) expected
+            scaled_omega_0_fixed = scaled_omega_0 / omega_0[0] # Made a mistake in data genration, fix here
 
             scaled_gamma_forward = np.asarray(gin["forward_sweep"].attrs["scaled_gamma"])    # (n_forces, 2,2,2,2)
             scaled_gamma_backward = np.asarray(gin["backward_sweep"].attrs["scaled_gamma"])  # (n_forces, 2,2,2,2)
@@ -131,7 +132,7 @@ def main():
                     "alpha": alpha,
                     "modal_forces": modal_forces,
                     "success_rate": success_rate,
-                    "scaled_omega_0": scaled_omega_0,
+                    "scaled_omega_0": scaled_omega_0_fixed,
                     "scaled_f_omegas": scaled_f_omegas,
                 }
 

@@ -4,7 +4,6 @@ import numpy as np
 
 HDF5_FILE_EXTENSIONS = [".hdf5", ".h5"]
 
-
 class DataLoader:
     def __init__(self, hdf5_files: list[str] | Path, 
                  split_ratios: tuple[float, ...] = (0.8, 0.1, 0.1),
@@ -98,7 +97,7 @@ class DataLoader:
 
         x_batch = np.empty((len(requested_idxs), self.x_dim), dtype=dtype)
         y_batch = np.empty((len(requested_idxs), self.y_dim), dtype=dtype)
-        sweep_difference_batch = np.empty((len(requested_idxs),), dtype=dtype)
+        f_omegas_batch = np.empty((len(requested_idxs), self.x_dim), dtype=dtype)
 
         for row, split_sim_idx in enumerate(requested_idxs):
             file_idx, file_sim_idx = split_sims_idxs[split_sim_idx]
@@ -108,7 +107,8 @@ class DataLoader:
             forward_sweep = file["forward_sweeps"][sim_name]
             backward_sweep = file["backward_sweeps"][sim_name]
 
-            sweep_difference = np.sum(np.abs(forward_sweep[:] - backward_sweep[:]))
+            f_omegas = np.asarray(forward_sweep.attrs["scaled_f_omegas"])
+            f_omegas_batch[row, :] = f_omegas
 
             # TO DO: Use backwards sweeps as well
             if not (isinstance(forward_sweep, h5py.Dataset) and isinstance(backward_sweep, h5py.Dataset)):
