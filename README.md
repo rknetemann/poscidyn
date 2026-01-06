@@ -1,4 +1,4 @@
-# 🌊 OscIDyn 
+# 🌊 POsciDyn - Python Oscillator Dynamics
 ### Simulation and Identification of Nonlinear Oscillator Dynamics
 
 **A Python toolkit for simulating and identifying the dynamics of nonlinear oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.**
