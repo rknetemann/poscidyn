@@ -36,9 +36,15 @@ plugins:
             merge_init_into_class: true
 
 nav:
-  - Poscidyn in a nutshell: index.md
-  - Usage:
-      - Installation: usage/installation.md
-      - Quick Start: usage/quick_start.md
+  - Poscidyn in a nutshell: poscidyn-in-a-nutshell.md
+  - Getting started: getting-started.md
+  - Simulation examples: 
+      - Time Response: 
+        - Duffing oscillator: examples/time_response/duffing_oscillator.md
+        - MDOF oscillator: examples/time_response/mdof_oscillator.md
+      - Frequency Sweep: 
+        - Duffing oscillator: examples/frequency_sweep/duffing_oscillator.md
+        - MDOF oscillator: examples/frequency_sweep/mdof_oscillator.md
   - API Reference:
+      - time_response: api/time_response.md
       - frequency_sweep: api/frequency_sweep.md

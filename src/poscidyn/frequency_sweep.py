@@ -24,6 +24,19 @@ def frequency_sweep(
     multistarter: AbstractMultistart = LinearResponseMultistart(),
     precision: const.Precision = const.Precision.SINGLE,
 ) -> FrequencySweepResult:
+    """Run a frequency sweep for a dynamical model.
+
+    Args:
+        model: ...
+        excitor: ...
+        sweeper: ...
+        solver: ...
+        multistarter: ...
+        precision: ...
+
+    Returns:
+        A `FrequencySweepResult` containing the sweep response.
+    """
             
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)

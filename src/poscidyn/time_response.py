@@ -8,7 +8,6 @@ from .solver.abstract_solver import AbstractSolver
 from .solver.time_integration_solver import TimeIntegrationSolver
 from . import constants as const
 
-
 def time_response(
     model: AbstractModel,
     driving_frequency: jax.Array, # Shape: (1,)
@@ -19,6 +18,22 @@ def time_response(
     precision: const.Precision = const.Precision.DOUBLE,
     **kwargs
 ) -> tuple:
+    """Compute the time response of a dynamical model to a one-tone excitation.
+
+    Args:
+        model: The dynamical model to simulate.
+        driving_frequency: The driving frequency (shape: (1,)).
+        driving_amplitude: The driving amplitude for each mode (shape: (n_modes,)).
+        initial_displacement: The initial displacement for each mode (shape: (n_modes,)).
+        initial_velocity: The initial velocity for each mode (shape: (n_modes,)).
+        solver: The time integration solver to use.
+        precision: The numerical precision to use.
+        **kwargs: Additional keyword arguments to pass to the solver's time_response method.
+        
+    Returns:
+        A tuple (ts, xs, vs) where ts is the time array (shape: (n_steps,)),
+        xs is the displacement array (shape: (n_steps, n_modes)), and vs is the velocity array (shape: (n_steps, n_modes)).
+    """
     
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)
