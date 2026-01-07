@@ -2,6 +2,7 @@ from .frequency_sweep import frequency_sweep
 from .time_response import time_response
 
 from .oscillator.nonlinear_oscillator import *
+from .oscillator.van_der_pol_oscillator import *
 
 from .solver.abstract_solver import *
 from .solver.shooting_solver import *

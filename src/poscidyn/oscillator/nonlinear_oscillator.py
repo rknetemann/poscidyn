@@ -11,7 +11,6 @@ from .abstract_oscillator import AbstractOscillator, oscillator
 
 @oscillator
 class NonlinearOscillator(AbstractOscillator):
-    # Physical parameters
     Q: jax.Array
     omega_0: jax.Array
     alpha: jax.Array
