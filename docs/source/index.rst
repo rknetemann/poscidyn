@@ -15,3 +15,11 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
+Welcome to YourPackage docs
+===========================
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   api/modules
