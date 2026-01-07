@@ -8,7 +8,7 @@ matplotlib==3.10.1
 # For documentation
 mkdocs==1.6.1
 mkdocs-material==9.7.1
-mkdocstrings[python]==2.0.1
+mkdocstrings-python==2.0.1
 
 # For profiling
 # tensorboard==2.20.0
