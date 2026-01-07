@@ -1,0 +1,44 @@
+site_name: Poscidyn
+site_description: Python Oscillator Dynamics
+repo_url: https://github.com/rknetemann/poscidyn
+repo_name: rknetemann/poscidyn
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_signature: true
+            signature_crossrefs: true
+            docstring_style: google
+            merge_init_into_class: true
+
+nav:
+  - Poscidyn in a nutshell: index.md
+  - Usage:
+      - Installation: usage/installation.md
+      - Quick Start: usage/quick_start.md
+  - API Reference:
+      - Modules: api/modules.md
+      - Classes: api/classes.md

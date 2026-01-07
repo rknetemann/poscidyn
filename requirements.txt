@@ -6,10 +6,9 @@ tqdm==4.67.1
 matplotlib==3.10.1
 
 # For documentation
-sphinx==8.2.3
-sphinx-autodoc-typehints==3.5.2
-sphinx-rtd-theme==3.0.2
-myst-parser==4.0.1
+mkdocs==1.6.1
+mkdocs-material==9.7.1
+mkdocstrings[python]==2.0.1
 
 # For profiling
 # tensorboard==2.20.0
