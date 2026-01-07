@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 Q, omega_0, gamma = np.array([5.0]), np.array([1.0]), np.array([0.8])
 full_width_half_max = omega_0 / Q
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(1.0 - 25*full_width_half_max[0], 1.0 + 25*full_width_half_max[0], 61)
 DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 61)

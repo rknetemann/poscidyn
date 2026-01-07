@@ -3,13 +3,13 @@ import jax
 import jax.numpy as jnp
 import time
 
-from .model.abstract_model import AbstractModel
+from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .solver.time_integration_solver import TimeIntegrationSolver
 from . import constants as const
 
 def time_response(
-    model: AbstractModel,
+    model: AbstractOscillator,
     driving_frequency: jax.Array, # Shape: (1,)
     driving_amplitude: jax.Array, # Shape: (n_modes,)
     initial_displacement: jax.Array, # Shape: (n_modes,)
@@ -29,7 +29,7 @@ def time_response(
         solver: The time integration solver to use.
         precision: The numerical precision to use.
         **kwargs: Additional keyword arguments to pass to the solver's time_response method.
-        
+
     Returns:
         A tuple (ts, xs, vs) where ts is the time array (shape: (n_steps,)),
         xs is the displacement array (shape: (n_steps, n_modes)), and vs is the velocity array (shape: (n_steps, n_modes)).

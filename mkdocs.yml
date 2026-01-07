@@ -37,14 +37,30 @@ plugins:
 
 nav:
   - Poscidyn in a nutshell: poscidyn-in-a-nutshell.md
+
   - Getting started: getting-started.md
-  - Simulation examples: 
-      - Time Response: 
-        - Duffing oscillator: examples/time_response/duffing_oscillator.md
-        - MDOF oscillator: examples/time_response/mdof_oscillator.md
-      - Frequency Sweep: 
-        - Duffing oscillator: examples/frequency_sweep/duffing_oscillator.md
-        - MDOF oscillator: examples/frequency_sweep/mdof_oscillator.md
+
+  - Usage: 
+    - Basic usage: usage/basic_usage.md
+    - Extending Poscidyn: usage/extending_poscidyn.md
+
   - API Reference:
-      - time_response: api/time_response.md
-      - frequency_sweep: api/frequency_sweep.md
+      - Overview: api/index.md
+      - Methods: 
+        - time_response: api/time_response.md
+        - frequency_sweep: api/frequency_sweep.md
+      - Classes:
+        - Oscillator models: usage/oscillator_models.md
+        - Excitation models: usage/excitation.md
+        - Solvers: usage/solvers.md
+        - Multistart strategies: usage/multistart_strategies.md
+        - Frequency sweep methods: usage/frequency_sweep_strategies.md
+        - Results analysis: usage/results_analysis.md
+
+  - Simulation examples: 
+    - Time Response: 
+      - Duffing oscillator: examples/time_response/duffing_oscillator.md
+      - MDOF oscillator: examples/time_response/mdof_oscillator.md
+    - Frequency Sweep: 
+      - Duffing oscillator: examples/frequency_sweep/duffing_oscillator.md
+      - MDOF oscillator: examples/frequency_sweep/mdof_oscillator.md

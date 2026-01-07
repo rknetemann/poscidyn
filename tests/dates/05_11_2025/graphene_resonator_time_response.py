@@ -7,7 +7,7 @@ alpha[0,0,1] = 2 * 1.4542
 alpha[1,0,0] = 1.4542
 gamma[0,0,0,0] = 0.0638
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*20, rtol=1e-5, atol=1e-7, verbose=True)
 DRIVING_FREQUENCY = 0.875
 DRIVING_AMPLITUDE = 0.005

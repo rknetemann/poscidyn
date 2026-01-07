@@ -2,7 +2,7 @@ import jax
 import diffrax
 from abc import ABC, abstractmethod
 
-from ..model.abstract_model import AbstractModel
+from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..excitation.abstract_excitation import AbstractExcitation
 from .. import constants as const
 

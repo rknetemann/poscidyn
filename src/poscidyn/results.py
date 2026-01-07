@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
-from .model.abstract_model import AbstractModel
+from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .constants import SweepDirection
 from . import constants as const
@@ -12,7 +12,7 @@ from . import constants as const
 @jax.tree_util.register_pytree_node_class
 @dataclass
 class FrequencySweepResult():
-    def __init__(self, model: AbstractModel, sweep_direction: SweepDirection,
+    def __init__(self, model: AbstractOscillator, sweep_direction: SweepDirection,
                  driving_frequencies, driving_amplitudes,
                  steady_state_displacement_amplitude, steady_state_velocity_amplitude,
                  total_steady_state_displacement_amplitude, total_steady_state_velocity_amplitude,

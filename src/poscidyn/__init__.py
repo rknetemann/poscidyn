@@ -1,7 +1,7 @@
 from .frequency_sweep import frequency_sweep
 from .time_response import time_response
 
-from .model.base_duffing_oscillator_model import *
+from .oscillator.nonlinear_oscillator import *
 
 from .solver.abstract_solver import *
 from .solver.shooting_solver import *

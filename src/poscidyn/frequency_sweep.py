@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 from typing import Tuple, Dict
 
-from .model.abstract_model import AbstractModel
+from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .excitation.abstract_excitation import AbstractExcitation
 from .multistart.abstract_multistart import AbstractMultistart
@@ -17,7 +17,7 @@ from .sweep.nearest_neighbour_sweep import NearestNeighbourSweep
 from . import constants as const
 
 def frequency_sweep(
-    model: AbstractModel,
+    model: AbstractOscillator,
     excitor: AbstractExcitation,
     sweeper: AbstractSweep = NearestNeighbourSweep(),
     solver: AbstractSolver = TimeIntegrationSolver(),

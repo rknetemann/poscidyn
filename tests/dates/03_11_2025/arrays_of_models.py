@@ -6,10 +6,10 @@ from typing import Dict, Any, List, Tuple, NamedTuple, Union, Callable, Optional
 from jaxtyping import PyTree
 
 Q, omega_0, alpha, gamma = np.array([50.0, 23.0, 23.0]), np.array([1.0, 2.0, 3.0]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
-model1 = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+model1 = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 
 Q, omega_0, alpha, gamma = np.array([20.0, 253.0, 23.0]), np.array([1.0, 2.0, 3.0]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
-model2 = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+model2 = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 
 
 test = dict(

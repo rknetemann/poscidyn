@@ -7,10 +7,10 @@ from typing import Optional
 from jax import tree_util
 
 from .. import constants as const
-from .abstract_model import AbstractModel, oscimodel
+from .abstract_oscillator import AbstractOscillator, oscillator
 
-@oscimodel
-class BaseDuffingOscillator(AbstractModel):
+@oscillator
+class NonlinearOscillator(AbstractOscillator):
     # Physical parameters
     Q: jax.Array
     omega_0: jax.Array
@@ -74,8 +74,8 @@ class BaseDuffingOscillator(AbstractModel):
 
         return t_steady_state
     
-    def to_dtype(self, dtype: jnp.dtype) -> BaseDuffingOscillator:
-        return BaseDuffingOscillator(
+    def to_dtype(self, dtype: jnp.dtype) -> NonlinearOscillator:
+        return NonlinearOscillator(
             Q=self.Q.astype(dtype),
             omega_0=self.omega_0.astype(dtype),
             alpha=self.alpha.astype(dtype),
@@ -96,6 +96,6 @@ class BaseDuffingOscillator(AbstractModel):
         if len(gamma_terms) > 20:
             gamma_terms = gamma_terms[:20] + ["... (truncated)"]
 
-        return (f"BaseDuffingOscillator(n_modes={self.n_modes}, "
+        return (f"NonlinearOscillator(n_modes={self.n_modes}, "
                 f"{Q_terms}, {omega_0_terms}, "
                 f"{', '.join(alpha_terms)}, {', '.join(gamma_terms)})")

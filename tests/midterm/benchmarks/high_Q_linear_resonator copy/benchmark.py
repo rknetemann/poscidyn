@@ -26,7 +26,7 @@ def simulate(params):
     Q, omega_0, alpha, gamma = jnp.array([1000.0]) * (1.0 + delta), jnp.array([1.0]), jnp.zeros((1,1,1)), jnp.zeros((1,1,1,1))
     modal_forces = jnp.array([1.0])
 
-    MODEL = poscidyn.BaseDuffingOscillator(
+    MODEL = poscidyn.NonlinearOscillator(
         Q=Q,
         alpha=alpha,
         gamma=gamma,

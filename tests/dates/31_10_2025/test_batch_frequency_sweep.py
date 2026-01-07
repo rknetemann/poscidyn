@@ -29,7 +29,7 @@ def batched_frequency_sweep(duffing: jax.Array):
     gamma = jnp.zeros((2, 2, 2, 2))
     gamma = gamma.at[0, 0, 0, 0].set(duffing)
 
-    model = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+    model = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 
     return poscidyn.frequency_sweep(
         model=model,

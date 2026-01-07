@@ -6,7 +6,7 @@ import diffrax
 from jax import core as jax_core
 
 from .abstract_solver import AbstractSolver
-from ..model.abstract_model import AbstractModel
+from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..excitation.abstract_excitation import AbstractExcitation
 from ..sweep.abstract_sweep import AbstractSweep
@@ -25,7 +25,7 @@ class TimeIntegrationSolver(AbstractSolver):
         self.verbose = verbose
         self.throw = throw
 
-        self.model: AbstractModel = None
+        self.model: AbstractOscillator = None
         self.multistarter: AbstractMultistart = None
 
     @staticmethod

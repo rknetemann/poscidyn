@@ -18,7 +18,7 @@ alpha[1,0,0] = 3.74e-1
 
 REQUIRED_FORCE = 1.0
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 200)
 DRIVING_AMPLITUDE = np.linspace(0.1 * REQUIRED_FORCE, 1.0 * REQUIRED_FORCE, 5)
 EXCITOR = poscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 1.0]))

@@ -8,7 +8,7 @@ from matplotlib.lines import Line2D
 Q, omega_0, alpha, gamma = np.array([1000.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
 modal_forces = np.array([1.0])
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = np.linspace(0.99, 1.01, 150)
 MAX_FORCE = 1.0
 DRIVING_AMPLITUDE = np.linspace(0.1 * MAX_FORCE, 1.0 * MAX_FORCE, 10)

@@ -3,7 +3,7 @@ import poscidyn
 
 from parameters_table_4 import Q, omega_0, alpha, gamma
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.1, 4.5, 601)
 DRIVING_AMPLITUDE = np.outer(np.linspace(0.15, 1.0, 6), np.array([0.9, 0.1, 0.05, 0.4, 0.03, 0.08, 0.1])) * 0.003

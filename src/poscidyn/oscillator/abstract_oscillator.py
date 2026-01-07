@@ -2,10 +2,10 @@ from __future__ import annotations
 from dataclasses import field, dataclass
 from abc import ABC, abstractmethod
 
-oscimodel = lambda cls: dataclass(eq=False, kw_only=True)(cls)
+oscillator = lambda cls: dataclass(eq=False, kw_only=True)(cls)
 
-@oscimodel
-class AbstractModel(ABC):
+@oscillator
+class AbstractOscillator(ABC):
     def __post_init__(self):
         pass
     

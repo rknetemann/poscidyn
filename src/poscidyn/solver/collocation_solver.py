@@ -7,7 +7,7 @@ import lineax as lx
 import numpy as np
 
 from .abstract_solver import AbstractSolver
-from ..model.abstract_model import AbstractModel
+from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..multistart.linear_response_multistart import LinearResponseMultistart
 from .. import constants as const 
@@ -30,7 +30,7 @@ class CollocationSolver(AbstractSolver):
         self.verbose = verbose
         self.throw = throw
 
-        self.model: AbstractModel = None
+        self.model: AbstractOscillator = None
 
         self.multistart.verbose = self.verbose
 

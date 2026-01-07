@@ -8,7 +8,7 @@ gamma[2,2,2,2] = 0.3
 gamma[0,0,1,1] = 0.1
 gamma[1,0,0,1] = 0.1
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.01, 3.9, 351)
 DRIVING_AMPLITUDE = np.linspace(0.1, 50.0, 5) * omega_0[0]**2/Q[0]

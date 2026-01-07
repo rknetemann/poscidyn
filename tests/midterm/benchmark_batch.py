@@ -32,7 +32,7 @@ def simulate(params):
     alpha = alpha.at[0, 0, 1].set(7.48e-01)
     alpha = alpha.at[1, 0, 0].set(3.74e-01)
 
-    MODEL = poscidyn.BaseDuffingOscillator(
+    MODEL = poscidyn.NonlinearOscillator(
         Q=Q,
         alpha=alpha,
         gamma=gamma,

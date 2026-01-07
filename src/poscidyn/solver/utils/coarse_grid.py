@@ -2,11 +2,11 @@ import jax
 import jax.numpy as jnp
 
 from ... import constants as const
-from ...model.abstract_model import AbstractModel
+from ...oscillator.abstract_oscillator import AbstractOscillator
 
 # TO DO: Randomize initial conditions within the grid cells
 
-def gen_coarse_grid_1(model: AbstractModel,
+def gen_coarse_grid_1(model: AbstractOscillator,
                     drive_freq: jax.Array,
                     drive_amp: jax.Array,
                     ):
@@ -53,7 +53,7 @@ def gen_coarse_grid_1(model: AbstractModel,
 
     return (coarse_drive_freq_mesh, coarse_drive_amp_mesh, coarse_init_disp_mesh, coarse_init_vel_mesh)
 
-def gen_grid_2(model: AbstractModel,
+def gen_grid_2(model: AbstractOscillator,
                     drive_freq: jax.Array,
                     drive_amp: jax.Array,
                     ):

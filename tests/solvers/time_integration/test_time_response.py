@@ -15,7 +15,7 @@ Q, omega_0, alpha, gamma = np.array([10000.0]), np.array([1.0]), np.zeros((1,1,1
 # modal_forces = np.array([1.0, 0.0])
 
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = 1.0
 DRIVING_AMPLITUDE = 0.5
 INITIAL_DISPLACEMENT = np.array([0.0])

@@ -218,7 +218,7 @@ TARGET_FREQ_POINTS = 100
 DENSE_MULTIPLIER = 1.0
 MIN_DRIVE_FREQ = 0.1
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = build_drive_frequency_grid(
     omega_0=omega_0,
     fwhm=FWHM,

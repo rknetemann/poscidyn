@@ -3,7 +3,7 @@ import poscidyn
 
 from zichao_parameters import Q, omega_0, alpha, gamma
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.1, 5.5, 401)
 DRIVING_AMPLITUDE = np.linspace(0.01, 1.0, 5) * 0.03

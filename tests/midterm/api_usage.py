@@ -11,7 +11,7 @@ driving_frequency = np.linspace(0.1, 2.0, 150)
 driving_amplitude = np.linspace(0.1, 1.0, 10)
 modal_forces = np.array([1.0, 0.0])
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 
 time_response = poscidyn.time_response(

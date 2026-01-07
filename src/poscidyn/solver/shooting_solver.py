@@ -6,7 +6,7 @@ import optimistix as optx
 import lineax as lx
 
 from .abstract_solver import AbstractSolver
-from ..model.abstract_model import AbstractModel
+from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..multistart.linear_response_multistart import LinearResponseMultistart
 from .. import constants as const 
@@ -24,7 +24,7 @@ class MultipleShootingSolver(AbstractSolver):
         self.atol = atol
         self.verbose = verbose
 
-        self.model: AbstractModel = None
+        self.model: AbstractOscillator = None
 
         self.multistart.verbose = self.verbose
 

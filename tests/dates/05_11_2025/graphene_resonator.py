@@ -7,7 +7,7 @@ alpha[0,0,1] = 2 * 1.4542
 alpha[1,0,0] = 1.4542
 gamma[0,0,0,0] = 0.0638
 
-MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 EXCITOR = poscidyn.OneToneExcitation(drive_frequencies=np.linspace(0.8, 1.2, 151), drive_amplitudes=np.array([0.0005, 0.001, 0.003, 0.005]), 
                                        modal_forces=np.array([1.0, 0.0]))

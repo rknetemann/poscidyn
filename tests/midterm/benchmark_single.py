@@ -11,7 +11,7 @@ def benchmark_single_frequency_sweep():
     alpha[0,0,1] = 7.48e-01
     alpha[1,0,0] = 3.74e-01
 
-    MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+    MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
     DRIVING_FREQUENCY = np.linspace(0.5, 1.5, 150)
     MAX_FORCE = 0.3
     DRIVING_AMPLITUDE = np.linspace(0.1 * MAX_FORCE, 1.0 * MAX_FORCE, 10)
