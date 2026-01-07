@@ -1,17 +1,17 @@
 import numpy as np
-import oscidyn
+import poscidyn
 
 from zichao_parameters import Q, omega_0, alpha, gamma
 
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
+MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.1, 5.5, 401)
 DRIVING_AMPLITUDE = np.linspace(0.01, 1.0, 5) * 0.03
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
-PRECISION = oscidyn.Precision.SINGLE
+MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.2)
+SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*10, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+PRECISION = poscidyn.Precision.SINGLE
 
-frequency_sweep = oscidyn.frequency_sweep(
+frequency_sweep = poscidyn.frequency_sweep(
     model = MODEL,
     sweep_direction = SWEEP_DIRECTION,
     driving_frequencies = DRIVING_FREQUENCY,

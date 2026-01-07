@@ -3,7 +3,7 @@ import timeit
 import jax
 import jax.numpy as jnp
 from equinox import filter_jit
-import oscidyn  # your library
+import poscidyn  # your library
 
 
 BATCH_SIZE = 4
@@ -32,7 +32,7 @@ def simulate(params):
     alpha = alpha.at[0, 0, 1].set(7.48e-01)
     alpha = alpha.at[1, 0, 0].set(3.74e-01)
 
-    MODEL = oscidyn.BaseDuffingOscillator(
+    MODEL = poscidyn.BaseDuffingOscillator(
         Q=Q,
         alpha=alpha,
         gamma=gamma,
@@ -43,18 +43,18 @@ def simulate(params):
     MAX_FORCE = 0.3
     DRIVING_AMPLITUDE = jnp.linspace(0.1 * MAX_FORCE, 1.0 * MAX_FORCE, 10)
 
-    EXCITOR = oscidyn.OneToneExcitation(
+    EXCITOR = poscidyn.OneToneExcitation(
         drive_frequencies=DRIVING_FREQUENCY,
         drive_amplitudes=DRIVING_AMPLITUDE,
         modal_forces=jnp.array([1.0, 1.0]),
     )
 
-    MULTISTART = oscidyn.LinearResponseMultistart(
+    MULTISTART = poscidyn.LinearResponseMultistart(
         init_cond_shape=(3, 3),
         linear_response_factor=1.0,
     )
 
-    SOLVER = oscidyn.TimeIntegrationSolver(
+    SOLVER = poscidyn.TimeIntegrationSolver(
         max_steps=4096 * 1,
         n_time_steps=50,
         verbose=False,  # usually disable for benchmarking
@@ -63,13 +63,13 @@ def simulate(params):
         atol=1e-7,
     )
 
-    SWEEPER = oscidyn.NearestNeighbourSweep(
-        sweep_direction=[oscidyn.Forward(), oscidyn.Backward()]
+    SWEEPER = poscidyn.NearestNeighbourSweep(
+        sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
     )
 
-    PRECISION = oscidyn.Precision.SINGLE
+    PRECISION = poscidyn.Precision.SINGLE
 
-    frequency_sweep = oscidyn.frequency_sweep(
+    frequency_sweep = poscidyn.frequency_sweep(
         model=MODEL,
         sweeper=SWEEPER,
         excitor=EXCITOR,

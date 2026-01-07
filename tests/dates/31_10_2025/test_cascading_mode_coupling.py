@@ -1,5 +1,5 @@
 import numpy as np
-import oscidyn
+import poscidyn
 
 Q, omega_0, alpha, gamma = np.array([50.0, 23.0, 23.0]), np.array([1.0, 2.0, 3.0]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
 gamma[0,0,0,0] = 0.03
@@ -8,15 +8,15 @@ gamma[2,2,2,2] = 0.3
 gamma[0,0,1,1] = 0.1
 gamma[1,0,0,1] = 0.1
 
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
+MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(0.01, 3.9, 351)
 DRIVING_AMPLITUDE = np.linspace(0.1, 50.0, 5) * omega_0[0]**2/Q[0]
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(7, 7), linear_response_factor=50.2)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*20, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
-PRECISION = oscidyn.Precision.SINGLE
+MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(7, 7), linear_response_factor=50.2)
+SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*20, multistart=MULTISTART, verbose=True, throw=False, rtol=1e-5, atol=1e-7)
+PRECISION = poscidyn.Precision.SINGLE
 
-frequency_sweep = oscidyn.frequency_sweep(
+frequency_sweep = poscidyn.frequency_sweep(
     model = MODEL,
     sweep_direction = SWEEP_DIRECTION,
     driving_frequencies = DRIVING_FREQUENCY,

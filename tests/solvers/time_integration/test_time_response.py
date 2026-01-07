@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import oscidyn
+import poscidyn
 
 # 1 mode: 
 Q, omega_0, alpha, gamma = np.array([10000.0]), np.array([1.0]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
@@ -15,15 +15,15 @@ Q, omega_0, alpha, gamma = np.array([10000.0]), np.array([1.0]), np.zeros((1,1,1
 # modal_forces = np.array([1.0, 0.0])
 
 
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = 1.0
 DRIVING_AMPLITUDE = 0.5
 INITIAL_DISPLACEMENT = np.array([0.0])
 INITIAL_VELOCITY = np.array([0.0])
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*1, verbose=True, throw=False, rtol=1e-2, atol=1e-7)
-PRECISION = oscidyn.Precision.SINGLE
+SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*1, verbose=True, throw=False, rtol=1e-2, atol=1e-7)
+PRECISION = poscidyn.Precision.SINGLE
 
-time_response = oscidyn.time_response(
+time_response = poscidyn.time_response(
     model = MODEL,
     driving_frequency = DRIVING_FREQUENCY,
     driving_amplitude = DRIVING_AMPLITUDE,

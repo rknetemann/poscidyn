@@ -4,7 +4,7 @@ import jax
 import time
 import matplotlib.pyplot as plt
 
-import oscidyn
+import poscidyn
 
 # --------------------------
 # Config
@@ -12,12 +12,12 @@ import oscidyn
 N_DUFFING_IN_PARALLEL = 2
 DUFFING_COEFFICIENTS = np.array([0.01, 0.02, 0.03, 0.04])
 
-SWEEP = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
-EXCITATION = oscidyn.OneToneExcitation(drive_frequencies=np.linspace(0.1, 3.0, 151), drive_amplitudes=np.linspace(0.01, 0.1, 5), 
+SWEEP = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
+EXCITATION = poscidyn.OneToneExcitation(drive_frequencies=np.linspace(0.1, 3.0, 151), drive_amplitudes=np.linspace(0.01, 0.1, 5), 
                                        modal_forces=np.array([1.0, 0.5]))
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.2)
-SOLVER = oscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
-PRECISION = oscidyn.Precision.SINGLE
+MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.2)
+SOLVER = poscidyn.TimeIntegrationSolver(n_time_steps=200, max_steps=4096*3, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+PRECISION = poscidyn.Precision.SINGLE
 
 start_time = time.time()
 
@@ -29,9 +29,9 @@ def batched_frequency_sweep(duffing: jax.Array):
     gamma = jnp.zeros((2, 2, 2, 2))
     gamma = gamma.at[0, 0, 0, 0].set(duffing)
 
-    model = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+    model = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 
-    return oscidyn.frequency_sweep(
+    return poscidyn.frequency_sweep(
         model=model,
         sweeper=SWEEP,
         excitor=EXCITATION,

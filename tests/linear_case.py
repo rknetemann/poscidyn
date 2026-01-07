@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
-HDF5_FILE = "/home/raymo/Projects/oscidyn/data/simulations/18_12_2025/converted/batch_0_2025-12-18_17-32-41_converted.hdf5"
+HDF5_FILE = "/home/raymo/Projects/poscidyn/data/simulations/18_12_2025/converted/batch_0_2025-12-18_17-32-41_converted.hdf5"
 HDF5_FILE = "/home/raymo/Projects/nlsid/data/simulations/18_12_2025/converted/batch_0_2025-12-18_17-32-41_converted.hdf5"
 
 def _normalize_f_amp(f_amp: np.ndarray) -> np.ndarray:

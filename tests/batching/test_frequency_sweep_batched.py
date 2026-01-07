@@ -6,14 +6,14 @@ import jax
 import time
 import matplotlib.pyplot as plt
 
-import oscidyn
+import poscidyn
 
 N_DUFFING = 20
 N_DUFFING_IN_PARALLEL = 10
 
-DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, N_DUFFING, dtype=oscidyn.const.DTYPE)  # Shape: (n_duffing,)
-DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 200, dtype=oscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
-DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 10, dtype=oscidyn.const.DTYPE)  # Shape: (n_driving_amplitudes,)
+DUFFING_COEFFICIENTS = jnp.linspace(-0.005, 0.03, N_DUFFING, dtype=poscidyn.const.DTYPE)  # Shape: (n_duffing,)
+DRIVING_FREQUENCIES = jnp.linspace(0.1, 2.0, 200, dtype=poscidyn.const.DTYPE) # Shape: (n_driving_frequencies,)
+DRIVING_AMPLITUDES = jnp.linspace(0.01, 1.0, 10, dtype=poscidyn.const.DTYPE)  # Shape: (n_driving_amplitudes,)
 
 start_time = time.time()
 
@@ -22,16 +22,16 @@ def batched_frequency_sweep(
     duffing: float,
 ):
     n_modes = 1
-    omega_ref = jnp.array(1.0, dtype=oscidyn.const.DTYPE)
-    x_ref = jnp.array(1.0, dtype=oscidyn.const.DTYPE)
-    omega_0_hat = jnp.array([1.0], dtype=oscidyn.const.DTYPE)
-    Q = jnp.array([10.0], dtype=oscidyn.const.DTYPE)
-    eta_hat = jnp.array([0.005], dtype=oscidyn.const.DTYPE)
-    alpha_hat = jnp.zeros((1, 1, 1), dtype=oscidyn.const.DTYPE)
-    gamma_hat = jnp.zeros((1, 1, 1, 1), dtype=oscidyn.const.DTYPE).at[0, 0, 0, 0].set(duffing)
-    delta_hat = jnp.zeros((1, 1, 1, 1, 1), dtype=oscidyn.const.DTYPE)
+    omega_ref = jnp.array(1.0, dtype=poscidyn.const.DTYPE)
+    x_ref = jnp.array(1.0, dtype=poscidyn.const.DTYPE)
+    omega_0_hat = jnp.array([1.0], dtype=poscidyn.const.DTYPE)
+    Q = jnp.array([10.0], dtype=poscidyn.const.DTYPE)
+    eta_hat = jnp.array([0.005], dtype=poscidyn.const.DTYPE)
+    alpha_hat = jnp.zeros((1, 1, 1), dtype=poscidyn.const.DTYPE)
+    gamma_hat = jnp.zeros((1, 1, 1, 1), dtype=poscidyn.const.DTYPE).at[0, 0, 0, 0].set(duffing)
+    delta_hat = jnp.zeros((1, 1, 1, 1, 1), dtype=poscidyn.const.DTYPE)
 
-    model = oscidyn.NonlinearOscillator(
+    model = poscidyn.NonlinearOscillator(
         n_modes=n_modes,
         Q=Q,
         eta_hat=eta_hat,
@@ -43,12 +43,12 @@ def batched_frequency_sweep(
         x_ref=x_ref
     )
     
-    return oscidyn.vmap_safe_frequency_sweep(
+    return poscidyn.vmap_safe_frequency_sweep(
         model=model,
-        sweep_direction=oscidyn.SweepDirection.FORWARD,
+        sweep_direction=poscidyn.SweepDirection.FORWARD,
         driving_frequencies=DRIVING_FREQUENCIES,
         driving_amplitudes=DRIVING_AMPLITUDES,
-        solver=oscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=512, rtol=1e-4, atol=1e-6),
+        solver=poscidyn.FixedTimeSteadyStateSolver(max_steps=4_096*1, n_time_steps=512, rtol=1e-4, atol=1e-6),
     )
 
 # Process N_DUFFING_IN_PARALLEL coefficients at a time

@@ -1,4 +1,4 @@
-import oscidyn
+import poscidyn
 import numpy as np
 
 Q, omega_0, alpha, gamma = np.array([10.0, 20.0]), np.array([1.00, 2.0]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
@@ -11,10 +11,10 @@ driving_frequency = np.linspace(0.1, 2.0, 150)
 driving_amplitude = np.linspace(0.1, 1.0, 10)
 modal_forces = np.array([1.0, 0.0])
 
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-EXCITOR = oscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 
-time_response = oscidyn.time_response(
+time_response = poscidyn.time_response(
     model = MODEL,
     driving_frequency = 1.0,
     driving_amplitude = 1.0,

@@ -1,20 +1,20 @@
-import oscidyn
+import poscidyn
 import numpy as np
 import matplotlib.pyplot as plt
 
 Q, omega_0, gamma = np.array([5.0]), np.array([1.0]), np.array([0.8])
 full_width_half_max = omega_0 / Q
 
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
-SWEEP_DIRECTION = oscidyn.SweepDirection.FORWARD
+MODEL = poscidyn.BaseDuffingOscillator(Q=Q, gamma=gamma, omega_0=omega_0)
+SWEEP_DIRECTION = poscidyn.SweepDirection.FORWARD
 DRIVING_FREQUENCY = np.linspace(1.0 - 25*full_width_half_max[0], 1.0 + 25*full_width_half_max[0], 61)
 DRIVING_FREQUENCY = np.linspace(0.1, 2.0, 61)
 DRIVING_AMPLITUDE = np.linspace(0.1, 1.0, 5) * omega_0[0]**2/Q[0]
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(6, 1), linear_response_factor=1.5)
-SOLVER = oscidyn.CollocationSolver(max_steps=1000, N_elements=8, m_collocation_points=4, multistart=MULTISTART, verbose=True, max_iterations=200, rtol=1e-9, atol=1e-12)
-PRECISION = oscidyn.Precision.DOUBLE
+MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(6, 1), linear_response_factor=1.5)
+SOLVER = poscidyn.CollocationSolver(max_steps=1000, N_elements=8, m_collocation_points=4, multistart=MULTISTART, verbose=True, max_iterations=200, rtol=1e-9, atol=1e-12)
+PRECISION = poscidyn.Precision.DOUBLE
 
-frequency_sweep = oscidyn.frequency_sweep(
+frequency_sweep = poscidyn.frequency_sweep(
     model = MODEL,
     sweep_direction = SWEEP_DIRECTION,
     driving_frequencies = DRIVING_FREQUENCY,

@@ -1,5 +1,5 @@
 import numpy as np
-import oscidyn
+import poscidyn
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import time
@@ -39,14 +39,14 @@ gamma[0,0,0,0] = gamma_hat
 
 REQUIRED_FORCE = drive_amp_hat
 
-MODEL = oscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.BaseDuffingOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 DRIVING_FREQUENCY = np.linspace(0.6, 1.4, 200)
 DRIVING_AMPLITUDE = np.linspace(0.1 * REQUIRED_FORCE, 1.0 * REQUIRED_FORCE, 10)
-EXCITOR = oscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 0.0]))
-MULTISTART = oscidyn.LinearResponseMultistart(init_cond_shape=(7, 7), linear_response_factor=1.0)
-SOLVER = oscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
-SWEEPER = oscidyn.NearestNeighbourSweep(sweep_direction=[oscidyn.Forward(), oscidyn.Backward()])
-PRECISION = oscidyn.Precision.SINGLE
+EXCITOR = poscidyn.OneToneExcitation(drive_frequencies=DRIVING_FREQUENCY, drive_amplitudes=DRIVING_AMPLITUDE, modal_forces=np.array([1.0, 0.0]))
+MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(7, 7), linear_response_factor=1.0)
+SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
+PRECISION = poscidyn.Precision.SINGLE
 
 def _extract_gamma_diagonal(gamma: np.ndarray):
     arr = np.asarray(gamma)
@@ -202,7 +202,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
 
 start_time = time.time()
 
-frequency_sweep = oscidyn.frequency_sweep(
+frequency_sweep = poscidyn.frequency_sweep(
     model = MODEL,
     sweeper=SWEEPER,
     excitor=EXCITOR,
