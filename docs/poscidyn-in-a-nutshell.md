@@ -32,7 +32,7 @@ frequency_sweep = poscidyn.frequency_sweep(
 
 ## Next steps
 
-Have a look at the [Getting Started](./getting-started.md) page.
+Have a look at the [Getting Started](./getting-started.md) page. 
 
 ## Credits where they are due
 

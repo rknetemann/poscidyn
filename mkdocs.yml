@@ -38,7 +38,11 @@ plugins:
 nav:
   - Poscidyn in a nutshell: poscidyn-in-a-nutshell.md
 
+  - For who is Poscidyn?: for-who-is-poscidyn.md
+
   - Getting started: getting-started.md
+
+  - Limitations: limitations.md
 
   - Usage: 
     - Basic usage: usage/basic_usage.md
