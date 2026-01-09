@@ -30,9 +30,9 @@ frequency_sweep = poscidyn.frequency_sweep(
 
 ```
 
-## Next steps
+## For who is Poscidyn?
 
-Have a look at the [Getting Started](./getting-started.md) page. 
+If you want to know more for who Poscidyn could be a useful package, have a look at the [For who is Poscidyn?](../for-who-is-poscidyn) page.
 
 ## Credits where they are due
 

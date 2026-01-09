@@ -21,6 +21,9 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
 
 plugins:
   - search
@@ -40,31 +43,41 @@ nav:
 
   - For who is Poscidyn?: for-who-is-poscidyn.md
 
-  - Getting started: getting-started.md
-
-  - Limitations: limitations.md
+  - Getting started: 
+    - Installation: getting-started/installation.md
+    - Understanding Poscidyn: getting-started/understanding-poscidyn.md
+    - Limitations: getting-started/limitations.md
+    - Next steps: getting-started/next-steps.md
 
   - Usage: 
-    - Basic usage: usage/basic_usage.md
-    - Extending Poscidyn: usage/extending_poscidyn.md
+    - Basic usage: 
+      - Setting up an oscillator model: usage/basic-usage/oscillator-models.md
+      - Setting up an excitation model: usage/basic-usage/excitation-models.md
+      - Performing a time response: usage/basic-usage/time-response.md
+      - Performing a frequency sweep: usage/basic-usage/frequency-sweep.md
+    - Advanced usage:
+      - Choosing a solver: usage/advanced-usage/choosing-a-solver.md
+      - Configuring multistart strategies: usage/advanced-usage/configuring-multistart-strategies.md
+      - Configuring sweep methods: usage/advanced-usage/configuring-sweep-methods.md
+    - Extending Poscidyn: usage/extending-poscidyn.md
+
+  - Examples: 
+    - Overview: examples/overview.md
+    - Time Response: 
+      - Duffing oscillator: examples/time-response/duffing-oscillator.md
+      - MDOF oscillator: examples/time-response/mdof-oscillator.md
+    - Frequency Sweep: 
+      - Duffing oscillator: examples/frequency-sweep/duffing-oscillator.md
+      - MDOF oscillator: examples/frequency-sweep/mdof-oscillator.md
 
   - API Reference:
-      - Overview: api/index.md
       - Methods: 
-        - time_response: api/time_response.md
-        - frequency_sweep: api/frequency_sweep.md
+        - time_response: api/methods.md#time-response
+        - frequency_sweep: api/methods.md#frequency-sweep
       - Classes:
-        - Oscillator models: usage/oscillator_models.md
-        - Excitation models: usage/excitation.md
-        - Solvers: usage/solvers.md
-        - Multistart strategies: usage/multistart_strategies.md
-        - Frequency sweep methods: usage/frequency_sweep_strategies.md
-        - Results analysis: usage/results_analysis.md
-
-  - Simulation examples: 
-    - Time Response: 
-      - Duffing oscillator: examples/time_response/duffing_oscillator.md
-      - MDOF oscillator: examples/time_response/mdof_oscillator.md
-    - Frequency Sweep: 
-      - Duffing oscillator: examples/frequency_sweep/duffing_oscillator.md
-      - MDOF oscillator: examples/frequency_sweep/mdof_oscillator.md
+        - Oscillator models: api/classes.md#oscillator-models
+        - Excitation models: api/classes.md#excitation-models
+        - Solvers: api/classes.md#solvers
+        - Multistart strategies: api/classes.md#multistart-strategies
+        - Frequency sweep methods: api/classes.md#frequency-sweep-strategies
+        - Results analysis: api/classes.md#results-analysis

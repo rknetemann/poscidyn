@@ -14,12 +14,6 @@ Poscidyn instead adopts a **multistart approach**, where steady-state periodic o
 
 This multistart strategy typically yields *all* solution branches simultaneously, meaning multiple solutions may exist for a single excitation frequency. In contrast, experimental frequency sweeps usually observe only a single branch. To bridge this gap, Poscidyn introduces **artificial sweep methods**. These methods synthetically reconstruct continuation-like behavior by selecting and ordering solutions from the high-dimensional multistart solution space.
 
-Be sure to consult the **limitations** page, as synthetic sweep methods come with important caveats and do not fully replicate true continuation algorithms.
+## Limitations
 
-## Choosing a model
-
-## Choosing a solver
-
-## Choosing a sweep method
-
-## Choosing a multistart method
+Be sure to consult the [Limitations](../limitations) page, as these kinds of synthetic sweep methods come with important caveats and do not fully replicate true continuation algorithms.
