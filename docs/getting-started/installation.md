@@ -4,7 +4,7 @@ pip install poscidyn
 ```
 Requirements:
 
-- Python 3.8 or newer
+- Python 3.10 or newer
 
 ## Virtual environment
 To avoid dependency conflicts with other Python packages, it is strongly recommended to install Poscidyn inside a virtual environment.

@@ -1,6 +1,7 @@
 # Poscidyn in a nutshell
 
-Poscidyn is a Python toolkit based on [JAX](https://github.com/google/jax), for simulating the dynamics of (nonlinear) oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.
+Poscidyn is a Python toolkit based on [JAX](https://github.com/google/jax), designed to **streamline and accelerate common workflows in nonlinear oscillator dynamics**. It enables the simulation and visualization of (nonlinear) oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.
+
 
 Features include:
 
