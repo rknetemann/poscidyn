@@ -41,10 +41,9 @@ plugins:
 
 nav:
   - Poscidyn in a nutshell: index.md
-
   - For who is Poscidyn?: for-who-is-poscidyn.md
-
   - Where Poscidyn shines: where-poscidyn-shines.md
+  - Future work: future-work.md
 
   - Getting started: 
     - Installation: getting-started/installation.md
