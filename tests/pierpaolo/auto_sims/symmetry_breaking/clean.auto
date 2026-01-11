@@ -1,9 +1,0 @@
-
-#==============
-# AUTO Demo frc
-#==============
-
-print "\n***Clean the directory***"
-dl('0')
-dl('frc')
-cl()

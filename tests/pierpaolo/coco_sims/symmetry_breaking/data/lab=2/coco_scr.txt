@@ -1,8 +1,0 @@
-
-    STEP   DAMPING               NORMS              COMPUTATION TIMES
-  IT SIT     GAMMA     ||d||     ||f||     ||U||   F(x)  DF(x)  SOLVE
-   0                          1.21e-14  1.91e+01    0.0    0.0    0.0
-
- STEP      TIME        ||U||  LABEL  TYPE         omega           fx
-    0  00:00:00   1.9141e+01      1  EP      5.0000e-01   3.0000e-02
-  123  00:00:10   1.0708e+01      2  EP      1.5000e+00   3.0000e-02

@@ -1,6 +1,7 @@
 site_name: Poscidyn
 site_description: Python Oscillator Dynamics
 site_url: https://rknetemann.github.io/poscidyn/
+site_dir: docs/site
 repo_url: https://github.com/rknetemann/poscidyn
 repo_name: rknetemann/poscidyn
 
