@@ -1,3 +1,5 @@
+Poscidyn has limitations, please make sure to read them before using this library for your application:
+
 - Difference between parallel and embarassingly parallel and how for example increasing the multistart search space could seriously increase simulation time.
 
 - Time integration solvers estimate the steady-state time, but are based on approximations and may require tuning of the time to steady state parameter to correctly calculate the maximum amplitude at different frequencies.
