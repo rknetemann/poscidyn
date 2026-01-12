@@ -7,6 +7,7 @@ from typing import Optional
 from jax import tree_util
 
 from .. import constants as const
+from .abstract_lienard_oscillator import AbstractLienardOscillator
 from .abstract_oscillator import AbstractOscillator, oscillator
 
 @oscillator
@@ -22,38 +23,18 @@ class NonlinearOscillator(AbstractOscillator):
         jnp.asarray(self.alpha)
         jnp.asarray(self.gamma)
 
-    def f(self, tau, state, args, omega_ref=1.0, x_ref=1.0):
-        q, dq_dtau   = jnp.split(state, 2)
-        f_amp, f_omega = [jnp.asarray(v).squeeze(()) for v in args]
+    def damping_term(self, t, state, args):
+        return (self.omega_0) * 1/self.Q
+    
+    def stiffness_term(self, t, state, args):
+        q, dq_dt = jnp.split(state, 2)
+        linear_stiffness_term = self.omega_0**2 * q
+        quadratic_stiffness_term = jnp.einsum("ijk,j,k->i", self.alpha, q, q)
+        cubic_stiffness_term = jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q)
 
-        #omega_ref = f_omega[0]
-
-        damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dtau
-        linear_stiffness_term = (1/omega_ref**2) * self.omega_0**2 * q
-        quadratic_stiffness_term = (x_ref / omega_ref**2) * jnp.einsum("ijk,j,k->i", self.alpha, q, q)
-        cubic_stiffness_term = (x_ref**2 / omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
-        forcing_term = f_amp / (omega_ref**2 * x_ref) * jnp.cos(f_omega/omega_ref * tau)
-
-        d2q_dtau2 = (
-            - damping_term
-            - linear_stiffness_term
-            - quadratic_stiffness_term
-            - cubic_stiffness_term
-            + forcing_term
-        ) 
-        return jnp.concatenate([dq_dtau, d2q_dtau2])
-
-    def f_y(self, tau, state, args):
-        q, dq_dtau = jnp.split(state, 2)
-
-        zero_block = jnp.zeros((self.n_modes, self.n_modes))
-        identity_block = jnp.eye(self.n_modes)
-        A_bottom_left = -jnp.diag(self.g2 + 3 * self.g3 * q**2)
-        A_bottom_right = -jnp.diag(self.g1)
-
-        A = jnp.block([[zero_block, identity_block],
-                       [A_bottom_left, A_bottom_right]])
-        return A
+        return (linear_stiffness_term
+                + quadratic_stiffness_term
+                + cubic_stiffness_term)
     
     @property
     def n_modes(self) -> int:

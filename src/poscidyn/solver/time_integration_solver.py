@@ -251,6 +251,6 @@ class TimeIntegrationSolver(AbstractSolver):
     def _rhs(self, t, y, args):
         f_amp, f_omega = args
 
-        dy_dt = self.model.f(t, y, (f_amp, f_omega))
+        dy_dt = self.model.rhs(t, y, (f_amp, f_omega))
 
         return dy_dt
