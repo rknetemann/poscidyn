@@ -54,13 +54,13 @@ $$
 + \omega_1^{2}\, x_1
 + c_{12}\,(\dot x_1 - \dot x_2)
 + k_{12}\,(x_1 - x_2)
-= f \cos(\omega t), \\[6pt]
+= f_1 \cos(\omega t + \phi_1), \\[6pt]
 \ddot x_2
 &+ 2\zeta_2 \omega_2\, \dot x_2
 + \omega_2^{2}\, x_2
 + c_{12}\,(\dot x_2 - \dot x_1)
 + k_{12}\,(x_2 - x_1)
-= 0 .
+= f_2 \cos(\omega t + \phi_2) .
 \end{aligned}
 $$
 
