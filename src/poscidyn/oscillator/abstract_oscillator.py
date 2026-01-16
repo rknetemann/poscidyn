@@ -29,10 +29,9 @@ class AbstractOscillator (ABC):
             state (Array): State vector
             args (PyTree): Additional arguments
         """
+        x, dx_dt = jnp.split(state, 2)
         damping_term = self.damping_term(t, x, *args) + self.parametric_damping_term(t, x, *args)
         stiffness_term = self.stiffness_term(t, x, *args) + self.parametric_stiffness_term(t, x, *args)
-
-        x, dx_dt = jnp.split(state, 2)
         d2x_dt2 = -  damping_term * dx_dt - stiffness_term + self.direct_drive_term(t, x, *args)
         return jnp.concatenate([dx_dt, d2x_dt2])
     
