@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import field, dataclass
+import jax
 import jax.numpy as jnp
 from jaxtyping import Float, Array, PyTree
 from typing import Any, Callable
@@ -16,7 +17,7 @@ class AbstractOscillator (ABC):
     def __init_subclass__(cls):
         super().__init_subclass__()
 
-    @filter_jit
+    #@filter_jit
     def rhs(self, t: Float, state: Array,
             *
             args: PyTree):

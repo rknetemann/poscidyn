@@ -114,11 +114,13 @@ class TimeIntegrationSolver(AbstractSolver):
         
     # TO DO: Add phase difference results
     def frequency_sweep(self,
-             excitor: AbstractExcitation,
+             excitation: AbstractExcitation,
              sweeper: AbstractSweep,
             ) -> FrequencySweepResult:
         
         periods_to_retain = const.N_PERIODS_TO_RETAIN
+
+        self.model.direct_drive_term = excitation
 
         @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
@@ -190,8 +192,8 @@ class TimeIntegrationSolver(AbstractSolver):
                 successful=successful
             )
             
-        f_omegas = excitor.f_omegas
-        f_amps = excitor.f_amps
+        f_omegas = excitation.f_omegas
+        f_amps = excitation.f_amps
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
@@ -211,6 +213,7 @@ class TimeIntegrationSolver(AbstractSolver):
         t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE)
         t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
         max_steps_budget = self._max_steps_budget(t_span_estimate, longest_period)
+        
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
 
@@ -231,13 +234,8 @@ class TimeIntegrationSolver(AbstractSolver):
         sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
                 
         result = FrequencySweepResult(
-            f_omegas=excitor.f_omegas,
-            f_amps=excitor.f_amps,
-            modal_forces=excitor.modal_forces,
-            Q=self.model.Q,
-            omega_0=self.model.omega_0,
-            alpha=self.model.alpha,
-            gamma=self.model.gamma,
+            model=self.model,
+            excitation=excitation,
             periodic_solutions=periodic_solutions,
             sweeped_periodic_solutions=sweeped_periodic_solutions,
             n_successful=n_successful,

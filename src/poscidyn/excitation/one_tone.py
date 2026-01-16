@@ -9,6 +9,10 @@ class OneToneExcitation:
                 
         self.f_omegas = jnp.asarray(drive_frequencies)
         self.f_amps = jnp.outer(jnp.asarray(drive_amplitudes), jnp.asarray(modal_forces))
+
+    def direct_drive_term(self, t, state, *args):
+        n_modes = self.f_amps.shape[1]
+        drive = jnp.zeros((n_modes,))
         
     def to_dtype(self, dtype):
         return OneToneExcitation(

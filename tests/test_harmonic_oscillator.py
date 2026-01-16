@@ -123,6 +123,7 @@ frequency_sweep = poscidyn.frequency_sweep(
     multistarter=MULTISTART,
 ) #n_freq, n_amp, n_init_disp, n_init_vel
 
+
 end_time = time.time()
 print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
 print(
