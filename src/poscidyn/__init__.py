@@ -5,8 +5,6 @@ from .oscillator.nonlinear_oscillator import *
 from .oscillator.harmonic_oscillator import *
 
 from .solver.abstract_solver import *
-from .solver.shooting_solver import *
-from .solver.collocation_solver import *
 from .solver.time_integration_solver import *
 
 from .sweep.sweep_directions import *

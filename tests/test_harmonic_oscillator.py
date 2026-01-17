@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 zeta = np.array([0.01, 0.02])
-omega_0 = np.array([1.0, 2.0])
+omega_0 = np.array([1.0, 1.5])
 
 driving_frequency = np.linspace(0.5, 2.0, 500)
 driving_amplitude = np.linspace(0.1, 1.0, 10)
