@@ -1,7 +1,12 @@
 import jax.numpy as jnp
 from jax import tree_util
+from jaxtyping import PyTree, Float, Array
+
+from ..oscillator.abstract_oscillator import AbstractOscillator
 
 class OneToneExcitation:
+    oscillator: AbstractOscillator = None
+
     def __init__(self, drive_frequencies, drive_amplitudes, modal_forces):
         self.drive_frequencies = drive_frequencies
         self.drive_amplitudes = drive_amplitudes
@@ -9,10 +14,9 @@ class OneToneExcitation:
                 
         self.f_omegas = jnp.asarray(drive_frequencies)
         self.f_amps = jnp.outer(jnp.asarray(drive_amplitudes), jnp.asarray(modal_forces))
-
-    def direct_drive_term(self, t, state, *args):
-        n_modes = self.f_amps.shape[1]
-        drive = jnp.zeros((n_modes,))
+        
+    def direct_drive(self, t: Float, state: Array, args: PyTree):
+        return args['f_amp'] * jnp.cos(args['f_omega'] * t) 
         
     def to_dtype(self, dtype):
         return OneToneExcitation(

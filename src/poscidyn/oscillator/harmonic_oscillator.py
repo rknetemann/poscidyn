@@ -29,7 +29,8 @@ class HarmonicOscillator(AbstractOscillator):
         self.omega_0 = jnp.asarray(self.omega_0)
 
     def damping_term(self, t, state, args):
-        return (self.omega_0) * 1/self.Q
+        q, dq_dt = jnp.split(state, 2)
+        return self.omega_0 / self.Q * dq_dt
     
     def stiffness_term(self, t, state, args):
         q, dq_dt = jnp.split(state, 2)
@@ -38,12 +39,8 @@ class HarmonicOscillator(AbstractOscillator):
         return (linear_stiffness_term)
     
     @property
-    def n_modes(self) -> int:
+    def n_dof(self) -> int:
         return self.Q.shape[0]
-    
-    @property
-    def n_states(self) -> int:
-        return self.n_modes * 2
 
     def t_steady_state(self, driving_frequency: jax.Array, ss_tol: float) -> float:
         '''driving_frequency
@@ -65,5 +62,5 @@ class HarmonicOscillator(AbstractOscillator):
         Q_terms = ", ".join([f"Q[{i}]={float(v):.6f}" for i, v in enumerate(self.Q)])
         omega_0_terms = ", ".join([f"omega_0[{i}]={float(v):.6f}" for i, v in enumerate(self.omega_0)])
 
-        return (f"HarmonicOscillator(n_modes={self.n_modes}, "
+        return (f"HarmonicOscillator(n_dof={self.n_dof}, "
                 f"{Q_terms}, {omega_0_terms})")

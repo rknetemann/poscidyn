@@ -18,7 +18,7 @@ from . import constants as const
 
 def frequency_sweep(
     model: AbstractOscillator,
-    excitor: AbstractExcitation,
+    excitation: AbstractExcitation,
     sweeper: AbstractSweep = NearestNeighbourSweep(),
     solver: AbstractSolver = TimeIntegrationSolver(),
     multistarter: AbstractMultistart = LinearResponseMultistart(),
@@ -28,7 +28,7 @@ def frequency_sweep(
 
     Args:
         model: ...
-        excitor: ...
+        excitation: ...
         sweeper: ...
         solver: ...
         multistarter: ...
@@ -48,13 +48,18 @@ def frequency_sweep(
         raise ValueError(f"Unsupported precision: {precision}")
 
     model = model.to_dtype(dtype)
-    excitor = excitor.to_dtype(dtype)
+    excitation = excitation.to_dtype(dtype)
     sweeper = sweeper.to_dtype(dtype)
     multistarter = multistarter.to_dtype(dtype)
     
     solver.model = model
     solver.multistarter = multistarter
+    solver.excitation = excitation
 
-    frequency_sweep = solver.frequency_sweep(excitor, sweeper)
+    model.excitation = excitation
+
+    excitation.model = model
+
+    frequency_sweep = solver.frequency_sweep(excitation, sweeper)
 
     return frequency_sweep

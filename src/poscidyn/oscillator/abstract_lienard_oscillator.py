@@ -15,9 +15,7 @@ class AbstractLienardOscillator (AbstractOscillator):
         super().__init_subclass__()
 
     @filter_jit
-    def rhs(self, t: Float, state: Array,
-            *
-            args: PyTree):
+    def rhs(self, t: Float, state: Array, args: PyTree):
         """Right-hand side of the Lienard oscillator equations
 
         Wikipedia: [https://en.wikipedia.org/wiki/Li%C3%A9nard_equation](https://en.wikipedia.org/wiki/Li%C3%A9nard_equation)
@@ -28,7 +26,7 @@ class AbstractLienardOscillator (AbstractOscillator):
             args (PyTree): Additional arguments
         """
         x, dx_dt = jnp.split(state, 2)
-        d2x_dt2 = - self.f(t, x, *args) * dx_dt - self.g(t, x, *args)
+        d2x_dt2 = - self.f(t, x, args) * dx_dt - self.g(t, x, args)
 
         return jnp.concatenate([dx_dt, d2x_dt2])
     

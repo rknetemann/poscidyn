@@ -13,25 +13,11 @@ driving_amplitude = np.linspace(0.1, 1.0, 10)
 modal_forces = np.array([1.0, 1.0])
 
 MODEL = poscidyn.HarmonicOscillator(zeta=zeta, omega_0=omega_0)
-EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
-
-
-def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, gamma: np.ndarray, modal_forces: np.ndarray) -> str:
-    q_vals = np.asarray(Q).ravel()
-    omega_vals = np.asarray(omega_0).ravel()
-
-    parts = []
-    if q_vals.size:
-        parts.append(f"Q=[{', '.join(f'{val:.2f}' for val in q_vals[:2])}]")
-    if omega_vals.size:
-        parts.append(f"omega0=[{', '.join(f'{val:.2f}' for val in omega_vals[:2])}]")
-    if modal_forces.size:
-        parts.append(f"modal_forces=[{', '.join(f'{val:.2f}' for val in modal_forces[:2])}]")
-    return "\n".join(parts)
 
 
 def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions) -> None:
@@ -117,7 +103,7 @@ start_time = time.time()
 frequency_sweep = poscidyn.frequency_sweep(
     model = MODEL,
     sweeper=SWEEPER,
-    excitor=EXCITOR,
+    excitation=EXCITATION,
     solver = SOLVER,
     precision = PRECISION,
     multistarter=MULTISTART,
@@ -135,8 +121,8 @@ print(
 fig, ax = plt.subplots(figsize=(10, 6))
 plot_sweep(
     ax=ax,
-    drive_freqs=EXCITOR.drive_frequencies,
-    drive_amps=EXCITOR.drive_amplitudes,
+    drive_freqs=EXCITATION.drive_frequencies,
+    drive_amps=EXCITATION.drive_amplitudes,
     sweeped_solutions=frequency_sweep.sweeped_periodic_solutions)
 plt.tight_layout()
 plt.show()

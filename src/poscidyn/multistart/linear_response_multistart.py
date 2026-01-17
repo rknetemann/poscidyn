@@ -16,9 +16,9 @@ class LinearResponseMultistart(AbstractMultistart):
         n_f_amps = f_amps.shape[0]
         n_x0s = self.init_cond_shape[0]
         n_v0s = self.init_cond_shape[1]
-        n_modes = model.n_modes
+        n_dof = model.n_dof
 
-        f_omegas_grid = jnp.tile(f_omegas[:, None], (1, n_modes))
+        f_omegas_grid = jnp.tile(f_omegas[:, None], (1, n_dof))
         f_amps_grid = f_amps
 
         if n_x0s > 1:
@@ -27,21 +27,21 @@ class LinearResponseMultistart(AbstractMultistart):
             ), max_displacement_per_mode)
 
         else:
-            x0s_grid = jnp.zeros((1, n_modes))
+            x0s_grid = jnp.zeros((1, n_dof))
 
         if n_v0s > 1:
             v0s_grid = jnp.outer(jnp.linspace(
                 -1.0, 1.0, n_v0s
             ), max_displacement_per_mode)
         else:
-            v0s_grid = jnp.zeros((1, n_modes))
+            v0s_grid = jnp.zeros((1, n_dof))
 
         f_omega_idx_mesh, f_amp_idx_mesh, x0_idx_mesh, v0_idx_mesh, mode_idx_mesh = jnp.meshgrid(
             jnp.arange(n_f_omegas),
             jnp.arange(n_f_amps),
             jnp.arange(n_x0s),
             jnp.arange(n_v0s),
-            jnp.arange(n_modes),
+            jnp.arange(n_dof),
             indexing="ij",
         )
 
@@ -51,12 +51,12 @@ class LinearResponseMultistart(AbstractMultistart):
         v0_mesh = v0s_grid[v0_idx_mesh, mode_idx_mesh]
 
         n_combinations = n_f_omegas * n_f_amps * n_x0s * n_v0s
-        f_omegas_mesh = f_omegas_mesh.reshape(n_combinations, n_modes)
-        f_amps_mesh = f_amps_mesh.reshape(n_combinations, n_modes)
-        x0_mesh = x0_mesh.reshape(n_combinations, n_modes)
-        v0_mesh = v0_mesh.reshape(n_combinations, n_modes)
+        f_omegas_mesh = f_omegas_mesh.reshape(n_combinations, n_dof)
+        f_amps_mesh = f_amps_mesh.reshape(n_combinations, n_dof)
+        x0_mesh = x0_mesh.reshape(n_combinations, n_dof)
+        v0_mesh = v0_mesh.reshape(n_combinations, n_dof)
 
-        shape = (n_f_omegas, n_f_amps, n_x0s, n_v0s, n_modes)  # Update shape to reflect the full grid dimensions
+        shape = (n_f_omegas, n_f_amps, n_x0s, n_v0s, n_dof)  # Update shape to reflect the full grid dimensions
 
         return (f_omegas_mesh, f_amps_mesh, x0_mesh, v0_mesh, shape)
     

@@ -107,7 +107,7 @@ class TimeIntegrationSolver(AbstractSolver):
                 throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args=(f_amp, f_omega),
+                args={"f_amp": f_amp, "f_omega": f_omega},
         )
 
         return sol.ts, sol.ys
@@ -117,25 +117,21 @@ class TimeIntegrationSolver(AbstractSolver):
              excitation: AbstractExcitation,
              sweeper: AbstractSweep,
             ) -> FrequencySweepResult:
-        
-        periods_to_retain = const.N_PERIODS_TO_RETAIN
-
-        self.model.direct_drive_term = excitation
 
         @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
-            x0 = jnp.full((self.model.n_modes,), x0)         
-            v0 = jnp.full((self.model.n_modes,), v0)
+            x0 = jnp.full((self.model.n_dof,), x0)         
+            v0 = jnp.full((self.model.n_dof,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
             period = jnp.max(2.0 * jnp.pi / f_omega)
-            T = period * periods_to_retain
+            T = period * const.N_PERIODS_TO_RETAIN
             t_ss = jnp.max(self.model.t_steady_state(f_omega, ss_tol=self.rtol)) * const.SAFETY_FACTOR_T_STEADY_STATE
             
             t0 = 0.0
             t1 = t_ss + T
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps * periods_to_retain)
-            
+            ts = jnp.linspace(t_ss, t1, self.n_time_steps * const.N_PERIODS_TO_RETAIN)
+
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
@@ -145,7 +141,7 @@ class TimeIntegrationSolver(AbstractSolver):
                 throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args=(f_amp, f_omega),
+                args={"f_amp": f_amp, "f_omega": f_omega},
             )
 
             # Treat any non-finite trajectories as failures to avoid polluting sweeps
@@ -155,8 +151,8 @@ class TimeIntegrationSolver(AbstractSolver):
                 is_finite,
             )
 
-            xs = sol.ys[:, :self.model.n_modes]
-            vs = sol.ys[:, self.model.n_modes:]
+            xs = sol.ys[:, :self.model.n_dof]
+            vs = sol.ys[:, self.model.n_dof:]
 
             max_x_total = jnp.where(
                 successful,
@@ -211,7 +207,7 @@ class TimeIntegrationSolver(AbstractSolver):
         f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.model, f_omegas, f_amps)
         longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
         t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE)
-        t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
+        t_span_estimate = t_ss_estimate + longest_period * const.N_PERIODS_TO_RETAIN
         max_steps_budget = self._max_steps_budget(t_span_estimate, longest_period)
         
 
@@ -247,8 +243,5 @@ class TimeIntegrationSolver(AbstractSolver):
 
     @filter_jit
     def _rhs(self, t, y, args):
-        f_amp, f_omega = args
-
-        dy_dt = self.model.rhs(t, y, (f_amp, f_omega))
-
+        dy_dt = self.model.rhs(t, y, args)
         return dy_dt
