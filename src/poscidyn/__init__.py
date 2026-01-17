@@ -3,7 +3,6 @@ from .time_response import time_response
 
 from .oscillator.nonlinear_oscillator import *
 from .oscillator.harmonic_oscillator import *
-from .oscillator.van_der_pol_oscillator import *
 
 from .solver.abstract_solver import *
 from .solver.shooting_solver import *
@@ -15,7 +14,7 @@ from .sweep.nearest_neighbour_sweep import *
 
 from .multistart.linear_response_multistart import *
 
-from .excitation.one_tone import *
+from .excitation.one_tone_excitation import *
 
 from .utils.plotting import *
 

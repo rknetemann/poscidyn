@@ -20,26 +20,14 @@ SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), po
 PRECISION = poscidyn.Precision.SINGLE
 
 
-def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, normalize: bool = False) -> None:
+def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions) -> None:
     forward = sweeped_solutions.get("forward")
     backward = sweeped_solutions.get("backward")
 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions to plot.")
 
-    ref_idx = np.argmin(np.abs(drive_freqs - 0.9 * omega_0[0]))
-
-    omega_ref = drive_freqs[ref_idx]
-    x_ref_forward = forward[ref_idx, :]
-    x_ref_backward = backward[ref_idx, :] if backward is not None else None
-    print(f"Reference frequency: {omega_ref}")
-    print(f"Reference displacement forward: {x_ref_forward}, backward: {x_ref_backward}")
-
-    if normalize:
-        forward = forward / x_ref_forward
-        backward = backward / x_ref_backward if backward is not None else None
-
-    drive_freqs = np.asarray(drive_freqs) / omega_ref
+    drive_freqs = np.asarray(drive_freqs)
     drive_amps = np.asarray(drive_amps)
     colors = plt.cm.viridis(np.linspace(0, 1, drive_amps.size))
 
@@ -126,7 +114,6 @@ plot_sweep(
     drive_freqs=EXCITATION.drive_frequencies,
     drive_amps=EXCITATION.drive_amplitudes,
     sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
-    normalize=False,
 )
 plt.tight_layout()
 plt.show()

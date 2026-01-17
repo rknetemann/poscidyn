@@ -7,7 +7,6 @@ from typing import Optional
 from jax import tree_util
 
 from .. import constants as const
-from .abstract_lienard_oscillator import AbstractLienardOscillator
 from .abstract_oscillator import AbstractOscillator, oscillator
 
 @oscillator
