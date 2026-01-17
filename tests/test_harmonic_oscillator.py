@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 zeta = np.array([0.01, 0.02])
-omega_0 = np.array([1.0, 1.5])
+omega_0 = np.array([1.0, 2.0])
 
 driving_frequency = np.linspace(0.5, 2.0, 500)
 driving_amplitude = np.linspace(0.1, 1.0, 10)
@@ -20,7 +20,7 @@ SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), po
 PRECISION = poscidyn.Precision.SINGLE
 
 
-def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions) -> None:
+def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, normalize: bool = False) -> None:
     forward = sweeped_solutions.get("forward")
     backward = sweeped_solutions.get("backward")
 
@@ -31,11 +31,13 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions) -> None:
 
     omega_ref = drive_freqs[ref_idx]
     x_ref_forward = forward[ref_idx, :]
-    x_ref_backward = backward[ref_idx, :]
+    x_ref_backward = backward[ref_idx, :] if backward is not None else None
     print(f"Reference frequency: {omega_ref}")
     print(f"Reference displacement forward: {x_ref_forward}, backward: {x_ref_backward}")
-    forward = forward / x_ref_forward
-    backward = backward / x_ref_backward
+
+    if normalize:
+        forward = forward / x_ref_forward
+        backward = backward / x_ref_backward if backward is not None else None
 
     drive_freqs = np.asarray(drive_freqs) / omega_ref
     drive_amps = np.asarray(drive_amps)
@@ -123,6 +125,8 @@ plot_sweep(
     ax=ax,
     drive_freqs=EXCITATION.drive_frequencies,
     drive_amps=EXCITATION.drive_amplitudes,
-    sweeped_solutions=frequency_sweep.sweeped_periodic_solutions)
+    sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
+    normalize=False,
+)
 plt.tight_layout()
 plt.show()

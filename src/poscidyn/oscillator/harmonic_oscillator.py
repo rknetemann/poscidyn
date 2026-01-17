@@ -14,6 +14,7 @@ from .abstract_oscillator import AbstractOscillator, oscillator
 class HarmonicOscillator(AbstractOscillator):
     zeta: Optional[jax.Array] = None
     Q: Optional[jax.Array] = None
+
     omega_0: jax.Array
 
     def __post_init__(self):
@@ -38,10 +39,6 @@ class HarmonicOscillator(AbstractOscillator):
 
         return (linear_stiffness_term)
     
-    @property
-    def n_dof(self) -> int:
-        return self.Q.shape[0]
-
     def t_steady_state(self, driving_frequency: jax.Array, ss_tol: float) -> float:
         '''driving_frequency
         Calculates the settling time for a given Q-factor and driving frequency.
@@ -51,6 +48,10 @@ class HarmonicOscillator(AbstractOscillator):
         t_steady_state = jnp.max(-2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / (driving_frequency))).reshape(())
 
         return t_steady_state
+    
+    @property
+    def n_dof(self) -> int:
+        return self.Q.shape[0]
     
     def to_dtype(self, dtype: jnp.dtype) -> HarmonicOscillator:
         return HarmonicOscillator(
