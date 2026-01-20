@@ -36,12 +36,12 @@ class NonlinearOscillator(AbstractOscillator):
                 + cubic_stiffness_term)
     
     @property
-    def n_modes(self) -> int:
+    def n_dof(self) -> int:
         return self.Q.shape[0]
     
     @property
     def n_states(self) -> int:
-        return self.n_modes * 2
+        return self.n_dof * 2
 
     def t_steady_state(self, driving_frequency: jax.Array, ss_tol: float) -> float:
         '''driving_frequency
@@ -75,6 +75,6 @@ class NonlinearOscillator(AbstractOscillator):
         if len(gamma_terms) > 20:
             gamma_terms = gamma_terms[:20] + ["... (truncated)"]
 
-        return (f"NonlinearOscillator(n_modes={self.n_modes}, "
+        return (f"NonlinearOscillator(n_dof={self.n_dof}, "
                 f"{Q_terms}, {omega_0_terms}, "
                 f"{', '.join(alpha_terms)}, {', '.join(gamma_terms)})")
