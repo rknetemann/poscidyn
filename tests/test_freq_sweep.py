@@ -14,11 +14,11 @@ gamma[0,0,0,0] = 2.55
 modal_forces = np.array([1.0])
 
 # 2 modes:
-Q, omega_0, alpha, gamma = np.array([30, 30]), np.array([1.0553, 1.5825]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 2.5688
-gamma[0,0,1,1] = 0.0
-gamma[1,1,1,1] = 18.8525
-gamma[1,0,0,1] = 0.0
+Q, omega_0, alpha, gamma = np.array([6.357357, 36.742565]), np.array([0.9946662, 2.1275177]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+gamma[0,0,0,0] = 1.9451260e+01
+gamma[0,0,1,1] = 1.3927963e+02
+gamma[1,1,1,1] = 2.6890811e+02
+gamma[1,0,0,1] = 1.4860869e+02
 
 # 3 modes:
 # Q, omega_0, alpha, gamma = np.array([100.0, 100.0, 100.0]), np.array([1.00, 1.73, 2.59]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
@@ -37,11 +37,12 @@ gamma[1,0,0,1] = 0.0
 # gamma[2,2,2,2] = -0.00144
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0,0,0,0])
+
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.9, 1.3, 501)
-driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
-modal_forces = np.array([1.0, 1.0])
+driving_frequency = np.linspace(0.6322645545005798, 2.2314629554748535, 400)
+driving_amplitude = np.linspace(0.1, 1.0, 10) * 1
+modal_forces = np.array([0.01101661, 0.00740971])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
