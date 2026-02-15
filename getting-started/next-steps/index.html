@@ -69,6 +69,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#basic-usage" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -486,6 +491,24 @@
       
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Next steps
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -502,6 +525,56 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#avanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Avanced usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extending-poscidyn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending Poscidyn
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1712,6 +1785,47 @@
   
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#avanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Avanced usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extending-poscidyn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending Poscidyn
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1732,7 +1846,29 @@
 
   <h1>Next steps</h1>
 
-
+<p>Now that you have installed <strong>Poscidyn</strong>, understand its core concepts, and reviewed the limitations, here’s a suggested path to get productive quickly.</p>
+<h2 id="basic-usage">Basic usage</h2>
+<p>Keep the mental model from <a href="../understanding-poscidyn/">Understanding Poscidyn</a> in mind: pick an oscillator model, choose an excitation model, and decide whether you want a time response or a frequency sweep.</p>
+<p>Walk through the <strong>Basic usage</strong> pages in order:</p>
+<ol>
+<li><a href="../../usage/basic-usage/oscillator-models/">Oscillator models</a></li>
+<li><a href="../../usage/basic-usage/excitation-models/">Excitation models</a></li>
+<li><a href="../../usage/basic-usage/time-response/">Time response</a></li>
+<li><a href="../../usage/basic-usage/frequency-sweep/">Frequency sweep</a></li>
+</ol>
+<div class="admonition recommended">
+<p class="admonition-title">Recommended</p>
+<p>Check out the <a href="../../examples/overview/">Examples</a> page, it will not only make the usage of Poscidyn more clear, but also demonstrates some of the use cases of using Poscidyn (such as generating large datasets).</p>
+</div>
+<h2 id="avanced-usage">Avanced usage</h2>
+<p>Once you have got the hang of the basic usage, move on to <strong>Advanced usage</strong> to explore Poscidyn's advanced (but still simple and powerfull) features:</p>
+<ul>
+<li><a href="../../usage/advanced-usage/choosing-a-solver/">Choosing a solver</a></li>
+<li><a href="../../usage/advanced-usage/configuring-multistart-strategies/">Configuring multistart strategies</a></li>
+<li><a href="../../usage/advanced-usage/configuring-sweep-methods/">Configuring sweep methods</a></li>
+</ul>
+<h2 id="extending-poscidyn">Extending Poscidyn</h2>
+<p>If built-in components are not enough, see <a href="../../usage/extending-poscidyn/">Extending Poscidyn</a> to add custom models or excitation types.</p>
 
 
 
@@ -1792,6 +1928,10 @@
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

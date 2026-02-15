@@ -69,6 +69,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#single-dof-harmonic-oscillator" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -642,6 +647,24 @@
       
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up an oscillator model
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -658,6 +681,45 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#single-dof-harmonic-oscillator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single DOF Harmonic Oscillator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-dof-harmonic-oscillator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple DOF Harmonic Oscillator
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1714,6 +1776,36 @@
   
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#single-dof-harmonic-oscillator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single DOF Harmonic Oscillator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-dof-harmonic-oscillator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple DOF Harmonic Oscillator
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1734,7 +1826,69 @@
 
   <h1>Setting up an oscillator model</h1>
 
-
+<p>Let's start by choosing an oscillator model. Poscidyn has multiple built in oscillator models. The full list of models is available on the <a href="#">Oscillator models</a> page.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Did you extend Poscidyn using your own oscillator, please contribute to the project by doing a pull request. Have a look at the <a href="#">Contributing</a> page.</p>
+</div>
+<h3 id="single-dof-harmonic-oscillator">Single DOF Harmonic Oscillator</h3>
+<p>To keep things simple we will setup a simple linear harmonic oscillator first. Each model requires their own set of parameters to be initialized. In the case of a the harmonic oscillator that are the damping ratio <span class="arithmatex">\(\zeta\)</span>, resonance frequency <span class="arithmatex">\(\omega_0\)</span> and cubic  stiffness <span class="arithmatex">\(\gamma\)</span>:</p>
+<div class="arithmatex">\[
+\ddot x
+  + 2\zeta \omega_0\, \dot x
+  + \omega_0^{2}\, x
+  \;=\; f
+        \cos\!\left(\omega t\right).
+\]</div>
+<p>We begin by importing the necessary libraries:
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">poscidyn</span>
+</code></pre></div></p>
+<p>We then define the parameters of our system:
+<div class="highlight"><pre><span></span><code><span class="n">zeta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.01</span><span class="p">])</span>
+<span class="n">omega_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">])</span>
+<span class="n">driving_frequency</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mi">500</span><span class="p">)</span>
+<span class="n">driving_amplitude</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+</code></pre></div></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It may seem confusing at first swhy we are using arrays here, that will become clear once we use this same system for multiple degrees of freedom.</p>
+</div>
+<p>The last thing to do is initialize the model:</p>
+<div class="highlight"><pre><span></span><code><span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">HarmonicOscillator</span><span class="p">(</span><span class="n">zeta</span><span class="o">=</span><span class="n">zeta</span><span class="p">,</span> <span class="n">omega_0</span><span class="o">=</span><span class="n">omega_0</span><span class="p">)</span>
+</code></pre></div>
+<p>That's it! Though the process of setting up a model, differs a little bit per model. So make sure to have a look at the documentation of each model to get started using it quickly.</p>
+<h3 id="multiple-dof-harmonic-oscillator">Multiple DOF Harmonic Oscillator</h3>
+<p>For demonstration purposes, let's also see how we can use the same model for multiple degrees of freedom simulations.</p>
+<div class="arithmatex">\[
+\begin{aligned}
+\ddot x_1
+&amp;+ 2\zeta_1 \omega_1\, \dot x_1
++ \omega_1^{2}\, x_1
++ c_{12}\,(\dot x_1 - \dot x_2)
++ k_{12}\,(x_1 - x_2)
+= f_1 \cos(\omega t + \phi_1), \\[6pt]
+\ddot x_2
+&amp;+ 2\zeta_2 \omega_2\, \dot x_2
++ \omega_2^{2}\, x_2
++ c_{12}\,(\dot x_2 - \dot x_1)
++ k_{12}\,(x_2 - x_1)
+= f_2 \cos(\omega t + \phi_2) .
+\end{aligned}
+\]</div>
+<p>We begin by importing the necessary libraries:
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">poscidyn</span>
+</code></pre></div></p>
+<p>We then define the parameters of our system:
+<div class="highlight"><pre><span></span><code><span class="n">zeta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.01</span><span class="p">])</span>
+<span class="n">omega_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">])</span>
+<span class="n">driving_frequency</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mi">500</span><span class="p">)</span>
+<span class="n">driving_amplitude</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+</code></pre></div></p>
+<p>The last thing to do is initialize the model:</p>
+<div class="highlight"><pre><span></span><code><span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">HarmonicOscillator</span><span class="p">(</span><span class="n">zeta</span><span class="o">=</span><span class="n">zeta</span><span class="p">,</span> <span class="n">omega_0</span><span class="o">=</span><span class="n">omega_0</span><span class="p">)</span>
+</code></pre></div>
 
 
 
@@ -1794,6 +1948,10 @@
     
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>
