@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poscidyn"
+version = "0.1.0"
+description = "Simulation and Visualization of Nonlinear Oscillator Dynamics in Python"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+authors = [
+  { name = "Raymond Knetemann", email = "rknetemann@student.tudelft.nl" }
+]
+
+keywords = ["nonlinear dynamics", "duffing", "oscillators", "simulation", "jax"]
+
+urls = { 
+  Homepage = "https://github.com/rknetemann/poscidyn",
+  Repository = "https://github.com/rknetemann/poscidyn",
+  Issues = "https://github.com/rknetemann/poscidyn/issues"
+}
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+
+dependencies = [
+  "jax>=0.4.0",
+  "diffrax>=0.7.0",
+  "equinox>=0.13.0",
+  "h5py>=3.14.0",
+  "tqdm>=4.67.0",
+  "matplotlib>=3.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mkdocs>=1.6.0",
+  "mkdocs-material>=9.7.0",
+  "mkdocstrings-python>=1.10.0",
+  "click>=8.2.0",
+  "tensorboard>=2.20.0",
+  "tensorboard_plugin_profile>=2.20.0",
+  "xprof>=2.20.0",
+]
+
+# Optional: keep GPU as an extra if you want, but this may still be fragile.
+# Consider documenting GPU install instead.
+gpu = [
+  "jax[cuda12]>=0.4.0",
+]

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Raymond Knetemann
+# Licensed under the MIT License. See LICENSE file for details.
+
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
