@@ -1,7 +1,14 @@
 You can install Poscidyn directly from PyPI using pip:
-```bash
-pip install poscidyn
-```
+
+* CPU-only (Linux/macOS/Windows)
+  ```
+  pip install -U poscidyn
+  ```
+* GPU (NVIDIA, CUDA 12)
+  ```
+  pip install -U poscidyn[gpu]
+  ```
+  
 Requirements:
 
 - Python 3.10 or newer
