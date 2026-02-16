@@ -36,6 +36,7 @@ dependencies = [
 Homepage = "https://github.com/rknetemann/poscidyn"
 Repository = "https://github.com/rknetemann/poscidyn"
 Issues = "https://github.com/rknetemann/poscidyn/issues"
+Documenation = "https://rknetemann.github.io/poscidyn/"
 
 [project.optional-dependencies]
 dev = [
