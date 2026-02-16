@@ -11,7 +11,7 @@ Features include:
 
 ## Installation
 ```bash
-pip install poscidyn
+pip install poscidyn[gpu]
 ```
 Requires Python 3.10 or newer.
 
