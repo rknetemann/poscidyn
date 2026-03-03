@@ -33,29 +33,6 @@ class TimeIntegrationSolver(AbstractSolver):
         """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
         return isinstance(value, jax_core.Tracer)
     
-    def _max_steps_budget(self, t_span: float, period: float, safety_factor: float = 2.0) -> int:
-        """Infer a max_steps large enough for the requested horizon.
-
-        We approximate the solver step size with the sampling interval
-        (period / (n_time_steps * MAXIMUM_ORDER_SUPERHARMONICS)) and
-        inflate by a safety factor so we don't trip the diffrax max_steps
-        guard on long, low-frequency runs.
-        """
-        if self.n_time_steps is None:
-            return self.max_steps
-
-        # When traced (e.g. under vmap/jit), fall back to the configured cap
-        # instead of trying to convert tracers to Python scalars.
-        if self._is_tracer(t_span) or self._is_tracer(period):
-            return self.max_steps
-
-        steps_per_period = max(int(self.n_time_steps), 1) * const.MAXIMUM_ORDER_SUPERHARMONICS
-        dt_est = float(period) / steps_per_period
-        if not math.isfinite(dt_est) or dt_est <= 0.0:
-            return self.max_steps
-
-        est_steps = math.ceil((t_span / dt_est) * safety_factor)
-        return max(self.max_steps, est_steps)
 
     def time_response(self,
                  f_omega: jax.Array,  
@@ -96,12 +73,10 @@ class TimeIntegrationSolver(AbstractSolver):
                 n_time_steps_total = self.n_time_steps * int(math.ceil(float(n_periods)))
             ts = jnp.linspace(t0, t1, n_time_steps_total)
 
-        max_steps_budget = self._max_steps_budget(t1 - t0, period)
-
         sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
-                t0=t0, t1=t1, dt0=None, max_steps=max_steps_budget,
+                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -121,6 +96,30 @@ class TimeIntegrationSolver(AbstractSolver):
         periods_to_retain = const.N_PERIODS_TO_RETAIN
 
         @filter_jit
+        def dft(x: jnp.ndarray, ts: jnp.ndarray, omega: float, window: str | None = None):
+            x = jnp.asarray(x)
+            ts = jnp.asarray(ts)
+            N = x.size
+
+            if window is None:
+                w = jnp.ones(N)
+            elif window == "hann":
+                w = jnp.hanning(N)
+            elif window == "hamming":
+                w = jnp.hamming(N)
+            else:
+                raise ValueError("Unsupported window")
+
+            exp_term = jnp.exp(-1j * omega * ts)
+
+            C = jnp.sum((x * w) * exp_term)
+
+            cg = w.sum()
+            A_peak = 2.0 * jnp.abs(C) / cg 
+            phase_rad = jnp.angle(C)
+            return A_peak, phase_rad
+
+        @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
             x0 = jnp.full((self.model.n_modes,), x0)         
             v0 = jnp.full((self.model.n_modes,), v0)
@@ -137,7 +136,7 @@ class TimeIntegrationSolver(AbstractSolver):
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
-                t0=t0, t1=t1, dt0=None, max_steps=max_steps_budget,
+                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -153,36 +152,43 @@ class TimeIntegrationSolver(AbstractSolver):
                 is_finite,
             )
 
-            xs = sol.ys[:, :self.model.n_modes]
-            vs = sol.ys[:, self.model.n_modes:]
+            xs_modes = sol.ys[:, :self.model.n_modes]
+            vs_modes = sol.ys[:, self.model.n_modes:]
 
+            xs_total = jnp.sum(xs_modes, axis=-1)
+
+            amplitude, phase = dft(xs_total, ts=ts, omega=f_omega)
+            
             max_x_total = jnp.where(
                 successful,
-                jnp.max(jnp.abs(jnp.sum(xs, axis=-1))),
+                jnp.max(jnp.abs(xs_total)),
                 jnp.nan,
             )
+
             max_v_total = jnp.where(
                 successful,
-                jnp.max(jnp.abs(jnp.sum(vs, axis=-1))),
+                jnp.max(jnp.abs(jnp.sum(vs_modes, axis=-1))),
                 jnp.nan,
             )
 
             max_x_modes = jnp.where(
                 successful,
-                jnp.max(jnp.abs(xs), axis=0),
-                jnp.full_like(xs[0], jnp.nan),
+                jnp.max(jnp.abs(xs_modes), axis=0),
+                jnp.full_like(xs_modes[0], jnp.nan),
             )
             max_v_modes = jnp.where(
                 successful,
-                jnp.max(jnp.abs(vs), axis=0),
-                jnp.full_like(vs[0], jnp.nan),
+                jnp.max(jnp.abs(vs_modes), axis=0),
+                jnp.full_like(vs_modes[0], jnp.nan),
             )
 
             return dict(
                 f_omega=f_omega, 
                 f_amp=f_amp,
                 x0=x0, 
-                v0=v0, 
+                v0=v0,
+                amplitude=amplitude,
+                phase=phase, 
                 max_x_total=max_x_total, 
                 max_v_total=max_v_total, 
                 max_x_modes=max_x_modes, 
@@ -207,10 +213,6 @@ class TimeIntegrationSolver(AbstractSolver):
             self.n_time_steps = n_time_steps
         
         f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.model, f_omegas, f_amps)
-        longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
-        t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE)
-        t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
-        max_steps_budget = self._max_steps_budget(t_span_estimate, longest_period)
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
 

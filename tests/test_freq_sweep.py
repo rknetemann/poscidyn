@@ -9,40 +9,17 @@ def F_max (eta, omega_0, Q, gamma):
     return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (eta + 1 / (2*Q**2)) * (1 + eta + 1 / (4 * Q **2)))
 
 # 1 mode:
-Q, omega_0, alpha, gamma = np.array([100.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+Q, omega_0, alpha, gamma = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
 gamma[0,0,0,0] = 2.55
 modal_forces = np.array([1.0])
-
-# 2 modes:
-Q, omega_0, alpha, gamma = np.array([6.357357, 36.742565]), np.array([0.9946662, 2.1275177]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 1.9451260e+01
-gamma[0,0,1,1] = 1.3927963e+02
-gamma[1,1,1,1] = 2.6890811e+02
-gamma[1,0,0,1] = 1.4860869e+02
-
-# 3 modes:
-# Q, omega_0, alpha, gamma = np.array([100.0, 100.0, 100.0]), np.array([1.00, 1.73, 2.59]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
-# gamma[0,0,0,0] = 2.55
-# gamma[0,0,1,1] = 8.61
-# gamma[0,0,0,2] = 0.942
-# gamma[0,0,1,2] = -0.143
-# gamma[0,0,2,2] = 9.88
-# gamma[1,1,1,1] = 18.7
-# gamma[1,0,0,1] = 8.57
-# gamma[1,0,0,2] = -0.000283
-# gamma[1,0,1,2] = -11.8
-# gamma[1,0,2,2] = 0.000849
-# gamma[1,1,1,2] = -0.00272
-# gamma[1,1,2,2] = 45.2
-# gamma[2,2,2,2] = -0.00144
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0,0,0,0])
 
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.6322645545005798, 2.2314629554748535, 400)
-driving_amplitude = np.linspace(0.1, 1.0, 10) * 1
-modal_forces = np.array([0.01101661, 0.00740971])
+driving_frequency = np.linspace(0.1, 2.0, 400)
+driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
+modal_forces = np.array([1.0, 0.5])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
@@ -50,17 +27,6 @@ MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_re
 SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
-
-def _extract_gamma_diagonal(gamma: np.ndarray):
-    arr = np.asarray(gamma)
-    if arr.ndim < 4:
-        return arr.ravel().tolist()[: arr.size]
-
-    diag = []
-    max_modes = min(2, arr.shape[0], arr.shape[1], arr.shape[2], arr.shape[3])
-    for i in range(max_modes):
-        diag.append(float(arr[i, i, i, i]))
-    return diag
 
 
 def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
@@ -109,12 +75,16 @@ def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, ga
     return "\n".join(parts)
 
 
-def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) -> None:
+def plot_sweep(ax_amp, ax_phase, drive_freqs, drive_amps, sweeped_solutions, param_text: str) -> None:
     forward = sweeped_solutions.get("forward")
     backward = sweeped_solutions.get("backward")
+    forward_phase = sweeped_solutions.get("forward_phase")
+    backward_phase = sweeped_solutions.get("backward_phase")
 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions to plot.")
+    if forward_phase is None and backward_phase is None:
+        raise ValueError("No sweeped phase solutions to plot.")
 
     drive_freqs = np.asarray(drive_freqs)
     drive_amps = np.asarray(drive_amps)
@@ -122,7 +92,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
 
     for idx, (amp, color) in enumerate(zip(drive_amps, colors)):
         if forward is not None:
-            ax.plot(
+            ax_amp.plot(
                 drive_freqs,
                 forward[:, idx],
                 color=color,
@@ -130,27 +100,44 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
                 linewidth=1.3,
             )
         if backward is not None:
-            ax.plot(
+            ax_amp.plot(
                 drive_freqs,
                 backward[:, idx],
                 color=color,
                 linestyle="--",
                 linewidth=1.1,
             )
+        if forward_phase is not None:
+            ax_phase.plot(
+                drive_freqs,
+                -forward_phase[:, idx],
+                color=color,
+                linestyle="-",
+                linewidth=1.3,
+            )
+        if backward_phase is not None:
+            ax_phase.plot(
+                drive_freqs,
+                -backward_phase[:, idx],
+                color=color,
+                linestyle="--",
+                linewidth=1.1,
+            )
 
-    ax.set_title(
-        f"Frequency sweep"
-    )
-    ax.set_xlabel("Drive frequency")
-    ax.set_ylabel("Max displacement")
-    ax.grid(alpha=0.25)
+    ax_amp.set_xlabel("Drive frequency")
+    ax_amp.set_ylabel("Amplitude")
+    ax_amp.grid(alpha=0.25)
+
+    ax_phase.set_xlabel("Drive frequency")
+    ax_phase.set_ylabel("Phase")
+    ax_phase.grid(alpha=0.25)
 
     if param_text:
-        ax.text(
+        ax_amp.text(
             0.02,
             0.98,
             param_text,
-            transform=ax.transAxes,
+            transform=ax_amp.transAxes,
             fontsize=8,
             va="top",
             ha="left",
@@ -161,7 +148,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
         Line2D([0], [0], color=color, lw=1.8) for color in colors
     ]
     amp_labels = [f"F={amp:.3f}" for amp in drive_amps]
-    legend1 = ax.legend(
+    legend1 = ax_amp.legend(
         amp_handles,
         amp_labels,
         title="Drive amplitude",
@@ -178,16 +165,16 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
             Line2D([0], [0], color="k", linestyle="--", lw=1.5),
         ]
         style_labels = ["Forward sweep", "Backward sweep"]
-        legend2 = ax.legend(
+        legend2 = ax_amp.legend(
             style_handles,
             style_labels,
             loc="lower right",
             fontsize=7,
             frameon=False,
         )
-        ax.add_artist(legend1)
+        ax_amp.add_artist(legend1)
     else:
-        ax.add_artist(legend1)
+        ax_amp.add_artist(legend1)
 
 start_time = time.time()
 
@@ -208,13 +195,15 @@ print(
 )
 
 
-fig, ax = plt.subplots(figsize=(10, 6))
+fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True)
 plot_sweep(
-    ax=ax,
+    ax_amp=axes[0],
+    ax_phase=axes[1],
     drive_freqs=EXCITOR.drive_frequencies,
     drive_amps=EXCITOR.drive_amplitudes,
     sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
     param_text=_format_param_text(Q, omega_0, alpha, gamma, EXCITOR.modal_forces),
 )
-plt.tight_layout()
+fig.suptitle("Frequency sweep")
+plt.tight_layout(rect=[0, 0, 1, 0.96])
 plt.show()
