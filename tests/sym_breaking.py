@@ -1,48 +1,24 @@
 import numpy as np
 import poscidyn
 import time
-
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 def F_max (eta, omega_0, Q, gamma):
     return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (eta + 1 / (2*Q**2)) * (1 + eta + 1 / (4 * Q **2)))
 
-# 1 mode:
-Q, omega_0, alpha, gamma = np.array([100.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = 2.55
-modal_forces = np.array([1.0])
+Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([7.0e6, 15.8e6]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+# gamma[0,0,0,0] = 5.78e30
+# alpha[0,0,1] = 2.0 * 1.97e24
+# alpha[1,0,0] = 1.97e24
 
-# 2 modes:
-Q, omega_0, alpha, gamma = np.array([6.357357, 36.742565]), np.array([0.9946662, 2.1275177]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-gamma[0,0,0,0] = 1.9451260e+01
-gamma[0,0,1,1] = 1.3927963e+02
-gamma[1,1,1,1] = 2.6890811e+02
-gamma[1,0,0,1] = 1.4860869e+02
+# F_max_value = F_max(0.50, omega_0[0], Q[0], gamma[0,0,0,0])
 
-# 3 modes:
-# Q, omega_0, alpha, gamma = np.array([100.0, 100.0, 100.0]), np.array([1.00, 1.73, 2.59]), np.zeros((3,3,3)), np.zeros((3,3,3,3))
-# gamma[0,0,0,0] = 2.55
-# gamma[0,0,1,1] = 8.61
-# gamma[0,0,0,2] = 0.942
-# gamma[0,0,1,2] = -0.143
-# gamma[0,0,2,2] = 9.88
-# gamma[1,1,1,1] = 18.7
-# gamma[1,0,0,1] = 8.57
-# gamma[1,0,0,2] = -0.000283
-# gamma[1,0,1,2] = -11.8
-# gamma[1,0,2,2] = 0.000849
-# gamma[1,1,1,2] = -0.00272
-# gamma[1,1,2,2] = 45.2
-# gamma[2,2,2,2] = -0.00144
+# print(f"Calculated F_max: {F_max_value:.4f}")
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0,0,0,0])
-
-print(f"Calculated F_max: {F_max_value:.4f}")
-
-driving_frequency = np.linspace(0.6322645545005798, 2.2314629554748535, 400)
+driving_frequency = np.linspace(6.0e6, 8.0e6, 400)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * 1
-modal_forces = np.array([0.01101661, 0.00740971])
+modal_forces = np.array([1.0, 0.0])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
@@ -51,17 +27,23 @@ SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbo
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
 
-def _extract_gamma_diagonal(gamma: np.ndarray):
-    arr = np.asarray(gamma)
-    if arr.ndim < 4:
-        return arr.ravel().tolist()[: arr.size]
+start_time = time.time()
 
-    diag = []
-    max_modes = min(2, arr.shape[0], arr.shape[1], arr.shape[2], arr.shape[3])
-    for i in range(max_modes):
-        diag.append(float(arr[i, i, i, i]))
-    return diag
+frequency_sweep = poscidyn.frequency_sweep(
+    model = MODEL,
+    sweeper=SWEEPER,
+    excitor=EXCITOR,
+    solver = SOLVER,
+    precision = PRECISION,
+    multistarter=MULTISTART,
+)
 
+end_time = time.time()
+print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
+print(
+    f"Successful periodic solutions: {frequency_sweep.n_successful}/{frequency_sweep.n_total} "
+    f"({frequency_sweep.success_rate:.1%})"
+)
 
 def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
     arr = np.asarray(gamma)
@@ -188,25 +170,6 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
         ax.add_artist(legend1)
     else:
         ax.add_artist(legend1)
-
-start_time = time.time()
-
-frequency_sweep = poscidyn.frequency_sweep(
-    model = MODEL,
-    sweeper=SWEEPER,
-    excitor=EXCITOR,
-    solver = SOLVER,
-    precision = PRECISION,
-    multistarter=MULTISTART,
-) #n_freq, n_amp, n_init_disp, n_init_vel
-
-end_time = time.time()
-print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
-print(
-    f"Successful periodic solutions: {frequency_sweep.n_successful}/{frequency_sweep.n_total} "
-    f"({frequency_sweep.success_rate:.1%})"
-)
-
 
 fig, ax = plt.subplots(figsize=(10, 6))
 plot_sweep(

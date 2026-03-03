@@ -15,12 +15,6 @@ HDF5_DATASET_PATH = "/home/raymo/Projects/nlsid/datasets/2026012301_string_2DOF/
 SPLIT = "test"          # <-- set train/val/test
 HDF5_INDEX = None       # <-- optional: override; if None we'll use worst_index from the npz
 
-# If you want to plot the dataset A as-is (already normalized), keep True.
-# If you want to undo the normalization used in plot_sweep() for the simulation (divide by x_ref),
-# set this False and we'll normalize the dataset A the same way before plotting.
-PLOT_DATASET_A_AS_STORED = True
-
-
 def F_max(eta, omega_0, Q, gamma):
     return np.sqrt(
         4 * omega_0**6
@@ -145,48 +139,24 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions to plot.")
 
-    # --- reference normalization for the simulation (your existing logic)
-    ref_idx = np.argmin(np.abs(drive_freqs - 0.9 * omega_0[0]))
-    omega_ref = drive_freqs[ref_idx]
-
-    x_ref_forward = forward[ref_idx, :]
-    x_ref_backward = backward[ref_idx, :]
-
-    print(f"Reference frequency: {omega_ref}")
-    print(f"Reference displacement forward: {x_ref_forward}, backward: {x_ref_backward}")
-
-    forward = forward / x_ref_forward
-    backward = backward / x_ref_backward
-
-    drive_freqs_norm = np.asarray(drive_freqs, dtype=np.float64) / omega_ref
+    drive_freqs = np.asarray(drive_freqs, dtype=np.float64)
     drive_amps = np.asarray(drive_amps)
     colors = plt.cm.viridis(np.linspace(0, 1, drive_amps.size))
 
     # --- simulation curves
     for idx, (amp, color) in enumerate(zip(drive_amps, colors)):
         if forward is not None:
-            ax.plot(drive_freqs_norm, forward[:, idx], color=color, linestyle="-", linewidth=1.3)
+            ax.plot(drive_freqs, forward[:, idx], color=color, linestyle="-", linewidth=1.3)
         if backward is not None:
-            ax.plot(drive_freqs_norm, backward[:, idx], color=color, linestyle="--", linewidth=1.1)
+            ax.plot(drive_freqs, backward[:, idx], color=color, linestyle="--", linewidth=1.1)
 
     # --- NEW: overlay dataset A (as saved)
-    ds_idx, omega_ds, A_ds, fmin_ds, fmax_ds = load_dataset_curve()
+    ds_idx, omega_ds, A_ds, _, _ = load_dataset_curve()
 
-    # dataset frequency axis normalized the same way as simulation:
-    omega_ds_norm = omega_ds / omega_ref
-
-    if PLOT_DATASET_A_AS_STORED:
-        A_ds_plot = A_ds
-    else:
-        # normalize dataset A with the same x_ref strategy:
-        # (use the dataset’s own omega axis to find nearest 0.9*omega0[0])
-        target = 0.9 * float(omega_0[0])
-        ref_idx_ds = int(np.argmin(np.abs(omega_ds - target)))
-        x_ref_ds = float(A_ds[ref_idx_ds])
-        A_ds_plot = A_ds / x_ref_ds
+    A_ds_plot = A_ds
 
     ax.plot(
-        omega_ds_norm,
+        omega_ds,
         A_ds_plot,
         color="black",
         linewidth=2.2,
@@ -199,7 +169,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     target = 0.9 * float(omega_0[0])
     ref_idx_ds = int(np.argmin(np.abs(omega_ds - target)))
     ax.scatter(
-        [omega_ds_norm[ref_idx_ds]],
+        [omega_ds[ref_idx_ds]],
         [A_ds_plot[ref_idx_ds]],
         color="red",
         s=55,
@@ -208,8 +178,8 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     )
 
     ax.set_title("Frequency sweep (simulation) + stored dataset A overlay")
-    ax.set_xlabel("Drive frequency (normalized by ω_ref)")
-    ax.set_ylabel("Max displacement (simulation normalized by x_ref)")
+    ax.set_xlabel("Drive frequency")
+    ax.set_ylabel("Max displacement")
     ax.grid(alpha=0.25)
 
     if param_text:
