@@ -32,30 +32,6 @@ class TimeIntegrationSolver(AbstractSolver):
     def _is_tracer(value) -> bool:
         """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
         return isinstance(value, jax_core.Tracer)
-    
-    def _max_steps_budget(self, t_span: float, period: float, safety_factor: float = 2.0) -> int:
-        """Infer a max_steps large enough for the requested horizon.
-
-        We approximate the solver step size with the sampling interval
-        (period / (n_time_steps * MAXIMUM_ORDER_SUPERHARMONICS)) and
-        inflate by a safety factor so we don't trip the diffrax max_steps
-        guard on long, low-frequency runs.
-        """
-        if self.n_time_steps is None:
-            return self.max_steps
-
-        # When traced (e.g. under vmap/jit), fall back to the configured cap
-        # instead of trying to convert tracers to Python scalars.
-        if self._is_tracer(t_span) or self._is_tracer(period):
-            return self.max_steps
-
-        steps_per_period = max(int(self.n_time_steps), 1) * const.MAXIMUM_ORDER_SUPERHARMONICS
-        dt_est = float(period) / steps_per_period
-        if not math.isfinite(dt_est) or dt_est <= 0.0:
-            return self.max_steps
-
-        est_steps = math.ceil((t_span / dt_est) * safety_factor)
-        return max(self.max_steps, est_steps)
 
     def time_response(self,
                  f_omega: jax.Array,  
@@ -96,12 +72,10 @@ class TimeIntegrationSolver(AbstractSolver):
                 n_time_steps_total = self.n_time_steps * int(math.ceil(float(n_periods)))
             ts = jnp.linspace(t0, t1, n_time_steps_total)
 
-        max_steps_budget = self._max_steps_budget(t1 - t0, period)
-
         sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
-                t0=t0, t1=t1, dt0=None, max_steps=max_steps_budget,
+                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -137,7 +111,7 @@ class TimeIntegrationSolver(AbstractSolver):
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
-                t0=t0, t1=t1, dt0=None, max_steps=max_steps_budget,
+                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -210,7 +184,6 @@ class TimeIntegrationSolver(AbstractSolver):
         longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
         t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * const.SAFETY_FACTOR_T_STEADY_STATE)
         t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
-        max_steps_budget = self._max_steps_budget(t_span_estimate, longest_period)
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
 

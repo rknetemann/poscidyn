@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 def F_max (eta, omega_0, Q, gamma):
     return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (eta + 1 / (2*Q**2)) * (1 + eta + 1 / (4 * Q **2)))
 
-Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([7.0e6, 15.8e6]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([1.0e6, 2.0e6]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
 # gamma[0,0,0,0] = 5.78e30
 # alpha[0,0,1] = 2.0 * 1.97e24
 # alpha[1,0,0] = 1.97e24
@@ -16,14 +16,14 @@ Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([7.0e6, 15.8e6]), np
 
 # print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(6.0e6, 8.0e6, 400)
+driving_frequency = np.linspace(0.5e6, 1.5e6, 200)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * 1
 modal_forces = np.array([1.0, 0.0])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
-SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
+SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
 
