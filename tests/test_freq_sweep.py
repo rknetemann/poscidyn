@@ -13,7 +13,7 @@ Q, omega_0, alpha, gamma = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1))
 gamma[0,0,0,0] = 2.55
 modal_forces = np.array([1.0])
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0,0,0,0])
+F_max_value = F_max(0.50, omega_0[0], Q[0], gamma[0,0,0,0])
 
 print(f"Calculated F_max: {F_max_value:.4f}")
 
@@ -23,7 +23,7 @@ modal_forces = np.array([1.0, 0.5])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
+MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
@@ -185,6 +185,7 @@ frequency_sweep = poscidyn.frequency_sweep(
     solver = SOLVER,
     precision = PRECISION,
     multistarter=MULTISTART,
+    
 ) #n_freq, n_amp, n_init_disp, n_init_vel
 
 end_time = time.time()
