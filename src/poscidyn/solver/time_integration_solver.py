@@ -9,6 +9,7 @@ from .abstract_solver import AbstractSolver
 from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..excitation.abstract_excitation import AbstractExcitation
+from ..response_measure.abstract_response_measure import AbstractResponseMeasure
 from ..sweep.abstract_sweep import AbstractSweep
 from ..result.frequency_sweep_result import FrequencySweepResult
 
@@ -91,33 +92,10 @@ class TimeIntegrationSolver(AbstractSolver):
     def frequency_sweep(self,
              excitor: AbstractExcitation,
              sweeper: AbstractSweep,
+             response_measure: AbstractResponseMeasure,
             ) -> FrequencySweepResult:
         
         periods_to_retain = const.N_PERIODS_TO_RETAIN
-
-        @filter_jit
-        def dft(x: jnp.ndarray, ts: jnp.ndarray, omega: float, window: str | None = None):
-            x = jnp.asarray(x)
-            ts = jnp.asarray(ts)
-            N = x.size
-
-            if window is None:
-                w = jnp.ones(N)
-            elif window == "hann":
-                w = jnp.hanning(N)
-            elif window == "hamming":
-                w = jnp.hamming(N)
-            else:
-                raise ValueError("Unsupported window")
-
-            exp_term = jnp.exp(-1j * omega * ts)
-
-            C = jnp.sum((x * w) * exp_term)
-
-            cg = w.sum()
-            A_peak = 2.0 * jnp.abs(C) / cg 
-            phase_rad = jnp.angle(C)
-            return A_peak, phase_rad
 
         @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
@@ -152,35 +130,10 @@ class TimeIntegrationSolver(AbstractSolver):
                 is_finite,
             )
 
-            xs_modes = sol.ys[:, :self.model.n_modes]
-            vs_modes = sol.ys[:, self.model.n_modes:]
+            xs = sol.ys[:, :self.model.n_modes]
+            vs = sol.ys[:, self.model.n_modes:]
 
-            xs_total = jnp.sum(xs_modes, axis=-1)
-
-            amplitude, phase = dft(xs_total, ts=ts, omega=f_omega)
-            
-            max_x_total = jnp.where(
-                successful,
-                jnp.max(jnp.abs(xs_total)),
-                jnp.nan,
-            )
-
-            max_v_total = jnp.where(
-                successful,
-                jnp.max(jnp.abs(jnp.sum(vs_modes, axis=-1))),
-                jnp.nan,
-            )
-
-            max_x_modes = jnp.where(
-                successful,
-                jnp.max(jnp.abs(xs_modes), axis=0),
-                jnp.full_like(xs_modes[0], jnp.nan),
-            )
-            max_v_modes = jnp.where(
-                successful,
-                jnp.max(jnp.abs(vs_modes), axis=0),
-                jnp.full_like(vs_modes[0], jnp.nan),
-            )
+            amplitude, phase = response_measure(xs=xs, ts=ts, drive_omega=f_omega)
 
             return dict(
                 f_omega=f_omega, 
@@ -189,10 +142,6 @@ class TimeIntegrationSolver(AbstractSolver):
                 v0=v0,
                 amplitude=amplitude,
                 phase=phase, 
-                max_x_total=max_x_total, 
-                max_v_total=max_v_total, 
-                max_x_modes=max_x_modes, 
-                max_v_modes=max_v_modes, 
                 successful=successful
             )
             

@@ -185,7 +185,7 @@ frequency_sweep = poscidyn.frequency_sweep(
     solver = SOLVER,
     precision = PRECISION,
     multistarter=MULTISTART,
-    
+
 ) #n_freq, n_amp, n_init_disp, n_init_vel
 
 end_time = time.time()

@@ -10,12 +10,15 @@ from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .excitation.abstract_excitation import AbstractExcitation
 from .multistart.abstract_multistart import AbstractMultistart
+from .response_measure.abstract_response_measure import AbstractResponseMeasure
 from .sweep.abstract_sweep import AbstractSweep
+
 from .result.frequency_sweep_result import FrequencySweepResult 
 
 from .solver.time_integration_solver import TimeIntegrationSolver
 from .multistart.linear_response_multistart import LinearResponseMultistart
 from .sweep.nearest_neighbour_sweep import NearestNeighbourSweep
+from .response_measure.demodulation import Demodulation
 
 from . import constants as const
 
@@ -25,6 +28,7 @@ def frequency_sweep(
     sweeper: AbstractSweep = NearestNeighbourSweep(),
     solver: AbstractSolver = TimeIntegrationSolver(),
     multistarter: AbstractMultistart = LinearResponseMultistart(),
+    response_measure: AbstractResponseMeasure = Demodulation(),
     precision: const.Precision = const.Precision.SINGLE,
 ) -> FrequencySweepResult:
     """Run a frequency sweep for a dynamical model.
@@ -58,6 +62,6 @@ def frequency_sweep(
     solver.model = model
     solver.multistarter = multistarter
 
-    frequency_sweep = solver.frequency_sweep(excitor, sweeper)
+    frequency_sweep = solver.frequency_sweep(excitor, sweeper, response_measure)
 
     return frequency_sweep
