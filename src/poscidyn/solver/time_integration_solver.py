@@ -133,7 +133,17 @@ class TimeIntegrationSolver(AbstractSolver):
             xs = sol.ys[:, :self.model.n_modes]
             vs = sol.ys[:, self.model.n_modes:]
 
-            amplitude, phase = response_measure(xs=xs, ts=ts, drive_omega=f_omega)
+            response = response_measure(xs=xs, ts=ts, drive_omega=f_omega)
+            if len(response) == 2:
+                amplitude, phase = response
+                response_frequency = jnp.full_like(phase, jnp.nan)
+            elif len(response) == 3:
+                amplitude, phase, response_frequency = response
+            else:
+                raise ValueError(
+                    "response_measure must return (amplitude, phase) or "
+                    "(amplitude, phase, response_frequency)"
+                )
 
             return dict(
                 f_omega=f_omega, 
@@ -142,6 +152,7 @@ class TimeIntegrationSolver(AbstractSolver):
                 v0=v0,
                 amplitude=amplitude,
                 phase=phase, 
+                response_frequency=response_frequency,
                 successful=successful
             )
             

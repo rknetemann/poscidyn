@@ -34,29 +34,10 @@ class Demodulation(AbstractResponseMeasure):
         xs = jnp.asarray(xs)
         ts = jnp.asarray(ts)
 
-        if xs.ndim == 1:
-            xs = xs[:, None]
-        elif xs.ndim != 2:
-            raise ValueError("xs must have shape (n_ts, n_modes) or (n_ts,)")
-
-        if ts.ndim != 1:
-            raise ValueError("ts must have shape (n_ts,)")
-
         n_ts = xs.shape[0]
-        if ts.shape[0] != n_ts:
-            raise ValueError("xs and ts must have matching time dimension")
-
         n_modes = xs.shape[1]
-        drive_omega = jnp.asarray(drive_omega)
-        if drive_omega.ndim == 0:
-            drive_omega = jnp.full((n_modes,), drive_omega)
-        elif drive_omega.ndim == 1 and drive_omega.shape[0] == 1 and n_modes > 1:
-            drive_omega = jnp.full((n_modes,), drive_omega[0])
-        elif drive_omega.ndim != 1:
-            raise ValueError("drive_omega must be scalar or shape (n_modes,)")
 
-        if drive_omega.shape[0] != n_modes:
-            raise ValueError("drive_omega must be scalar or match n_modes")
+        drive_omega = jnp.full((n_modes,), drive_omega)
 
         w = self.window(n_ts)
         demod_omegas = self.multiples[:, None] * drive_omega[None, :]
@@ -69,4 +50,5 @@ class Demodulation(AbstractResponseMeasure):
 
         cg = w.sum()
         amplitudes = 2.0 * jnp.abs(C) / cg
-        return amplitudes, demod_omegas
+        phase_rad = jnp.angle(C)
+        return amplitudes, phase_rad, demod_omegas

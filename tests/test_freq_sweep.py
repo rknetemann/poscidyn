@@ -5,29 +5,75 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-def F_max (eta, omega_0, Q, gamma):
-    return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (eta + 1 / (2*Q**2)) * (1 + eta + 1 / (4 * Q **2)))
 
-# 1 mode:
-Q, omega_0, alpha, gamma = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-gamma[0,0,0,0] = 2.55
-modal_forces = np.array([1.0])
+def F_max(eta, omega_0, Q, gamma):
+    return np.sqrt(
+        4 * omega_0**6 / (3 * gamma * Q**2)
+        * (eta + 1 / (2 * Q**2))
+        * (1 + eta + 1 / (4 * Q**2))
+    )
 
-F_max_value = F_max(0.50, omega_0[0], Q[0], gamma[0,0,0,0])
 
+# ============================================================
+# Model definition
+# ============================================================
+
+# 1 mode example:
+# Q, omega_0, alpha, gamma = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+# gamma[0,0,0,0] = 2.55
+# modal_forces = np.array([1.0])
+
+# 2 mode example:
+Q = np.array([50.0, 80.0])
+omega_0 = np.array([1.0, 1.5])
+alpha = np.zeros((2, 2, 2))
+gamma = np.zeros((2, 2, 2, 2))
+gamma[0, 0, 0, 0] = 1.0
+gamma[1, 1, 1, 1] = -0.5
+# alpha[0,0,1] = 2.0 * 1 * 0.08
+# alpha[1,0,0] = 1 * 0.08
+modal_forces = np.array([1.0, 1.0])
+
+# ------------------------------------------------------------
+# Mode shape vector at the MEASUREMENT location r_m
+# phi_i(r_m) for each mode i
+#
+# Example:
+# - mode 1 contributes fully
+# - mode 2 contributes with smaller weight
+#
+# Replace with your actual mode shape values at the probe point.
+# ============================================================
+phi_rm = np.array([1.0, 0.25], dtype=float)
+
+F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.1, 2.0, 400)
+driving_frequency = np.linspace(0.8, 2.0, 400)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
-modal_forces = np.array([1.0, 0.5])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
-SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
-SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
+SOLVER = poscidyn.TimeIntegrationSolver(
+    max_steps=4096 * 5,
+    n_time_steps=50,
+    verbose=True,
+    throw=False,
+    rtol=1e-4,
+    atol=1e-7,
+)
+SWEEPER = poscidyn.NearestNeighbourSweep(
+    sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
+)
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,))
+RESPONSE_MEASURE = poscidyn.Max()
 PRECISION = poscidyn.Precision.SINGLE
 
+
+# ============================================================
+# Helpers
+# ============================================================
 
 def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
     arr = np.asarray(gamma)
@@ -49,7 +95,14 @@ def _extract_alpha_entries(alpha: np.ndarray, max_entries: int = 3):
     return entries, int(non_zero.shape[0])
 
 
-def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, gamma: np.ndarray, modal_forces: np.ndarray) -> str:
+def _format_param_text(
+    Q: np.ndarray,
+    omega_0: np.ndarray,
+    alpha: np.ndarray,
+    gamma: np.ndarray,
+    modal_forces: np.ndarray,
+    phi_rm: np.ndarray | None = None,
+) -> str:
     q_vals = np.asarray(Q).ravel()
     omega_vals = np.asarray(omega_0).ravel()
     alpha_entries, alpha_total = _extract_alpha_entries(alpha)
@@ -57,9 +110,9 @@ def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, ga
 
     parts = []
     if q_vals.size:
-        parts.append(f"Q=[{', '.join(f'{val:.2f}' for val in q_vals[:2])}]")
+        parts.append(f"Q=[{', '.join(f'{val:.2f}' for val in q_vals[:4])}]")
     if omega_vals.size:
-        parts.append(f"omega0=[{', '.join(f'{val:.2f}' for val in omega_vals[:2])}]")
+        parts.append(f"omega0=[{', '.join(f'{val:.2f}' for val in omega_vals[:4])}]")
     if alpha_entries:
         formatted_alpha = ", ".join(f"{idx}={val:.2e}" for idx, val in alpha_entries)
         if alpha_total > len(alpha_entries):
@@ -71,11 +124,135 @@ def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, ga
             formatted_gamma += ", ..."
         parts.append(f"gamma={formatted_gamma}")
     if modal_forces.size:
-        parts.append(f"modal_forces=[{', '.join(f'{val:.2f}' for val in modal_forces[:2])}]")
+        parts.append(f"modal_forces=[{', '.join(f'{val:.2f}' for val in modal_forces[:4])}]")
+    if phi_rm is not None:
+        phi_vals = np.asarray(phi_rm).ravel()
+        parts.append(f"phi_rm=[{', '.join(f'{val:.3f}' for val in phi_vals[:4])}]")
     return "\n".join(parts)
 
 
-def plot_sweep(ax_amp, ax_phase, drive_freqs, drive_amps, sweeped_solutions, param_text: str) -> None:
+def _to_4d_response(arr: np.ndarray) -> np.ndarray:
+    """
+    Normalize response to shape:
+        (n_freq, n_amp, n_multiples, n_modes)
+    """
+    arr = np.asarray(arr)
+    if arr.ndim == 2:
+        return arr[:, :, None, None]
+    if arr.ndim == 3:
+        return arr[:, :, None, :]
+    if arr.ndim == 4:
+        return arr
+    raise ValueError(f"Unsupported response shape: {arr.shape}")
+
+
+def _finite_limits(data: np.ndarray, pad: float = 0.05) -> tuple[float, float]:
+    data = np.asarray(data)
+    finite = np.isfinite(data)
+    if not np.any(finite):
+        return -1.0, 1.0
+
+    y_min = float(np.min(data[finite]))
+    y_max = float(np.max(data[finite]))
+    if y_min == y_max:
+        eps = 1e-6 if y_min == 0.0 else abs(y_min) * 0.05
+        return y_min - eps, y_max + eps
+
+    span = y_max - y_min
+    return y_min - pad * span, y_max + pad * span
+
+
+def append_total_displacement_mode(
+    sweeped_solutions: dict,
+    phi_rm: np.ndarray,
+    mode_labels: list[str] | None = None,
+) -> tuple[dict, list[str]]:
+    """
+    Append the measured total displacement as an extra "mode".
+
+    For each demodulation multiple and each sweep point:
+        X_total = sum_i phi_i(r_m) * A_i * exp(j * theta_i)
+
+    Then:
+        A_total = |X_total|
+        phase_total = angle(X_total)
+
+    Assumptions:
+    - response_measure = Demodulation(...)
+    - phases are returned in radians
+    - phi_rm is real-valued here; if needed, complex phi_rm also works
+    """
+    forward = sweeped_solutions.get("forward")
+    backward = sweeped_solutions.get("backward")
+    forward_phase = sweeped_solutions.get("forward_phase")
+    backward_phase = sweeped_solutions.get("backward_phase")
+
+    if forward is None and backward is None:
+        raise ValueError("No sweeped solutions found.")
+
+    out = dict(sweeped_solutions)
+
+    if mode_labels is None:
+        template = forward if forward is not None else backward
+        n_modes = _to_4d_response(template).shape[-1]
+        mode_labels = [f"mode {i}" for i in range(n_modes)]
+
+    phi_rm = np.asarray(phi_rm)
+    if phi_rm.ndim != 1:
+        raise ValueError(f"phi_rm must be 1D, got shape {phi_rm.shape}")
+
+    def _combine(amplitude: np.ndarray, phase: np.ndarray):
+        amp4 = _to_4d_response(amplitude)
+        ph4 = _to_4d_response(phase)
+
+        n_modes = amp4.shape[-1]
+        if phi_rm.size != n_modes:
+            raise ValueError(
+                f"phi_rm length ({phi_rm.size}) does not match number of modes ({n_modes})."
+            )
+
+        # Broadcast mode shape weights to (1,1,1,n_modes)
+        phi_b = phi_rm.reshape(1, 1, 1, -1)
+
+        # Complex modal phasors
+        modal_phasors = amp4 * np.exp(1j * ph4)
+
+        # Total measured complex displacement phasor
+        total_phasor = np.sum(phi_b * modal_phasors, axis=-1)  # (freq, amp, mult)
+
+        total_amp = np.abs(total_phasor)[..., None]     # append mode axis
+        total_phase = np.angle(total_phasor)[..., None]
+
+        amp_out = np.concatenate([amp4, total_amp], axis=-1)
+        phase_out = np.concatenate([ph4, total_phase], axis=-1)
+        return amp_out, phase_out
+
+    if forward is not None:
+        if forward_phase is None:
+            raise ValueError(
+                "forward_phase is missing. Total displacement reconstruction requires phase."
+            )
+        out["forward"], out["forward_phase"] = _combine(forward, forward_phase)
+
+    if backward is not None:
+        if backward_phase is None:
+            raise ValueError(
+                "backward_phase is missing. Total displacement reconstruction requires phase."
+            )
+        out["backward"], out["backward_phase"] = _combine(backward, backward_phase)
+
+    mode_labels = list(mode_labels) + ["total"]
+    return out, mode_labels
+
+
+def plot_sweep_grid(
+    drive_freqs,
+    drive_amps,
+    sweeped_solutions,
+    param_text: str,
+    multiples: np.ndarray | None = None,
+    mode_labels: list[str] | None = None,
+):
     forward = sweeped_solutions.get("forward")
     backward = sweeped_solutions.get("backward")
     forward_phase = sweeped_solutions.get("forward_phase")
@@ -83,110 +260,152 @@ def plot_sweep(ax_amp, ax_phase, drive_freqs, drive_amps, sweeped_solutions, par
 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions to plot.")
-    if forward_phase is None and backward_phase is None:
-        raise ValueError("No sweeped phase solutions to plot.")
+
+    if forward_phase is None:
+        forward_phase = np.full_like(forward if forward is not None else backward, np.nan)
+    if backward_phase is None:
+        backward_phase = np.full_like(backward if backward is not None else forward, np.nan)
 
     drive_freqs = np.asarray(drive_freqs)
     drive_amps = np.asarray(drive_amps)
     colors = plt.cm.viridis(np.linspace(0, 1, drive_amps.size))
 
-    for idx, (amp, color) in enumerate(zip(drive_amps, colors)):
-        if forward is not None:
-            ax_amp.plot(
-                drive_freqs,
-                forward[:, idx],
-                color=color,
-                linestyle="-",
-                linewidth=1.3,
-            )
-        if backward is not None:
-            ax_amp.plot(
-                drive_freqs,
-                backward[:, idx],
-                color=color,
-                linestyle="--",
-                linewidth=1.1,
-            )
-        if forward_phase is not None:
-            ax_phase.plot(
-                drive_freqs,
-                -forward_phase[:, idx],
-                color=color,
-                linestyle="-",
-                linewidth=1.3,
-            )
-        if backward_phase is not None:
-            ax_phase.plot(
-                drive_freqs,
-                -backward_phase[:, idx],
-                color=color,
-                linestyle="--",
-                linewidth=1.1,
-            )
+    fwd4 = _to_4d_response(forward) if forward is not None else None
+    bwd4 = _to_4d_response(backward) if backward is not None else None
+    fwdp4 = _to_4d_response(forward_phase)
+    bwdp4 = _to_4d_response(backward_phase)
 
-    ax_amp.set_xlabel("Drive frequency")
-    ax_amp.set_ylabel("Amplitude")
-    ax_amp.grid(alpha=0.25)
+    amp_stack = [arr for arr in (fwd4, bwd4) if arr is not None]
+    amp_all = np.concatenate(amp_stack, axis=1)
+    amp_ylim = _finite_limits(amp_all)
 
-    ax_phase.set_xlabel("Drive frequency")
-    ax_phase.set_ylabel("Phase")
-    ax_phase.grid(alpha=0.25)
+    template = fwd4 if fwd4 is not None else bwd4
+    _, _, n_multiples, n_modes = template.shape
 
+    if multiples is None:
+        multiple_labels = [f"{i}" for i in range(n_multiples)]
+    else:
+        multiples = np.asarray(multiples).reshape(-1)
+        if multiples.size == n_multiples:
+            multiple_labels = [f"{m:g}" for m in multiples]
+        else:
+            multiple_labels = [f"{i}" for i in range(n_multiples)]
+
+    if mode_labels is None:
+        mode_labels = [f"mode {i}" for i in range(n_modes)]
+    if len(mode_labels) != n_modes:
+        raise ValueError(
+            f"len(mode_labels) = {len(mode_labels)} but n_modes = {n_modes}"
+        )
+
+    n_rows = n_modes * n_multiples
+    fig, axes = plt.subplots(
+        n_rows,
+        2,
+        figsize=(14, max(4, 2.8 * n_rows)),
+        sharex=True,
+    )
+    axes = np.atleast_2d(axes)
+
+    for mode_idx in range(n_modes):
+        for mult_idx in range(n_multiples):
+            row_idx = mode_idx * n_multiples + mult_idx
+            ax_amp = axes[row_idx, 0]
+            ax_phase = axes[row_idx, 1]
+
+            for amp_idx, (amp, color) in enumerate(zip(drive_amps, colors)):
+                if fwd4 is not None:
+                    ax_amp.plot(
+                        drive_freqs,
+                        fwd4[:, amp_idx, mult_idx, mode_idx],
+                        color=color,
+                        linestyle="-",
+                        linewidth=1.1,
+                    )
+                    ax_phase.plot(
+                        drive_freqs,
+                        -fwdp4[:, amp_idx, mult_idx, mode_idx],
+                        color=color,
+                        linestyle="-",
+                        linewidth=1.1,
+                    )
+
+                if bwd4 is not None:
+                    ax_amp.plot(
+                        drive_freqs,
+                        bwd4[:, amp_idx, mult_idx, mode_idx],
+                        color=color,
+                        linestyle="--",
+                        linewidth=1.0,
+                    )
+                    ax_phase.plot(
+                        drive_freqs,
+                        -bwdp4[:, amp_idx, mult_idx, mode_idx],
+                        color=color,
+                        linestyle="--",
+                        linewidth=1.0,
+                    )
+
+            ax_amp.set_ylabel(f"A ({mode_labels[mode_idx]}, mult {multiple_labels[mult_idx]})")
+            ax_phase.set_ylabel(f"phi ({mode_labels[mode_idx]}, mult {multiple_labels[mult_idx]})")
+            ax_amp.set_ylim(*amp_ylim)
+            ax_amp.grid(alpha=0.25)
+            ax_phase.grid(alpha=0.25)
+
+    axes[-1, 0].set_xlabel("Drive frequency")
+    axes[-1, 1].set_xlabel("Drive frequency")
+
+    amp_handles = [Line2D([0], [0], color=color, lw=1.6) for color in colors]
+    amp_labels = [f"F={amp:.3f}" for amp in drive_amps]
+
+    style_handles = [
+        Line2D([0], [0], color="k", linestyle="-", lw=1.4),
+        Line2D([0], [0], color="k", linestyle="--", lw=1.4),
+    ]
+    style_labels = ["Forward sweep", "Backward sweep"]
+
+    legend = axes[0, 0].legend(
+        amp_handles + style_handles,
+        amp_labels + style_labels,
+        title="Drive amplitude / sweep",
+        loc="best",
+        fontsize=7,
+        frameon=False,
+        ncol=2,
+    )
+    axes[0, 0].add_artist(legend)
+
+    fig.suptitle("Frequency sweep")
     if param_text:
-        ax_amp.text(
-            0.02,
-            0.98,
+        fig.text(
+            0.01,
+            0.99,
             param_text,
-            transform=ax_amp.transAxes,
             fontsize=8,
             va="top",
             ha="left",
             bbox=dict(facecolor="white", edgecolor="none", alpha=0.65),
         )
 
-    amp_handles = [
-        Line2D([0], [0], color=color, lw=1.8) for color in colors
-    ]
-    amp_labels = [f"F={amp:.3f}" for amp in drive_amps]
-    legend1 = ax_amp.legend(
-        amp_handles,
-        amp_labels,
-        title="Drive amplitude",
-        loc="upper right",
-        bbox_to_anchor=(1.0, 1.0),
-        fontsize=7,
-        frameon=False,
-        ncol=2,
-    )
+    fig.tight_layout(rect=[0, 0, 1, 0.98])
+    return fig
 
-    if forward is not None and backward is not None:
-        style_handles = [
-            Line2D([0], [0], color="k", linestyle="-", lw=1.5),
-            Line2D([0], [0], color="k", linestyle="--", lw=1.5),
-        ]
-        style_labels = ["Forward sweep", "Backward sweep"]
-        legend2 = ax_amp.legend(
-            style_handles,
-            style_labels,
-            loc="lower right",
-            fontsize=7,
-            frameon=False,
-        )
-        ax_amp.add_artist(legend1)
-    else:
-        ax_amp.add_artist(legend1)
+
+# ============================================================
+# Run sweep
+# ============================================================
 
 start_time = time.time()
 
 frequency_sweep = poscidyn.frequency_sweep(
-    model = MODEL,
+    model=MODEL,
     sweeper=SWEEPER,
     excitor=EXCITOR,
-    solver = SOLVER,
-    precision = PRECISION,
+    solver=SOLVER,
+    response_measure=RESPONSE_MEASURE,
+    precision=PRECISION,
     multistarter=MULTISTART,
-
-) #n_freq, n_amp, n_init_disp, n_init_vel
+)
 
 end_time = time.time()
 print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
@@ -195,16 +414,33 @@ print(
     f"({frequency_sweep.success_rate:.1%})"
 )
 
+# ============================================================
+# Reconstruct total measured displacement at r_m
+# ============================================================
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True)
-plot_sweep(
-    ax_amp=axes[0],
-    ax_phase=axes[1],
+sweeped_with_total, mode_labels = append_total_displacement_mode(
+    sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
+    phi_rm=phi_rm,
+)
+
+# ============================================================
+# Plot
+# ============================================================
+
+fig = plot_sweep_grid(
     drive_freqs=EXCITOR.drive_frequencies,
     drive_amps=EXCITOR.drive_amplitudes,
-    sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
-    param_text=_format_param_text(Q, omega_0, alpha, gamma, EXCITOR.modal_forces),
+    sweeped_solutions=sweeped_with_total,
+    param_text=_format_param_text(
+        Q,
+        omega_0,
+        alpha,
+        gamma,
+        EXCITOR.modal_forces,
+        phi_rm=phi_rm,
+    ),
+    multiples=np.asarray(RESPONSE_MEASURE.multiples),
+    mode_labels=mode_labels,
 )
-fig.suptitle("Frequency sweep")
-plt.tight_layout(rect=[0, 0, 1, 0.96])
+
 plt.show()
