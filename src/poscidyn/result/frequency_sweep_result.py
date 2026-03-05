@@ -1,68 +1,55 @@
+from dataclasses import dataclass
+from typing import Any
+
 from jax import tree_util
+from jaxtyping import Array, PyTree
 
-class FrequencySweepResult:
-    def __init__(self, f_omegas, f_amps, modal_forces, Q, omega_0, alpha, gamma, periodic_solutions, sweeped_periodic_solutions, n_successful, n_total, success_rate):
-        self.f_omegas = f_omegas
-        self.f_amps = f_amps
-        self.modal_forces = modal_forces
-        self.Q = Q
-        self.omega_0 = omega_0
-        self.alpha = alpha
-        self.gamma = gamma
-        self.periodic_solutions = periodic_solutions
-        self.sweeped_periodic_solutions = sweeped_periodic_solutions
-        self.n_successful = n_successful
-        self.n_total = n_total
-        self.success_rate = success_rate
+@dataclass
+class Phasors():
+    amplitudes: PyTree[Array]
+    phases: PyTree[Array] | None
+    demod_freqs: PyTree[Array] | None
 
-# Register FrequencySweepResult as a pytree
-def _tree_flatten(obj):
-    leaves = (
-        obj.f_omegas,
-        obj.f_amps,
-        obj.modal_forces,
-        obj.Q,
-        obj.omega_0,
-        obj.alpha,
-        obj.gamma,
-        obj.periodic_solutions,
-        obj.sweeped_periodic_solutions,
-        obj.n_successful,
-        obj.n_total,
-        obj.success_rate,
-    )
-    return leaves, None
+@tree_util.register_pytree_node_class
+@dataclass
+class FrequencySweep:
+    modal_coordinates: Phasors
+    modal_superposition: Phasors
+    stats: dict[str, Any]
 
-def _tree_unflatten(aux_data, leaves):
-    (
-        f_omegas,
-        f_amps,
-        modal_forces,
-        Q,
-        omega_0,
-        alpha,
-        gamma,
-        periodic_solutions,
-        sweeped_periodic_solutions,
-        n_successful,
-        n_total,
-        success_rate,
-    ) = leaves
-    return FrequencySweepResult(
-        f_omegas,
-        f_amps,
-        modal_forces,
-        Q,
-        omega_0,
-        alpha,
-        gamma,
-        periodic_solutions,
-        sweeped_periodic_solutions,
-        n_successful,
-        n_total,
-        success_rate,
-    )
+    def tree_flatten(self):
+        leaves = (
+            self.modal_coordinates.amplitudes,
+            self.modal_coordinates.phases,
+            self.modal_coordinates.demod_freqs,
+            self.modal_superposition.amplitudes,
+            self.modal_superposition.phases,
+            self.modal_superposition.demod_freqs,
+            self.stats,
+        )
+        return leaves, None
 
-tree_util.register_pytree_node(
-    FrequencySweepResult, _tree_flatten, _tree_unflatten
-)
+    @classmethod
+    def tree_unflatten(cls, aux_data, leaves):
+        (
+            modal_coord_amps,
+            modal_coord_phases,
+            modal_coord_demod,
+            modal_super_amps,
+            modal_super_phases,
+            modal_super_demod,
+            stats,
+        ) = leaves
+        return cls(
+            modal_coordinates=Phasors(
+                amplitudes=modal_coord_amps,
+                phases=modal_coord_phases,
+                demod_freqs=modal_coord_demod,
+            ),
+            modal_superposition=Phasors(
+                amplitudes=modal_super_amps,
+                phases=modal_super_phases,
+                demod_freqs=modal_super_demod,
+            ),
+            stats=stats,
+        )

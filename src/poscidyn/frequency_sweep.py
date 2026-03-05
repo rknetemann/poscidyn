@@ -4,7 +4,6 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-from typing import Tuple, Dict
 
 from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
@@ -13,7 +12,7 @@ from .multistart.abstract_multistart import AbstractMultistart
 from .response_measure.abstract_response_measure import AbstractResponseMeasure
 from .sweep.abstract_sweep import AbstractSweep
 
-from .result.frequency_sweep_result import FrequencySweepResult 
+from .result.frequency_sweep_result import FrequencySweep 
 
 from .solver.time_integration_solver import TimeIntegrationSolver
 from .multistart.linear_response_multistart import LinearResponseMultistart
@@ -30,7 +29,7 @@ def frequency_sweep(
     multistarter: AbstractMultistart = LinearResponseMultistart(),
     response_measure: AbstractResponseMeasure = Demodulation(),
     precision: const.Precision = const.Precision.SINGLE,
-) -> FrequencySweepResult:
+) -> FrequencySweep:
     """Run a frequency sweep for a dynamical model.
 
     Args:
@@ -42,7 +41,7 @@ def frequency_sweep(
         precision: ...
 
     Returns:
-        A `FrequencySweepResult` containing the sweep response.
+        A `FrequencySweep` containing the sweep response.
     """
             
     if precision == const.Precision.DOUBLE:

@@ -26,55 +26,92 @@ class NearestNeighbourSweep(AbstractSweep):
 
     @filter_jit
     def sweep(self, periodic_solutions):
-        amplitudes = periodic_solutions['amplitude']
-        phases = periodic_solutions['phase']
+        modal_amplitudes = periodic_solutions["modal_amplitude"]
+        modal_phases = periodic_solutions["modal_phase"]
+        modal_response_frequencies = periodic_solutions.get("modal_response_frequency")
+        if modal_response_frequencies is None:
+            modal_response_frequencies = jnp.full_like(modal_phases, jnp.nan)
 
-        n_freq, n_amp, n_init_disp, n_init_vel = amplitudes.shape[:4]
-        response_shape = amplitudes.shape[4:]
+        total_amplitudes = periodic_solutions["total_amplitude"]
+        total_phases = periodic_solutions["total_phase"]
+        total_response_frequencies = periodic_solutions.get("total_response_frequency")
+        if total_response_frequencies is None:
+            total_response_frequencies = jnp.full_like(total_phases, jnp.nan)
+
+        n_freq, n_amp, n_init_disp, n_init_vel = modal_amplitudes.shape[:4]
+        modal_shape = modal_amplitudes.shape[4:]
+        total_shape = total_amplitudes.shape[4:]
         n_seeds = n_init_disp * n_init_vel
 
-        # we reshape the amplitudes to collapse the initial conditions into one
-        amplitudes_seed = amplitudes.reshape((n_freq, n_amp, n_seeds) + response_shape)
-        phases_seed = phases.reshape((n_freq, n_amp, n_seeds) + response_shape)
+        modal_amplitudes_seed = modal_amplitudes.reshape((n_freq, n_amp, n_seeds) + modal_shape)
+        modal_phases_seed = modal_phases.reshape((n_freq, n_amp, n_seeds) + modal_shape)
+        modal_response_frequencies_seed = modal_response_frequencies.reshape(
+            (n_freq, n_amp, n_seeds) + modal_shape
+        )
+        total_amplitudes_seed = total_amplitudes.reshape((n_freq, n_amp, n_seeds) + total_shape)
+        total_phases_seed = total_phases.reshape((n_freq, n_amp, n_seeds) + total_shape)
+        total_response_frequencies_seed = total_response_frequencies.reshape(
+            (n_freq, n_amp, n_seeds) + total_shape
+        )
 
         results = {
-            'forward': None,
-            'backward': None,
-            'forward_phase': None,
-            'backward_phase': None,
-            'forward_idx': None,
-            'backward_idx': None,
+            "forward": None,
+            "backward": None,
+            "forward_phase": None,
+            "backward_phase": None,
+            "forward_demod_freq": None,
+            "backward_demod_freq": None,
+            "forward_total": None,
+            "backward_total": None,
+            "forward_total_phase": None,
+            "backward_total_phase": None,
+            "forward_total_demod_freq": None,
+            "backward_total_demod_freq": None,
+            "forward_idx": None,
+            "backward_idx": None,
         }
 
-        # sweep_direction can be either a list of the directions or a single direction
+        def _unwrap_if_phase_in_rad(arr):
+            finite_phase_mask = jnp.isfinite(arr)
+            max_abs_phase = jnp.max(jnp.abs(jnp.where(finite_phase_mask, arr, 0.0)))
+            has_finite_phase = jnp.any(finite_phase_mask)
+            should_unwrap = jnp.logical_and(has_finite_phase, max_abs_phase <= (jnp.pi + 1e-6))
+            return jnp.where(
+                should_unwrap,
+                jnp.unwrap(arr, axis=0),
+                arr,
+            )
+
         for direction_obj in (self.sweep_direction if isinstance(self.sweep_direction, list) else [self.sweep_direction]):
             if isinstance(direction_obj, Forward):
                 order = jnp.arange(n_freq)
                 start_idx = 0
-                direction = 'forward'
+                direction = "forward"
             elif isinstance(direction_obj, Backward):
                 order = jnp.arange(n_freq - 1, -1, -1)
                 start_idx = n_freq - 1
-                direction = 'backward'
+                direction = "backward"
             else:
                 raise ValueError("Unsupported sweep direction")
 
             def sweep_one_amplitude(amp_idx):
-                # candidates at the starting frequency, flattened over seeds only
-                start_cands = amplitudes_seed[start_idx, amp_idx]  # (n_seeds, *response_shape)
-                start_phase_cands = phases_seed[start_idx, amp_idx]  # (n_seeds, *response_shape)
-                start_cands_flat = start_cands.reshape((n_seeds, -1))
+                start_modal = modal_amplitudes_seed[start_idx, amp_idx]
+                start_modal_phase = modal_phases_seed[start_idx, amp_idx]
+                start_modal_freq = modal_response_frequencies_seed[start_idx, amp_idx]
+                start_total = total_amplitudes_seed[start_idx, amp_idx]
+                start_total_phase = total_phases_seed[start_idx, amp_idx]
+                start_total_freq = total_response_frequencies_seed[start_idx, amp_idx]
 
-                # choose the largest finite RMS amplitude as start
-                finite_mask = jnp.all(jnp.isfinite(start_cands_flat), axis=1)
-                start_rms = jnp.sqrt(jnp.mean(start_cands_flat**2, axis=1))
+                start_modal_flat = start_modal.reshape((n_seeds, -1))
+                finite_mask = jnp.all(jnp.isfinite(start_modal_flat), axis=1)
+                start_rms = jnp.sqrt(jnp.mean(start_modal_flat**2, axis=1))
                 safe_start_rms = jnp.where(finite_mask, start_rms, -jnp.inf)
                 start_choice_idx_raw = jnp.argmax(safe_start_rms)
                 has_valid_start = jnp.any(finite_mask)
-                start_choice = jnp.where(
+                start_modal_choice = jnp.where(
                     has_valid_start,
-                    start_cands[start_choice_idx_raw],
-                    jnp.zeros(response_shape, dtype=amplitudes.dtype),
+                    start_modal[start_choice_idx_raw],
+                    jnp.zeros(modal_shape, dtype=modal_amplitudes.dtype),
                 )
                 start_choice_idx = jnp.where(
                     has_valid_start,
@@ -82,32 +119,75 @@ class NearestNeighbourSweep(AbstractSweep):
                     -1,
                 )
                 safe_start_idx = jnp.maximum(start_choice_idx, 0)
-                start_choice_phase = jnp.where(
+                start_modal_phase_choice = jnp.where(
                     has_valid_start,
-                    start_phase_cands[safe_start_idx],
-                    jnp.full(response_shape, jnp.nan, dtype=phases.dtype),
+                    start_modal_phase[safe_start_idx],
+                    jnp.full(modal_shape, jnp.nan, dtype=modal_phases.dtype),
+                )
+                start_modal_freq_choice = jnp.where(
+                    has_valid_start,
+                    start_modal_freq[safe_start_idx],
+                    jnp.full(modal_shape, jnp.nan, dtype=modal_response_frequencies.dtype),
+                )
+                start_total_choice = jnp.where(
+                    has_valid_start,
+                    start_total[safe_start_idx],
+                    jnp.full(total_shape, jnp.nan, dtype=total_amplitudes.dtype),
+                )
+                start_total_phase_choice = jnp.where(
+                    has_valid_start,
+                    start_total_phase[safe_start_idx],
+                    jnp.full(total_shape, jnp.nan, dtype=total_phases.dtype),
+                )
+                start_total_freq_choice = jnp.where(
+                    has_valid_start,
+                    start_total_freq[safe_start_idx],
+                    jnp.full(total_shape, jnp.nan, dtype=total_response_frequencies.dtype),
                 )
 
                 def body(carry, freq_idx):
-                    prev_val, prev_phase, prev_idx, out_vals, out_phases, out_idx = carry
-                    cands = amplitudes_seed[freq_idx, amp_idx]  # (n_seeds, *response_shape)
-                    phase_cands = phases_seed[freq_idx, amp_idx]  # (n_seeds, *response_shape)
-                    cands_flat = cands.reshape((n_seeds, -1))
-                    prev_flat = prev_val.reshape((1, -1))
-                    phase_cands_flat = phase_cands.reshape((n_seeds, -1))
-                    prev_phase_flat = prev_phase.reshape((1, -1))
+                    (
+                        prev_modal,
+                        prev_modal_phase,
+                        prev_modal_freq,
+                        prev_total,
+                        prev_total_phase,
+                        prev_total_freq,
+                        prev_idx,
+                        out_modal,
+                        out_modal_phase,
+                        out_modal_freq,
+                        out_total,
+                        out_total_phase,
+                        out_total_freq,
+                        out_idx,
+                    ) = carry
+
+                    modal_cands = modal_amplitudes_seed[freq_idx, amp_idx]
+                    modal_phase_cands = modal_phases_seed[freq_idx, amp_idx]
+                    modal_freq_cands = modal_response_frequencies_seed[freq_idx, amp_idx]
+                    total_cands = total_amplitudes_seed[freq_idx, amp_idx]
+                    total_phase_cands = total_phases_seed[freq_idx, amp_idx]
+                    total_freq_cands = total_response_frequencies_seed[freq_idx, amp_idx]
+
+                    modal_cands_flat = modal_cands.reshape((n_seeds, -1))
+                    prev_modal_flat = prev_modal.reshape((1, -1))
+                    modal_phase_cands_flat = modal_phase_cands.reshape((n_seeds, -1))
+                    prev_modal_phase_flat = prev_modal_phase.reshape((1, -1))
 
                     # RMS amplitude distance over all response components.
-                    amp_diffs_flat = cands_flat - prev_flat
+                    amp_diffs_flat = modal_cands_flat - prev_modal_flat
                     amp_diffs = jnp.sqrt(jnp.mean(amp_diffs_flat**2, axis=1))  # (n_seeds,)
-                    prev_amp_scale = jnp.sqrt(jnp.mean(prev_flat**2)) + 1e-12
+                    prev_amp_scale = jnp.sqrt(jnp.mean(prev_modal_flat**2)) + 1e-12
                     amp_cost = amp_diffs / prev_amp_scale
 
                     # Circular phase distance; ignored where phase is not finite.
-                    phase_delta = jnp.angle(jnp.exp(1j * (phase_cands_flat - prev_phase_flat)))
+                    phase_delta = jnp.angle(
+                        jnp.exp(1j * (modal_phase_cands_flat - prev_modal_phase_flat))
+                    )
                     phase_finite_mask = jnp.logical_and(
-                        jnp.isfinite(phase_cands_flat),
-                        jnp.isfinite(prev_phase_flat),
+                        jnp.isfinite(modal_phase_cands_flat),
+                        jnp.isfinite(prev_modal_phase_flat),
                     )
                     phase_count = jnp.sum(phase_finite_mask, axis=1)
                     safe_phase_count = jnp.maximum(phase_count, 1)
@@ -128,57 +208,142 @@ class NearestNeighbourSweep(AbstractSweep):
                     diffs = diffs + switch_cost
 
                     # ignore NaN/Inf candidates
-                    finite_mask = jnp.all(jnp.isfinite(cands_flat), axis=1)
+                    finite_mask = jnp.all(jnp.isfinite(modal_cands_flat), axis=1)
                     diffs = jnp.where(finite_mask, diffs, jnp.inf)
 
                     k = jnp.argmin(diffs)
                     no_valid = jnp.logical_not(jnp.any(finite_mask))
-                    chosen = jnp.where(no_valid, prev_val, cands[k])
-                    chosen_phase = jnp.where(no_valid, prev_phase, phase_cands[k])
+                    chosen_modal = jnp.where(no_valid, prev_modal, modal_cands[k])
+                    chosen_modal_phase = jnp.where(no_valid, prev_modal_phase, modal_phase_cands[k])
+                    chosen_modal_freq = jnp.where(no_valid, prev_modal_freq, modal_freq_cands[k])
+                    chosen_total = jnp.where(no_valid, prev_total, total_cands[k])
+                    chosen_total_phase = jnp.where(no_valid, prev_total_phase, total_phase_cands[k])
+                    chosen_total_freq = jnp.where(no_valid, prev_total_freq, total_freq_cands[k])
                     chosen_idx = jnp.where(no_valid, prev_idx, k)
 
-                    out_vals = out_vals.at[freq_idx].set(chosen)
-                    out_phases = out_phases.at[freq_idx].set(chosen_phase)
+                    out_modal = out_modal.at[freq_idx].set(chosen_modal)
+                    out_modal_phase = out_modal_phase.at[freq_idx].set(chosen_modal_phase)
+                    out_modal_freq = out_modal_freq.at[freq_idx].set(chosen_modal_freq)
+                    out_total = out_total.at[freq_idx].set(chosen_total)
+                    out_total_phase = out_total_phase.at[freq_idx].set(chosen_total_phase)
+                    out_total_freq = out_total_freq.at[freq_idx].set(chosen_total_freq)
                     out_idx = out_idx.at[freq_idx].set(chosen_idx)
-                    return (chosen, chosen_phase, chosen_idx, out_vals, out_phases, out_idx), None
+                    return (
+                        chosen_modal,
+                        chosen_modal_phase,
+                        chosen_modal_freq,
+                        chosen_total,
+                        chosen_total_phase,
+                        chosen_total_freq,
+                        chosen_idx,
+                        out_modal,
+                        out_modal_phase,
+                        out_modal_freq,
+                        out_total,
+                        out_total_phase,
+                        out_total_freq,
+                        out_idx,
+                    ), None
 
-                init_vals = jnp.full((n_freq,) + response_shape, jnp.nan, dtype=amplitudes.dtype)
-                init_phases = jnp.full((n_freq,) + response_shape, jnp.nan, dtype=phases.dtype)
+                init_modal = jnp.full((n_freq,) + modal_shape, jnp.nan, dtype=modal_amplitudes.dtype)
+                init_modal_phase = jnp.full((n_freq,) + modal_shape, jnp.nan, dtype=modal_phases.dtype)
+                init_modal_freq = jnp.full(
+                    (n_freq,) + modal_shape, jnp.nan, dtype=modal_response_frequencies.dtype
+                )
+                init_total = jnp.full((n_freq,) + total_shape, jnp.nan, dtype=total_amplitudes.dtype)
+                init_total_phase = jnp.full((n_freq,) + total_shape, jnp.nan, dtype=total_phases.dtype)
+                init_total_freq = jnp.full(
+                    (n_freq,) + total_shape, jnp.nan, dtype=total_response_frequencies.dtype
+                )
                 init_idx = jnp.full((n_freq,), -1, dtype=jnp.int32)
 
-                (_, _, _, out_vals, out_phases, out_idx), _ = lax.scan(
-                    body, (start_choice, start_choice_phase, start_choice_idx, init_vals, init_phases, init_idx), order
+                (
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    out_modal,
+                    out_modal_phase,
+                    out_modal_freq,
+                    out_total,
+                    out_total_phase,
+                    out_total_freq,
+                    out_idx,
+                ), _ = lax.scan(
+                    body,
+                    (
+                        start_modal_choice,
+                        start_modal_phase_choice,
+                        start_modal_freq_choice,
+                        start_total_choice,
+                        start_total_phase_choice,
+                        start_total_freq_choice,
+                        start_choice_idx,
+                        init_modal,
+                        init_modal_phase,
+                        init_modal_freq,
+                        init_total,
+                        init_total_phase,
+                        init_total_freq,
+                        init_idx,
+                    ),
+                    order,
                 )
-                return out_vals, out_phases, out_idx
+                return (
+                    out_modal,
+                    out_modal_phase,
+                    out_modal_freq,
+                    out_total,
+                    out_total_phase,
+                    out_total_freq,
+                    out_idx,
+                )
 
-            vals, phase_vals, idxs = zip(*(sweep_one_amplitude(amp) for amp in range(n_amp)))
-            sweeped_vals = jnp.stack(vals, axis=1)  # (n_freq, n_amp, *response_shape)
-            sweeped_phase_vals = jnp.stack(phase_vals, axis=1)  # (n_freq, n_amp, *response_shape)
+            (
+                modal_vals,
+                modal_phase_vals,
+                modal_freq_vals,
+                total_vals,
+                total_phase_vals,
+                total_freq_vals,
+                idxs,
+            ) = zip(*(sweep_one_amplitude(amp) for amp in range(n_amp)))
 
-            # Backward compatibility for single-mode/single-multiple responses:
-            # drop singleton response dimensions so plotting code that expects
-            # (n_freq, n_amp) keeps working.
-            singleton_axes = tuple(
-                axis
-                for axis, size in enumerate(response_shape, start=2)
-                if size == 1
+            sweeped_modal = jnp.stack(modal_vals, axis=1)
+            sweeped_modal_phase = jnp.stack(modal_phase_vals, axis=1)
+            sweeped_modal_freq = jnp.stack(modal_freq_vals, axis=1)
+            sweeped_total = jnp.stack(total_vals, axis=1)
+            sweeped_total_phase = jnp.stack(total_phase_vals, axis=1)
+            sweeped_total_freq = jnp.stack(total_freq_vals, axis=1)
+
+            modal_singleton_axes = tuple(
+                axis for axis, size in enumerate(modal_shape, start=2) if size == 1
             )
-            if singleton_axes:
-                sweeped_vals = jnp.squeeze(sweeped_vals, axis=singleton_axes)
-                sweeped_phase_vals = jnp.squeeze(sweeped_phase_vals, axis=singleton_axes)
-
-            finite_phase_mask = jnp.isfinite(sweeped_phase_vals)
-            max_abs_phase = jnp.max(jnp.abs(jnp.where(finite_phase_mask, sweeped_phase_vals, 0.0)))
-            has_finite_phase = jnp.any(finite_phase_mask)
-            should_unwrap = jnp.logical_and(has_finite_phase, max_abs_phase <= (jnp.pi + 1e-6))
-            sweeped_phase_vals = jnp.where(
-                should_unwrap,
-                jnp.unwrap(sweeped_phase_vals, axis=0),
-                sweeped_phase_vals,
+            total_singleton_axes = tuple(
+                axis for axis, size in enumerate(total_shape, start=2) if size == 1
             )
+            if modal_singleton_axes:
+                sweeped_modal = jnp.squeeze(sweeped_modal, axis=modal_singleton_axes)
+                sweeped_modal_phase = jnp.squeeze(sweeped_modal_phase, axis=modal_singleton_axes)
+                sweeped_modal_freq = jnp.squeeze(sweeped_modal_freq, axis=modal_singleton_axes)
+            if total_singleton_axes:
+                sweeped_total = jnp.squeeze(sweeped_total, axis=total_singleton_axes)
+                sweeped_total_phase = jnp.squeeze(sweeped_total_phase, axis=total_singleton_axes)
+                sweeped_total_freq = jnp.squeeze(sweeped_total_freq, axis=total_singleton_axes)
+
+            sweeped_modal_phase = _unwrap_if_phase_in_rad(sweeped_modal_phase)
+            sweeped_total_phase = _unwrap_if_phase_in_rad(sweeped_total_phase)
             sweeped_idxs = jnp.stack(idxs, axis=1)  # (n_freq, n_amp)
-            results[direction] = sweeped_vals
-            results[f"{direction}_phase"] = sweeped_phase_vals
+
+            results[direction] = sweeped_modal
+            results[f"{direction}_phase"] = sweeped_modal_phase
+            results[f"{direction}_demod_freq"] = sweeped_modal_freq
+            results[f"{direction}_total"] = sweeped_total
+            results[f"{direction}_total_phase"] = sweeped_total_phase
+            results[f"{direction}_total_demod_freq"] = sweeped_total_freq
             results[f"{direction}_idx"] = sweeped_idxs
 
         return results

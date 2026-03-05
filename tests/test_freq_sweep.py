@@ -44,7 +44,7 @@ modal_forces = np.array([1.0, 1.0])
 #
 # Replace with your actual mode shape values at the probe point.
 # ============================================================
-phi_rm = np.array([1.0, 0.25], dtype=float)
+phi_rm = np.array([1.0, 0.9], dtype=float)
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
@@ -66,8 +66,8 @@ SOLVER = poscidyn.TimeIntegrationSolver(
 SWEEPER = poscidyn.NearestNeighbourSweep(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,))
-RESPONSE_MEASURE = poscidyn.Max()
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), mode_shape=phi_rm)
+# RESPONSE_MEASURE = poscidyn.L2(mode_shape=phi_rm)
 PRECISION = poscidyn.Precision.SINGLE
 
 
@@ -162,84 +162,86 @@ def _finite_limits(data: np.ndarray, pad: float = 0.05) -> tuple[float, float]:
     return y_min - pad * span, y_max + pad * span
 
 
-def append_total_displacement_mode(
-    sweeped_solutions: dict,
-    phi_rm: np.ndarray,
+def _phasors_to_sweeped_solutions(phasors) -> dict:
+    amplitudes = phasors.amplitudes
+    phases = phasors.phases
+    demod_freqs = phasors.demod_freqs
+
+    if not isinstance(amplitudes, dict):
+        raise TypeError("phasors.amplitudes must be a dict with forward/backward keys.")
+
+    return {
+        "forward": amplitudes.get("forward"),
+        "backward": amplitudes.get("backward"),
+        "forward_phase": None if phases is None else phases.get("forward"),
+        "backward_phase": None if phases is None else phases.get("backward"),
+        "forward_demod_freq": None if demod_freqs is None else demod_freqs.get("forward"),
+        "backward_demod_freq": None if demod_freqs is None else demod_freqs.get("backward"),
+        "forward_idx": None,
+        "backward_idx": None,
+    }
+
+
+def append_total_response_mode(
+    modal_sweeped_solutions: dict,
+    total_sweeped_solutions: dict,
     mode_labels: list[str] | None = None,
 ) -> tuple[dict, list[str]]:
-    """
-    Append the measured total displacement as an extra "mode".
+    forward = modal_sweeped_solutions.get("forward")
+    backward = modal_sweeped_solutions.get("backward")
+    forward_phase = modal_sweeped_solutions.get("forward_phase")
+    backward_phase = modal_sweeped_solutions.get("backward_phase")
 
-    For each demodulation multiple and each sweep point:
-        X_total = sum_i phi_i(r_m) * A_i * exp(j * theta_i)
-
-    Then:
-        A_total = |X_total|
-        phase_total = angle(X_total)
-
-    Assumptions:
-    - response_measure = Demodulation(...)
-    - phases are returned in radians
-    - phi_rm is real-valued here; if needed, complex phi_rm also works
-    """
-    forward = sweeped_solutions.get("forward")
-    backward = sweeped_solutions.get("backward")
-    forward_phase = sweeped_solutions.get("forward_phase")
-    backward_phase = sweeped_solutions.get("backward_phase")
+    forward_total = total_sweeped_solutions.get("forward")
+    backward_total = total_sweeped_solutions.get("backward")
+    forward_total_phase = total_sweeped_solutions.get("forward_phase")
+    backward_total_phase = total_sweeped_solutions.get("backward_phase")
 
     if forward is None and backward is None:
         raise ValueError("No sweeped solutions found.")
 
-    out = dict(sweeped_solutions)
+    out = dict(modal_sweeped_solutions)
 
     if mode_labels is None:
         template = forward if forward is not None else backward
         n_modes = _to_4d_response(template).shape[-1]
         mode_labels = [f"mode {i}" for i in range(n_modes)]
 
-    phi_rm = np.asarray(phi_rm)
-    if phi_rm.ndim != 1:
-        raise ValueError(f"phi_rm must be 1D, got shape {phi_rm.shape}")
+    def _combine(
+        modal_amplitude: np.ndarray,
+        modal_phase: np.ndarray,
+        total_amplitude: np.ndarray,
+        total_phase: np.ndarray,
+    ):
+        modal_amp4 = _to_4d_response(modal_amplitude)
+        modal_phase4 = _to_4d_response(modal_phase)
+        total_amp4 = _to_4d_response(total_amplitude)
+        total_phase4 = _to_4d_response(total_phase)
 
-    def _combine(amplitude: np.ndarray, phase: np.ndarray):
-        amp4 = _to_4d_response(amplitude)
-        ph4 = _to_4d_response(phase)
-
-        n_modes = amp4.shape[-1]
-        if phi_rm.size != n_modes:
+        if modal_amp4.shape[:3] != total_amp4.shape[:3]:
             raise ValueError(
-                f"phi_rm length ({phi_rm.size}) does not match number of modes ({n_modes})."
+                "Modal and total response shapes do not match in (freq, amp, multiples)."
             )
 
-        # Broadcast mode shape weights to (1,1,1,n_modes)
-        phi_b = phi_rm.reshape(1, 1, 1, -1)
-
-        # Complex modal phasors
-        modal_phasors = amp4 * np.exp(1j * ph4)
-
-        # Total measured complex displacement phasor
-        total_phasor = np.sum(phi_b * modal_phasors, axis=-1)  # (freq, amp, mult)
-
-        total_amp = np.abs(total_phasor)[..., None]     # append mode axis
-        total_phase = np.angle(total_phasor)[..., None]
-
-        amp_out = np.concatenate([amp4, total_amp], axis=-1)
-        phase_out = np.concatenate([ph4, total_phase], axis=-1)
+        amp_out = np.concatenate([modal_amp4, total_amp4], axis=-1)
+        phase_out = np.concatenate([modal_phase4, total_phase4], axis=-1)
         return amp_out, phase_out
 
     if forward is not None:
-        if forward_phase is None:
-            raise ValueError(
-                "forward_phase is missing. Total displacement reconstruction requires phase."
-            )
-        out["forward"], out["forward_phase"] = _combine(forward, forward_phase)
+        out["forward"], out["forward_phase"] = _combine(
+            forward,
+            forward_phase,
+            forward_total,
+            forward_total_phase,
+        )
 
     if backward is not None:
-        if backward_phase is None:
-            raise ValueError(
-                "backward_phase is missing. Total displacement reconstruction requires phase."
-            )
-        out["backward"], out["backward_phase"] = _combine(backward, backward_phase)
+        out["backward"], out["backward_phase"] = _combine(
+            backward,
+            backward_phase,
+            backward_total,
+            backward_total_phase,
+        )
 
     mode_labels = list(mode_labels) + ["total"]
     return out, mode_labels
@@ -409,18 +411,24 @@ frequency_sweep = poscidyn.frequency_sweep(
 
 end_time = time.time()
 print(f"Frequency sweep completed in {end_time - start_time:.2f} seconds.")
+n_successful = frequency_sweep.stats["n_successful"]
+n_total = frequency_sweep.stats["n_total"]
+success_rate = frequency_sweep.stats["success_rate"]
 print(
-    f"Successful periodic solutions: {frequency_sweep.n_successful}/{frequency_sweep.n_total} "
-    f"({frequency_sweep.success_rate:.1%})"
+    f"Successful periodic solutions: {n_successful}/{n_total} "
+    f"({success_rate:.1%})"
 )
 
 # ============================================================
 # Reconstruct total measured displacement at r_m
 # ============================================================
 
-sweeped_with_total, mode_labels = append_total_displacement_mode(
-    sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
-    phi_rm=phi_rm,
+modal_sweeped_solutions = _phasors_to_sweeped_solutions(frequency_sweep.modal_coordinates)
+total_sweeped_solutions = _phasors_to_sweeped_solutions(frequency_sweep.modal_superposition)
+
+sweeped_with_total, mode_labels = append_total_response_mode(
+    modal_sweeped_solutions=modal_sweeped_solutions,
+    total_sweeped_solutions=total_sweeped_solutions,
 )
 
 # ============================================================

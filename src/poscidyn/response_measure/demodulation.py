@@ -9,8 +9,13 @@ WINDOWS = [None, "hann", "hamming"]
 
 class Demodulation(AbstractResponseMeasure):
 
-    def __init__(self, multiples: Sequence[float] = (1.0,), window: str | None = None):
-        super().__init__()
+    def __init__(
+        self,
+        multiples: Sequence[float] = (1.0,),
+        window: str | None = None,
+        mode_shape: jnp.ndarray | None = None,
+    ):
+        super().__init__(mode_shape=mode_shape)
 
         if len(multiples) == 0:
             raise ValueError("multiples cannot be empty")
@@ -26,16 +31,28 @@ class Demodulation(AbstractResponseMeasure):
         else:
             raise ValueError(f"Unsupported window: {window}. Supported windows are: {WINDOWS}")
 
-    def __call__(self, xs: jnp.ndarray, ts: jnp.ndarray, drive_omega: jnp.ndarray):
+    def __call__(
+        self,
+        xs: jnp.ndarray,
+        ts: jnp.ndarray,
+        drive_omega: jnp.ndarray,
+    ):
         return self.dft(xs, ts, drive_omega)
 
     @filter_jit
-    def dft(self, xs: jnp.ndarray, ts: jnp.ndarray, drive_omega: jnp.ndarray):
+    def dft(
+        self,
+        xs: jnp.ndarray,
+        ts: jnp.ndarray,
+        drive_omega: jnp.ndarray,
+    ):
         xs = jnp.asarray(xs)
         ts = jnp.asarray(ts)
 
         n_ts = xs.shape[0]
         n_modes = xs.shape[1]
+        mode_shape = self._resolve_mode_shape(n_modes=n_modes)
+        mode_shape = jnp.asarray(mode_shape, dtype=xs.dtype)
 
         drive_omega = jnp.full((n_modes,), drive_omega)
 
@@ -47,8 +64,26 @@ class Demodulation(AbstractResponseMeasure):
 
         # C shape: (n_multiples, n_modes)
         C = jnp.sum(exp_term * (xs[None, :, :] * w[None, :, None]), axis=1)
+        # Total displacement phasor at the measurement point, per multiple.
+        C_total = jnp.sum(C * mode_shape[None, :], axis=1)
 
         cg = w.sum()
-        amplitudes = 2.0 * jnp.abs(C) / cg
-        phase_rad = jnp.angle(C)
-        return amplitudes, phase_rad, demod_omegas
+        modal_amplitudes = 2.0 * jnp.abs(C) / cg
+        modal_phase_rad = jnp.angle(C)
+        total_amplitudes = 2.0 * jnp.abs(C_total) / cg
+        total_phase_rad = jnp.angle(C_total)
+
+        total_demod_omegas = self.multiples * jnp.max(drive_omega)
+
+        return {
+            "modal": {
+                "amplitude": modal_amplitudes,
+                "phase": modal_phase_rad,
+                "response_frequency": demod_omegas,
+            },
+            "total": {
+                "amplitude": total_amplitudes,
+                "phase": total_phase_rad,
+                "response_frequency": total_demod_omegas,
+            },
+        }
