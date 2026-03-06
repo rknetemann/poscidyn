@@ -1,14 +1,15 @@
 import numpy as np
 import poscidyn
 import time
+import sys
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 
-def F_max(eta, omega_0, Q, gamma):
+def F_max(eta, omega_0, Q, b):
     return np.sqrt(
-        4 * omega_0**6 / (3 * gamma * Q**2)
+        4 * omega_0**6 / (3 * b * Q**2)
         * (eta + 1 / (2 * Q**2))
         * (1 + eta + 1 / (4 * Q**2))
     )
@@ -19,19 +20,19 @@ def F_max(eta, omega_0, Q, gamma):
 # ============================================================
 
 # 1 mode example:
-# Q, omega_0, alpha, gamma = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-# gamma[0,0,0,0] = 2.55
+# Q, omega_0, a, b = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+# b[0,0,0,0] = 2.55
 # modal_forces = np.array([1.0])
 
 # 2 mode example:
 Q = np.array([50.0, 80.0])
 omega_0 = np.array([1.0, 1.5])
-alpha = np.zeros((2, 2, 2))
-gamma = np.zeros((2, 2, 2, 2))
-gamma[0, 0, 0, 0] = 1.0
-gamma[1, 1, 1, 1] = -0.5
-# alpha[0,0,1] = 2.0 * 1 * 0.08
-# alpha[1,0,0] = 1 * 0.08
+a = np.zeros((2, 2, 2))
+b = np.zeros((2, 2, 2, 2))
+b[0, 0, 0, 0] = 1.0
+b[1, 1, 1, 1] = -0.5
+# a[0,0,1] = 2.0 * 1 * 0.08
+# a[1,0,0] = 1 * 0.08
 modal_forces = np.array([1.0, 1.0])
 
 # ------------------------------------------------------------
@@ -46,14 +47,15 @@ modal_forces = np.array([1.0, 1.0])
 # ============================================================
 phi_rm = np.array([1.0, 0.9], dtype=float)
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], gamma[0, 0, 0, 0])
+F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
 driving_frequency = np.linspace(0.8, 2.0, 400)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
 
-MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
-EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
+print(MODEL)
+EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(5, 5), linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(
     max_steps=4096 * 5,
@@ -66,7 +68,7 @@ SOLVER = poscidyn.TimeIntegrationSolver(
 SWEEPER = poscidyn.NearestNeighbourSweep(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), mode_shape=phi_rm)
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,))
 # RESPONSE_MEASURE = poscidyn.L2(mode_shape=phi_rm)
 PRECISION = poscidyn.Precision.SINGLE
 
@@ -75,8 +77,8 @@ PRECISION = poscidyn.Precision.SINGLE
 # Helpers
 # ============================================================
 
-def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
-    arr = np.asarray(gamma)
+def _extract_b_entries(b: np.ndarray, max_entries: int = 3):
+    arr = np.asarray(b)
     non_zero = np.argwhere(arr != 0)
     entries = []
     for idx in non_zero[:max_entries]:
@@ -85,8 +87,8 @@ def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
     return entries, int(non_zero.shape[0])
 
 
-def _extract_alpha_entries(alpha: np.ndarray, max_entries: int = 3):
-    arr = np.asarray(alpha)
+def _extract_a_entries(a: np.ndarray, max_entries: int = 3):
+    arr = np.asarray(a)
     non_zero = np.argwhere(arr != 0)
     entries = []
     for idx in non_zero[:max_entries]:
@@ -98,31 +100,31 @@ def _extract_alpha_entries(alpha: np.ndarray, max_entries: int = 3):
 def _format_param_text(
     Q: np.ndarray,
     omega_0: np.ndarray,
-    alpha: np.ndarray,
-    gamma: np.ndarray,
+    a: np.ndarray,
+    b: np.ndarray,
     modal_forces: np.ndarray,
     phi_rm: np.ndarray | None = None,
 ) -> str:
     q_vals = np.asarray(Q).ravel()
     omega_vals = np.asarray(omega_0).ravel()
-    alpha_entries, alpha_total = _extract_alpha_entries(alpha)
-    gamma_entries, gamma_total = _extract_gamma_entries(gamma)
+    a_entries, a_total = _extract_a_entries(a)
+    b_entries, b_total = _extract_b_entries(b)
 
     parts = []
     if q_vals.size:
         parts.append(f"Q=[{', '.join(f'{val:.2f}' for val in q_vals[:4])}]")
     if omega_vals.size:
         parts.append(f"omega0=[{', '.join(f'{val:.2f}' for val in omega_vals[:4])}]")
-    if alpha_entries:
-        formatted_alpha = ", ".join(f"{idx}={val:.2e}" for idx, val in alpha_entries)
-        if alpha_total > len(alpha_entries):
-            formatted_alpha += ", ..."
-        parts.append(f"alpha={formatted_alpha}")
-    if gamma_entries:
-        formatted_gamma = ", ".join(f"{idx}={val:.2e}" for idx, val in gamma_entries)
-        if gamma_total > len(gamma_entries):
-            formatted_gamma += ", ..."
-        parts.append(f"gamma={formatted_gamma}")
+    if a_entries:
+        formatted_a = ", ".join(f"{idx}={val:.2e}" for idx, val in a_entries)
+        if a_total > len(a_entries):
+            formatted_a += ", ..."
+        parts.append(f"a={formatted_a}")
+    if b_entries:
+        formatted_b = ", ".join(f"{idx}={val:.2e}" for idx, val in b_entries)
+        if b_total > len(b_entries):
+            formatted_b += ", ..."
+        parts.append(f"b={formatted_b}")
     if modal_forces.size:
         parts.append(f"modal_forces=[{', '.join(f'{val:.2f}' for val in modal_forces[:4])}]")
     if phi_rm is not None:
@@ -402,7 +404,7 @@ start_time = time.time()
 frequency_sweep = poscidyn.frequency_sweep(
     model=MODEL,
     sweeper=SWEEPER,
-    excitor=EXCITOR,
+    excitation=EXCITATION,
     solver=SOLVER,
     response_measure=RESPONSE_MEASURE,
     precision=PRECISION,
@@ -436,15 +438,15 @@ sweeped_with_total, mode_labels = append_total_response_mode(
 # ============================================================
 
 fig = plot_sweep_grid(
-    drive_freqs=EXCITOR.drive_frequencies,
-    drive_amps=EXCITOR.drive_amplitudes,
+    drive_freqs=EXCITATION.drive_frequencies,
+    drive_amps=EXCITATION.drive_amplitudes,
     sweeped_solutions=sweeped_with_total,
     param_text=_format_param_text(
         Q,
         omega_0,
-        alpha,
-        gamma,
-        EXCITOR.modal_forces,
+        a,
+        b,
+        EXCITATION.modal_forces,
         phi_rm=phi_rm,
     ),
     multiples=np.asarray(RESPONSE_MEASURE.multiples),

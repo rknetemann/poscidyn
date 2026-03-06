@@ -1,28 +1,53 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-from functools import partial
-from typing import Optional
+import numpy as np
 
-from jax import tree_util
+from jaxtyping import Array
 
-from .. import constants as const
 from .abstract_oscillator import AbstractOscillator, oscillator
 
 @oscillator
 class NonlinearOscillator(AbstractOscillator):
-    Q: jax.Array
-    omega_0: jax.Array
-    alpha: jax.Array
-    gamma: jax.Array
+    n_modes: int
+    omega_0: Array
+    Q: Array
+    a: Array
+    b: Array
 
-    def __post_init__(self):
-        jnp.asarray(self.Q)
-        jnp.asarray(self.omega_0)
-        jnp.asarray(self.alpha)
-        jnp.asarray(self.gamma)
+    def __init__(self, omega_0: Array = None, Q: Array = None, a: Array = None, b: Array = None, n_modes: int = None):
+        if n_modes is not None:
+            if omega_0 is None:
+                omega_0 = np.zeros(n_modes)
+            if Q is None:
+                Q = np.zeros(n_modes)
+            if a is None:
+                a = np.zeros((n_modes, n_modes, n_modes))
+            if b is None:
+                b = np.zeros((n_modes, n_modes, n_modes, n_modes))
 
-    def f(self, tau, state, args, omega_ref=1.0, x_ref=1.0):
+            if omega_0.shape != (n_modes,):
+                raise ValueError("omega_0 must have shape (n_modes,)")
+            if Q.shape != (n_modes,):
+                raise ValueError("Q must have shape (n_modes,)")
+            if a.shape != (n_modes, n_modes, n_modes):
+                raise ValueError("a must have shape (n_modes, n_modes, n_modes)")
+            if b.shape != (n_modes, n_modes, n_modes, n_modes):
+                raise ValueError("b must have shape (n_modes, n_modes, n_modes, n_modes)")
+        else:
+            if n_modes is None:
+                if omega_0 is None or Q is None or a is None or b is None:
+                    raise ValueError("n_modes must be specified if any of the arrays are None")
+                n_modes = omega_0.shape[0]
+                
+        self.n_modes = n_modes     
+        self.omega_0 = omega_0
+        self.Q = Q
+        self.a = a
+        self.b = b
+
+
+    def f(self, tau: float, state, args, omega_ref=1.0, x_ref=1.0):
         q, dq_dtau   = jnp.split(state, 2)
         f_amp, f_omega = [jnp.asarray(v).squeeze(()) for v in args]
 
@@ -30,8 +55,8 @@ class NonlinearOscillator(AbstractOscillator):
 
         damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dtau
         linear_stiffness_term = (1/omega_ref**2) * self.omega_0**2 * q
-        quadratic_stiffness_term = (x_ref / omega_ref**2) * jnp.einsum("ijk,j,k->i", self.alpha, q, q)
-        cubic_stiffness_term = (x_ref**2 / omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.gamma, q, q, q) # Shape: (n_modes,)
+        quadratic_stiffness_term = (x_ref / omega_ref**2) * jnp.einsum("ijk,j,k->i", self.a, q, q)
+        cubic_stiffness_term = (x_ref**2 / omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.b, q, q, q) # Shape: (n_modes,)
         forcing_term = f_amp / (omega_ref**2 * x_ref) * jnp.cos(f_omega/omega_ref * tau)
 
         d2q_dtau2 = (
@@ -43,6 +68,7 @@ class NonlinearOscillator(AbstractOscillator):
         ) 
         return jnp.concatenate([dq_dtau, d2q_dtau2])
 
+    # Not yet used, but for future shooting and collocation methods already built-in
     def f_y(self, tau, state, args):
         q, dq_dtau = jnp.split(state, 2)
 
@@ -54,11 +80,7 @@ class NonlinearOscillator(AbstractOscillator):
         A = jnp.block([[zero_block, identity_block],
                        [A_bottom_left, A_bottom_right]])
         return A
-    
-    @property
-    def n_modes(self) -> int:
-        return self.Q.shape[0]
-    
+
     @property
     def n_states(self) -> int:
         return self.n_modes * 2
@@ -75,26 +97,27 @@ class NonlinearOscillator(AbstractOscillator):
     
     def to_dtype(self, dtype: jnp.dtype) -> NonlinearOscillator:
         return NonlinearOscillator(
-            Q=self.Q.astype(dtype),
-            omega_0=self.omega_0.astype(dtype),
-            alpha=self.alpha.astype(dtype),
-            gamma=self.gamma.astype(dtype)
+            Q=jnp.asarray(self.Q, dtype=dtype),
+            omega_0=jnp.asarray(self.omega_0, dtype=dtype),
+            a=jnp.asarray(self.a, dtype=dtype),
+            b=jnp.asarray(self.b, dtype=dtype)
         )
     
     def __repr__(self):
         Q_terms = ", ".join([f"Q[{i}]={float(v):.6f}" for i, v in enumerate(self.Q)])
         omega_0_terms = ", ".join([f"omega_0[{i}]={float(v):.6f}" for i, v in enumerate(self.omega_0)])
 
-        alpha_indices, alpha_value = jnp.where(self.alpha != 0.0), self.alpha[jnp.where(self.alpha != 0.0)]
-        alpha_terms = [f"alpha[{i[0]},{i[1]},{i[2]}]={float(v):.6f}" for i, v in zip(zip(*alpha_indices), alpha_value)]
-        if len(alpha_terms) > 20:
-            alpha_terms = alpha_terms[:20] + ["... (truncated)"]
+        a_indices, a_value = jnp.where(self.a != 0.0), self.a[jnp.where(self.a != 0.0)]
+        a_terms = [f"a[{i[0]},{i[1]},{i[2]}]={float(v):.6f}" for i, v in zip(zip(*a_indices), a_value)]
+        if len(a_terms) > 20:
+            a_terms = a_terms[:20] + ["... (truncated)"]
+        a_str = f", {', '.join(a_terms)}" if a_terms else ""
 
-        gamma_indices, gamma_value = jnp.where(self.gamma != 0.0), self.gamma[jnp.where(self.gamma != 0.0)]
-        gamma_terms = [f"gamma[{i[0]},{i[1]},{i[2]},{i[3]}]={float(v):.6f}" for i, v in zip(zip(*gamma_indices), gamma_value)]
-        if len(gamma_terms) > 20:
-            gamma_terms = gamma_terms[:20] + ["... (truncated)"]
+        b_indices, b_value = jnp.where(self.b != 0.0), self.b[jnp.where(self.b != 0.0)]
+        b_terms = [f"b[{i[0]},{i[1]},{i[2]},{i[3]}]={float(v):.6f}" for i, v in zip(zip(*b_indices), b_value)]
+        if len(b_terms) > 20:
+            b_terms = b_terms[:20] + ["... (truncated)"]
+        b_str = f", {', '.join(b_terms)}" if b_terms else ""
 
         return (f"NonlinearOscillator(n_modes={self.n_modes}, "
-                f"{Q_terms}, {omega_0_terms}, "
-                f"{', '.join(alpha_terms)}, {', '.join(gamma_terms)})")
+                f"{Q_terms}, {omega_0_terms}{a_str}{b_str})")

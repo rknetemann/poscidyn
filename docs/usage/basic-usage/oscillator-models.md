@@ -6,7 +6,7 @@ Let's start by choosing an oscillator model. Poscidyn has multiple built in osci
 
 ### Single DOF Harmonic Oscillator
 
-To keep things simple we will setup a simple linear harmonic oscillator first. Each model requires their own set of parameters to be initialized. In the case of a the harmonic oscillator that are the damping ratio $\zeta$, resonance frequency $\omega_0$ and cubic  stiffness $\gamma$:
+To keep things simple we will setup a simple linear harmonic oscillator first. Each model requires their own set of parameters to be initialized. In the case of a the harmonic oscillator that are the damping ratio $\zeta$, resonance frequency $\omega_0$ and cubic  stiffness $\b$:
 
 $$
 \ddot x

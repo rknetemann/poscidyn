@@ -4,15 +4,15 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-def F_max (eta, omega_0, Q, gamma):
-    return np.sqrt(4 * omega_0**6 / (3 * gamma * Q**2) * (eta + 1 / (2*Q**2)) * (1 + eta + 1 / (4 * Q **2)))
+def F_max (eta, omega_0, Q, b):
+    return np.sqrt(4 * omega_0**6 / (3 * b * Q**2) * (eta + 1 / (2*Q**2)) * (1 + eta + 1 / (4 * Q **2)))
 
-Q, omega_0, alpha, gamma = np.array([80.0, 40.0]), np.array([7.0e6, 15.8e6]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
-# gamma[0,0,0,0] = 5.78e30
-# alpha[0,0,1] = 2.0 * 1.97e24
-# alpha[1,0,0] = 1.97e24
+Q, omega_0, a, b = np.array([80.0, 40.0]), np.array([7.0e6, 15.8e6]), np.zeros((2,2,2)), np.zeros((2,2,2,2))
+# b[0,0,0,0] = 5.78e30
+# a[0,0,1] = 2.0 * 1.97e24
+# a[1,0,0] = 1.97e24
 
-# F_max_value = F_max(0.50, omega_0[0], Q[0], gamma[0,0,0,0])
+# F_max_value = F_max(0.50, omega_0[0], Q[0], b[0,0,0,0])
 
 # print(f"Calculated F_max: {F_max_value:.4f}")
 
@@ -20,7 +20,7 @@ driving_frequency = np.linspace(6.0e6, 8.0e6, 400)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * 1
 modal_forces = np.array([1.0, 0.0])
 
-MODEL = poscidyn.NonlinearOscillator(Q=Q, alpha=alpha, gamma=gamma, omega_0=omega_0)
+MODEL = poscidyn.NonlinearOscillator(Q=Q, a=a, b=b, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
@@ -45,8 +45,8 @@ print(
     f"({frequency_sweep.success_rate:.1%})"
 )
 
-def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
-    arr = np.asarray(gamma)
+def _extract_b_entries(b: np.ndarray, max_entries: int = 3):
+    arr = np.asarray(b)
     non_zero = np.argwhere(arr != 0)
     entries = []
     for idx in non_zero[:max_entries]:
@@ -55,8 +55,8 @@ def _extract_gamma_entries(gamma: np.ndarray, max_entries: int = 3):
     return entries, int(non_zero.shape[0])
 
 
-def _extract_alpha_entries(alpha: np.ndarray, max_entries: int = 3):
-    arr = np.asarray(alpha)
+def _extract_a_entries(a: np.ndarray, max_entries: int = 3):
+    arr = np.asarray(a)
     non_zero = np.argwhere(arr != 0)
     entries = []
     for idx in non_zero[:max_entries]:
@@ -65,27 +65,27 @@ def _extract_alpha_entries(alpha: np.ndarray, max_entries: int = 3):
     return entries, int(non_zero.shape[0])
 
 
-def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, alpha: np.ndarray, gamma: np.ndarray, modal_forces: np.ndarray) -> str:
+def _format_param_text(Q: np.ndarray, omega_0: np.ndarray, a: np.ndarray, b: np.ndarray, modal_forces: np.ndarray) -> str:
     q_vals = np.asarray(Q).ravel()
     omega_vals = np.asarray(omega_0).ravel()
-    alpha_entries, alpha_total = _extract_alpha_entries(alpha)
-    gamma_entries, gamma_total = _extract_gamma_entries(gamma)
+    a_entries, a_total = _extract_a_entries(a)
+    b_entries, b_total = _extract_b_entries(b)
 
     parts = []
     if q_vals.size:
         parts.append(f"Q=[{', '.join(f'{val:.2f}' for val in q_vals[:2])}]")
     if omega_vals.size:
         parts.append(f"omega0=[{', '.join(f'{val:.2f}' for val in omega_vals[:2])}]")
-    if alpha_entries:
-        formatted_alpha = ", ".join(f"{idx}={val:.2e}" for idx, val in alpha_entries)
-        if alpha_total > len(alpha_entries):
-            formatted_alpha += ", ..."
-        parts.append(f"alpha={formatted_alpha}")
-    if gamma_entries:
-        formatted_gamma = ", ".join(f"{idx}={val:.2e}" for idx, val in gamma_entries)
-        if gamma_total > len(gamma_entries):
-            formatted_gamma += ", ..."
-        parts.append(f"gamma={formatted_gamma}")
+    if a_entries:
+        formatted_a = ", ".join(f"{idx}={val:.2e}" for idx, val in a_entries)
+        if a_total > len(a_entries):
+            formatted_a += ", ..."
+        parts.append(f"a={formatted_a}")
+    if b_entries:
+        formatted_b = ", ".join(f"{idx}={val:.2e}" for idx, val in b_entries)
+        if b_total > len(b_entries):
+            formatted_b += ", ..."
+        parts.append(f"b={formatted_b}")
     if modal_forces.size:
         parts.append(f"modal_forces=[{', '.join(f'{val:.2f}' for val in modal_forces[:2])}]")
     return "\n".join(parts)
@@ -125,7 +125,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
     )
     ax.set_xlabel("Drive frequency")
     ax.set_ylabel("Max displacement")
-    ax.grid(alpha=0.25)
+    ax.grid(a=0.25)
 
     if param_text:
         ax.text(
@@ -136,7 +136,7 @@ def plot_sweep(ax, drive_freqs, drive_amps, sweeped_solutions, param_text: str) 
             fontsize=8,
             va="top",
             ha="left",
-            bbox=dict(facecolor="white", edgecolor="none", alpha=0.65),
+            bbox=dict(facecolor="white", edgecolor="none", a=0.65),
         )
 
     amp_handles = [
@@ -177,7 +177,7 @@ plot_sweep(
     drive_freqs=EXCITOR.drive_frequencies,
     drive_amps=EXCITOR.drive_amplitudes,
     sweeped_solutions=frequency_sweep.sweeped_periodic_solutions,
-    param_text=_format_param_text(Q, omega_0, alpha, gamma, EXCITOR.modal_forces),
+    param_text=_format_param_text(Q, omega_0, a, b, EXCITOR.modal_forces),
 )
 plt.tight_layout()
 plt.show()
