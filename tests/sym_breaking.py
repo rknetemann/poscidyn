@@ -22,7 +22,7 @@ modal_forces = np.array([1.0, 0.0])
 
 MODEL = poscidyn.NonlinearOscillator(Q=Q, a=a, b=b, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(init_cond_shape=(3, 3), linear_response_factor=1.0)
+MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=9, linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(max_steps=4096*5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7)
 SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
