@@ -25,28 +25,27 @@ def F_max(eta, omega_0, Q, b):
 # modal_forces = np.array([1.0])
 
 # 2 mode example:
-Q = np.array([50.0, 80.0])
-omega_0 = np.array([1.0, 1.5])
+Q = np.array([80.0, 40.0])
+omega_0 = np.array([1.0, 2.0])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-# a[0,0,1] = 2.0 * 1 * 0.08
-# a[1,0,0] = 1 * 0.08
-b[0, 0, 0, 0] = 1.0
-b[1, 1, 1, 1] = -0.5
-modal_forces = np.array([1.0, 1.0])
+a[0,0,1] = 2.0 * 1000 * 0.08
+a[1,0,0] = 1000 * 0.08
+b[0, 0, 0, 0] = 1000.0
+modal_forces = np.array([1.0, 0.0])
 phi_rm = np.array([1.0, 0.9], dtype=float)
 
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.8, 2.0, 256)
+driving_frequency = np.linspace(0.6, 1.4, 256)
 driving_amplitude = np.linspace(0.1, 1.0, 8) * F_max_value
 
 MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
 print(MODEL)
 EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=16, linear_response_factor=1.0)
+MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=32, linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(
     max_steps=4096 * 5,
     n_time_steps=50,
@@ -58,8 +57,8 @@ SOLVER = poscidyn.TimeIntegrationSolver(
 SWEEPER = poscidyn.NearestNeighbourSweep(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,))
-# RESPONSE_MEASURE = poscidyn.L2(mode_shape=phi_rm)
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1, 2), mode_shape=phi_rm)
+#RESPONSE_MEASURE = poscidyn.Max(mode_shape=phi_rm)
 PRECISION = poscidyn.Precision.SINGLE
 
 
@@ -123,7 +122,7 @@ def _format_param_text(
     return "\n".join(parts)
 
 
-def _to_4d_response(arr: np.ndarray) -> np.ndarray:
+def _to_4d_response(arr: np.ndarray, *, interpret_3d_as: str = "modes") -> np.ndarray:
     """
     Normalize response to shape:
         (n_freq, n_amp, n_multiples, n_modes)
@@ -132,7 +131,11 @@ def _to_4d_response(arr: np.ndarray) -> np.ndarray:
     if arr.ndim == 2:
         return arr[:, :, None, None]
     if arr.ndim == 3:
-        return arr[:, :, None, :]
+        if interpret_3d_as == "modes":
+            return arr[:, :, None, :]
+        if interpret_3d_as == "multiples":
+            return arr[:, :, :, None]
+        raise ValueError(f"Unsupported interpret_3d_as value: {interpret_3d_as!r}")
     if arr.ndim == 4:
         return arr
     raise ValueError(f"Unsupported response shape: {arr.shape}")
@@ -194,10 +197,9 @@ def append_total_response_mode(
 
     out = dict(modal_sweeped_solutions)
 
-    if mode_labels is None:
-        template = forward if forward is not None else backward
-        n_modes = _to_4d_response(template).shape[-1]
-        mode_labels = [f"mode {i}" for i in range(n_modes)]
+    auto_mode_labels = mode_labels is None
+    if auto_mode_labels:
+        mode_labels = []
 
     def _combine(
         modal_amplitude: np.ndarray,
@@ -205,14 +207,19 @@ def append_total_response_mode(
         total_amplitude: np.ndarray,
         total_phase: np.ndarray,
     ):
-        modal_amp4 = _to_4d_response(modal_amplitude)
-        modal_phase4 = _to_4d_response(modal_phase)
-        total_amp4 = _to_4d_response(total_amplitude)
-        total_phase4 = _to_4d_response(total_phase)
+        modal_amp4 = _to_4d_response(modal_amplitude, interpret_3d_as="modes")
+        modal_phase4 = _to_4d_response(modal_phase, interpret_3d_as="modes")
+        total_amp4 = _to_4d_response(total_amplitude, interpret_3d_as="multiples")
+        total_phase4 = _to_4d_response(total_phase, interpret_3d_as="multiples")
+
+        if modal_amp4.shape[:3] != total_amp4.shape[:3] and np.asarray(modal_amplitude).ndim == 3:
+            modal_amp4 = _to_4d_response(modal_amplitude, interpret_3d_as="multiples")
+            modal_phase4 = _to_4d_response(modal_phase, interpret_3d_as="multiples")
 
         if modal_amp4.shape[:3] != total_amp4.shape[:3]:
             raise ValueError(
-                "Modal and total response shapes do not match in (freq, amp, multiples)."
+                "Modal and total response shapes do not match in (freq, amp, multiples): "
+                f"modal={modal_amp4.shape}, total={total_amp4.shape}."
             )
 
         amp_out = np.concatenate([modal_amp4, total_amp4], axis=-1)
@@ -226,6 +233,8 @@ def append_total_response_mode(
             forward_total,
             forward_total_phase,
         )
+        if auto_mode_labels and not mode_labels:
+            mode_labels = [f"mode {i}" for i in range(out["forward"].shape[-1] - 1)]
 
     if backward is not None:
         out["backward"], out["backward_phase"] = _combine(
@@ -234,6 +243,8 @@ def append_total_response_mode(
             backward_total,
             backward_total_phase,
         )
+        if auto_mode_labels and not mode_labels:
+            mode_labels = [f"mode {i}" for i in range(out["backward"].shape[-1] - 1)]
 
     mode_labels = list(mode_labels) + ["total"]
     return out, mode_labels
