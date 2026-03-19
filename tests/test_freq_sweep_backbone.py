@@ -25,21 +25,22 @@ def F_max(eta, omega_0, Q, b):
 # modal_forces = np.array([1.0])
 
 # 2 mode example:
-Q = np.array([80.0, 40.0])
-omega_0 = np.array([1.0, 2.0])
+Q = np.array([50.0, 80.0])
+omega_0 = np.array([1.0, 1.2])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2.0 * 1000 * 0.08
-a[1,0,0] = 1000 * 0.08
-b[0, 0, 0, 0] = 1000.0
-modal_forces = np.array([1.0, 0.0])
+# a[0,0,1] = 2.0 * 1 * 0.08
+# a[1,0,0] = 1 * 0.08
+b[0, 0, 0, 0] = 1.0
+b[1, 1, 1, 1] = -0.5
+modal_forces = np.array([1.0, 1.0])
 phi_rm = np.array([1.0, 0.9], dtype=float)
 
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
+F_max_value = F_max(0.4, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.6, 1.4, 256)
+driving_frequency = np.linspace(0.8, 2.0, 256)
 driving_amplitude = np.linspace(0.1, 1.0, 8) * F_max_value
 
 MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
@@ -57,8 +58,8 @@ SOLVER = poscidyn.TimeIntegrationSolver(
 SWEEPER = poscidyn.NearestNeighbourSweep(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1, 2), mode_shape=phi_rm)
-#RESPONSE_MEASURE = poscidyn.Max(mode_shape=phi_rm)
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,))
+# RESPONSE_MEASURE = poscidyn.L2(mode_shape=phi_rm)
 PRECISION = poscidyn.Precision.SINGLE
 
 
@@ -155,6 +156,30 @@ def _finite_limits(data: np.ndarray, pad: float = 0.05) -> tuple[float, float]:
 
     span = y_max - y_min
     return y_min - pad * span, y_max + pad * span
+
+
+def _diag_cubic_coefficients(b: np.ndarray, n_modes: int) -> np.ndarray:
+    arr = np.asarray(b)
+    return np.asarray([arr[i, i, i, i] for i in range(n_modes)], dtype=float)
+
+
+def _hb_backbone_curve(
+    omega_linear: float,
+    cubic_coeff: float,
+    amplitude_max: float,
+    n_points: int = 400,
+) -> tuple[np.ndarray, np.ndarray]:
+    if not np.isfinite(amplitude_max) or amplitude_max <= 0:
+        return np.array([]), np.array([])
+
+    amplitudes = np.linspace(0.0, float(amplitude_max), n_points)
+    # First-harmonic balance backbone: omega^2 = omega_0^2 + 3/4 * beta * A^2
+    omega_sq = float(omega_linear) ** 2 + 0.75 * float(cubic_coeff) * amplitudes**2
+    mask = omega_sq > 0.0
+    if not np.any(mask):
+        return np.array([]), np.array([])
+
+    return np.sqrt(omega_sq[mask]), amplitudes[mask]
 
 
 def _phasors_to_sweeped_solutions(phasors) -> dict:
@@ -257,6 +282,8 @@ def plot_sweep_grid(
     param_text: str,
     multiples: np.ndarray | None = None,
     mode_labels: list[str] | None = None,
+    hb_omega0: np.ndarray | None = None,
+    hb_b_diag: np.ndarray | None = None,
 ):
     forward = sweeped_solutions.get("forward")
     backward = sweeped_solutions.get("backward")
@@ -351,6 +378,29 @@ def plot_sweep_grid(
                         linewidth=1.0,
                     )
 
+            if hb_omega0 is not None and hb_b_diag is not None and mode_idx < len(hb_omega0) and mode_idx < len(hb_b_diag):
+                modal_branches = []
+                if fwd4 is not None:
+                    modal_branches.append(np.asarray(fwd4[:, :, mult_idx, mode_idx], dtype=float))
+                if bwd4 is not None:
+                    modal_branches.append(np.asarray(bwd4[:, :, mult_idx, mode_idx], dtype=float))
+                if modal_branches:
+                    modal_stack = np.concatenate(modal_branches, axis=1)
+                    amplitude_max = float(np.nanmax(modal_stack))
+                    bb_freq, bb_amp = _hb_backbone_curve(
+                        omega_linear=float(hb_omega0[mode_idx]),
+                        cubic_coeff=float(hb_b_diag[mode_idx]),
+                        amplitude_max=amplitude_max,
+                    )
+                    if bb_freq.size > 0:
+                        ax_amp.plot(
+                            bb_freq,
+                            bb_amp,
+                            color="black",
+                            linestyle="-",
+                            linewidth=1.8,
+                        )
+
             ax_amp.set_ylabel(f"A ({mode_labels[mode_idx]}, mult {multiple_labels[mult_idx]})")
             ax_phase.set_ylabel(f"phi ({mode_labels[mode_idx]}, mult {multiple_labels[mult_idx]})")
             ax_amp.set_ylim(*amp_ylim)
@@ -368,6 +418,9 @@ def plot_sweep_grid(
         Line2D([0], [0], color="k", linestyle="--", lw=1.4),
     ]
     style_labels = ["Forward sweep", "Backward sweep"]
+    if hb_omega0 is not None and hb_b_diag is not None:
+        style_handles.append(Line2D([0], [0], color="black", linestyle="-", lw=1.8))
+        style_labels.append("HB backbone")
 
     legend = axes[0, 0].legend(
         amp_handles + style_handles,
@@ -452,6 +505,8 @@ fig = plot_sweep_grid(
     ),
     multiples=np.asarray(RESPONSE_MEASURE.multiples),
     mode_labels=mode_labels,
+    hb_omega0=omega_0,
+    hb_b_diag=_diag_cubic_coefficients(b, n_modes=len(omega_0)),
 )
 
 plt.show()
