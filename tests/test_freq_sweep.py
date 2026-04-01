@@ -25,27 +25,29 @@ def F_max(eta, omega_0, Q, b):
 # modal_forces = np.array([1.0])
 
 # 2 mode example:
-Q = np.array([80.0, 40.0])
+Q = np.array([10.0, 20.0])
 omega_0 = np.array([1.0, 2.0])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2.0 * 1000 * 0.08
-a[1,0,0] = 1000 * 0.08
-b[0, 0, 0, 0] = 1000.0
+a[0,0,1] = 2*3.74e-1
+a[1,0,0] = 3.74e-1    
+b[0, 0, 0, 0] = 2.67e-2
+b[1, 1, 1, 1] = 5.40e-1
 modal_forces = np.array([1.0, 0.0])
-phi_rm = np.array([1.0, 0.9], dtype=float)
+phi_rm = np.array([1.0, 1.0], dtype=float)
 
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
+F_max = 0.3
 
-driving_frequency = np.linspace(0.6, 1.4, 256)
-driving_amplitude = np.linspace(0.1, 1.0, 8) * F_max_value
+driving_frequency = np.linspace(0.5, 1.5, 150)
+driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
 
 MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
 print(MODEL)
 EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=32, linear_response_factor=1.0)
+MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=16, linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(
     max_steps=4096 * 5,
     n_time_steps=50,
@@ -57,7 +59,7 @@ SOLVER = poscidyn.TimeIntegrationSolver(
 SWEEPER = poscidyn.NearestNeighbourSweep(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1, 2), mode_shape=phi_rm)
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), mode_shape=phi_rm)
 #RESPONSE_MEASURE = poscidyn.Max(mode_shape=phi_rm)
 PRECISION = poscidyn.Precision.SINGLE
 
