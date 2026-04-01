@@ -9,8 +9,9 @@ from .abstract_solver import AbstractSolver
 from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..excitation.abstract_excitation import AbstractExcitation
+from ..response_measure.abstract_response_measure import AbstractResponseMeasure
 from ..sweep.abstract_sweep import AbstractSweep
-from ..result.frequency_sweep_result import FrequencySweepResult
+from ..result.frequency_sweep_result import FrequencySweep, Phasors
 
 from .. import constants as const 
 
@@ -32,6 +33,7 @@ class TimeIntegrationSolver(AbstractSolver):
     def _is_tracer(value) -> bool:
         """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
         return isinstance(value, jax_core.Tracer)
+    
 
     def time_response(self,
                  f_omega: jax.Array,  
@@ -76,6 +78,7 @@ class TimeIntegrationSolver(AbstractSolver):
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
                 t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
+                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -86,11 +89,11 @@ class TimeIntegrationSolver(AbstractSolver):
 
         return sol.ts, sol.ys
         
-    # TO DO: Add phase difference results
     def frequency_sweep(self,
              excitor: AbstractExcitation,
              sweeper: AbstractSweep,
-            ) -> FrequencySweepResult:
+             response_measure: AbstractResponseMeasure,
+            ) -> FrequencySweep:
         
         periods_to_retain = const.N_PERIODS_TO_RETAIN
 
@@ -112,6 +115,7 @@ class TimeIntegrationSolver(AbstractSolver):
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
                 t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
+                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -130,37 +134,42 @@ class TimeIntegrationSolver(AbstractSolver):
             xs = sol.ys[:, :self.model.n_modes]
             vs = sol.ys[:, self.model.n_modes:]
 
-            max_x_total = jnp.where(
-                successful,
-                jnp.max(jnp.abs(jnp.sum(xs, axis=-1))),
-                jnp.nan,
+            response = response_measure(
+                xs=xs,
+                ts=ts,
+                drive_omega=f_omega,
             )
-            max_v_total = jnp.where(
-                successful,
-                jnp.max(jnp.abs(jnp.sum(vs, axis=-1))),
-                jnp.nan,
-            )
+            if not isinstance(response, dict):
+                raise ValueError(
+                    "response_measure must return a dict with 'modal' and 'total' blocks."
+                )
 
-            max_x_modes = jnp.where(
-                successful,
-                jnp.max(jnp.abs(xs), axis=0),
-                jnp.full_like(xs[0], jnp.nan),
-            )
-            max_v_modes = jnp.where(
-                successful,
-                jnp.max(jnp.abs(vs), axis=0),
-                jnp.full_like(vs[0], jnp.nan),
-            )
+            modal = response["modal"]
+            total = response["total"]
+
+            modal_amplitude = modal["amplitude"]
+            modal_phase = modal["phase"]
+            modal_response_frequency = modal.get("response_frequency")
+            if modal_response_frequency is None:
+                modal_response_frequency = jnp.full_like(modal_phase, jnp.nan)
+
+            total_amplitude = total["amplitude"]
+            total_phase = total["phase"]
+            total_response_frequency = total.get("response_frequency")
+            if total_response_frequency is None:
+                total_response_frequency = jnp.full_like(total_phase, jnp.nan)
 
             return dict(
                 f_omega=f_omega, 
                 f_amp=f_amp,
                 x0=x0, 
-                v0=v0, 
-                max_x_total=max_x_total, 
-                max_v_total=max_v_total, 
-                max_x_modes=max_x_modes, 
-                max_v_modes=max_v_modes, 
+                v0=v0,
+                modal_amplitude=modal_amplitude,
+                modal_phase=modal_phase,
+                modal_response_frequency=modal_response_frequency,
+                total_amplitude=total_amplitude,
+                total_phase=total_phase,
+                total_response_frequency=total_response_frequency,
                 successful=successful
             )
             
@@ -203,19 +212,44 @@ class TimeIntegrationSolver(AbstractSolver):
         
         sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
                 
-        result = FrequencySweepResult(
-            f_omegas=excitor.f_omegas,
-            f_amps=excitor.f_amps,
-            modal_forces=excitor.modal_forces,
-            Q=self.model.Q,
-            omega_0=self.model.omega_0,
-            alpha=self.model.alpha,
-            gamma=self.model.gamma,
-            periodic_solutions=periodic_solutions,
-            sweeped_periodic_solutions=sweeped_periodic_solutions,
-            n_successful=n_successful,
-            n_total=n_total,
-            success_rate=success_rate,
+        modal_coordinates = Phasors(
+            amplitudes={
+                "forward": sweeped_periodic_solutions.get("forward"),
+                "backward": sweeped_periodic_solutions.get("backward"),
+            },
+            phases={
+                "forward": sweeped_periodic_solutions.get("forward_phase"),
+                "backward": sweeped_periodic_solutions.get("backward_phase"),
+            },
+            demod_freqs={
+                "forward": sweeped_periodic_solutions.get("forward_demod_freq"),
+                "backward": sweeped_periodic_solutions.get("backward_demod_freq"),
+            }
+        )
+
+        modal_superposition = Phasors(
+            amplitudes={
+                "forward": sweeped_periodic_solutions.get("forward_total"),
+                "backward": sweeped_periodic_solutions.get("backward_total"),
+            },
+            phases={
+                "forward": sweeped_periodic_solutions.get("forward_total_phase"),
+                "backward": sweeped_periodic_solutions.get("backward_total_phase"),
+            },
+            demod_freqs={
+                "forward": sweeped_periodic_solutions.get("forward_total_demod_freq"),
+                "backward": sweeped_periodic_solutions.get("backward_total_demod_freq"),
+            },
+        )
+
+        result = FrequencySweep(
+            modal_coordinates=modal_coordinates,
+            modal_superposition=modal_superposition,
+            stats={
+                "n_successful": n_successful,
+                "n_total": n_total,
+                "success_rate": success_rate,
+            },
         )
 
         return result
