@@ -104,10 +104,24 @@ class NearestNeighbourSweep(AbstractSweep):
 
                 start_modal_flat = start_modal.reshape((n_seeds, -1))
                 finite_mask = jnp.all(jnp.isfinite(start_modal_flat), axis=1)
-                start_rms = jnp.sqrt(jnp.mean(start_modal_flat**2, axis=1))
-                safe_start_rms = jnp.where(finite_mask, start_rms, -jnp.inf)
-                start_choice_idx_raw = jnp.argmax(safe_start_rms)
+
+                # Medoid selection:
+                # choose the valid seed whose average RMS distance to all other valid seeds is minimal.
+                pairwise_diffs = start_modal_flat[:, None, :] - start_modal_flat[None, :, :]
+                pairwise_dist = jnp.sqrt(jnp.mean(pairwise_diffs**2, axis=-1))
+
+                valid_pair_mask = jnp.logical_and(finite_mask[:, None], finite_mask[None, :])
+                pairwise_dist_masked = jnp.where(valid_pair_mask, pairwise_dist, 0.0)
+
+                valid_counts = jnp.sum(valid_pair_mask, axis=1)
+                safe_valid_counts = jnp.maximum(valid_counts, 1)
+
+                mean_dist_to_others = jnp.sum(pairwise_dist_masked, axis=1) / safe_valid_counts
+                safe_mean_dist_to_others = jnp.where(finite_mask, mean_dist_to_others, jnp.inf)
+
+                start_choice_idx_raw = jnp.argmin(safe_mean_dist_to_others)
                 has_valid_start = jnp.any(finite_mask)
+
                 start_modal_choice = jnp.where(
                     has_valid_start,
                     start_modal[start_choice_idx_raw],
