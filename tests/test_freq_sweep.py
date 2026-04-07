@@ -25,24 +25,24 @@ def F_max(eta, omega_0, Q, b):
 # modal_forces = np.array([1.0])
 
 # 2 mode example:
-Q = np.array([10.0, 20.0])
+Q = np.array([300.0, 300.0])
 omega_0 = np.array([1.0, 2.0])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2*3.74e-1
-a[1,0,0] = 3.74e-1    
-b[0, 0, 0, 0] = 2.67e-2
-b[1, 1, 1, 1] = 5.40e-1
-modal_forces = np.array([1.0, 0.0])
+end_mult = 1.0
+b[0, 0, 0, 0] = 1.0 * end_mult
+a_mult = 1.0 * end_mult
+a[0,0,1] = 2*a_mult*b[0, 0, 0, 0]
+a[1,0,0] = a_mult*b[0, 0, 0, 0]    
+modal_forces = np.array([1.0, 1.0])
 phi_rm = np.array([1.0, 1.0], dtype=float)
 
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
+F_max_value = F_max(0.30, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
-F_max = 0.3
 
-driving_frequency = np.linspace(0.5, 1.5, 150)
-driving_amplitude = np.linspace(0.1, 1.0, 10) * F_max_value
+driving_frequency = np.linspace(0.85, 1.3, 150)
+driving_amplitude = np.linspace(0.1, 1.0, 5) * F_max_value
 
 MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
 print(MODEL)
@@ -53,7 +53,7 @@ SOLVER = poscidyn.TimeIntegrationSolver(
     n_time_steps=50,
     verbose=True,
     throw=False,
-    rtol=1e-4,
+    rtol=1e-5,
     atol=1e-7,
 )
 SWEEPER = poscidyn.NearestNeighbourSweep(
