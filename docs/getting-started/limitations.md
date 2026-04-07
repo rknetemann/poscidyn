@@ -4,7 +4,7 @@ Poscidyn has several limitations. Please review them before using the library fo
 
 ### Transient response estimation
 
-Time-integration solvers estimate the duration of the transient response using an approximation derived from a **linear single-degree-of-freedom (SDOF)** system. This estimate may therefore be inaccurate for **nonlinear multi-degree-of-freedom (MDOF)** systems. In practice, the estimate works well for many parameter combinations and system sizes.
+Time-integration solvers estimate the duration of the transient response using an approximation derived from a **linear single-degree-of-freedom (SDOF)** system. This estimate may therefore be inaccurate for **nonlinear multi-degree-of-freedom (MDOF)** systems. In practice, the estimate works well for many parameter combinations and system sizes. If you suspect that this estimate is too low, `TimeIntegrationSolver` allows setting the `t_steady_state_factor`.
 
 For the `NonlinearOscillator` model, the estimated time to steady state used for time integration is
 

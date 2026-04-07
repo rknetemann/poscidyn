@@ -51,7 +51,18 @@ nav:
 
   - Getting started: 
     - Installation: getting-started/installation.md
-    - Understanding Poscidyn: getting-started/understanding-poscidyn.md
+    - Understanding Poscidyn:
+      - Start here: getting-started/understanding-poscidyn/start-here.md
+      - Multistarting:
+        - Linear response multistart: getting-started/understanding-poscidyn/multistarting/linear-response.md
+      - Artificial sweeps:
+        - Nearest neighbour sweep: getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour.md
+      - Response measures:
+        - Demodulation: getting-started/understanding-poscidyn/response-measures/demodulation.md
+        - Minimum and maximum: getting-started/understanding-poscidyn/response-measures/min-max.md
+        - L2: getting-started/understanding-poscidyn/response-measures/l2.md
+      - Solvers:
+        - Time integration solver: getting-started/understanding-poscidyn/solvers/time-integration-solver.md
     - Limitations: getting-started/limitations.md
     - Next steps: getting-started/next-steps.md
 

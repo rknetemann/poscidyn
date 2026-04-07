@@ -79,7 +79,6 @@ class TimeIntegrationSolver(AbstractSolver):
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
                 t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
-                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),
                 throw=self.throw,
@@ -115,7 +114,6 @@ class TimeIntegrationSolver(AbstractSolver):
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
                 solver=diffrax.Tsit5(),
-                t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 t0=t0, t1=t1, dt0=None, max_steps=self.max_steps,
                 y0=y0,
                 saveat=diffrax.SaveAt(ts=ts),

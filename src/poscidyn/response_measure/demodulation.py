@@ -13,9 +13,9 @@ class Demodulation(AbstractResponseMeasure):
         self,
         multiples: Sequence[float] = (1.0,),
         window: str | None = None,
-        mode_shape: jnp.ndarray | None = None,
+        modal_contributions: jnp.ndarray | None = None,
     ):
-        super().__init__(mode_shape=mode_shape)
+        super().__init__(modal_contributions=modal_contributions)
 
         if len(multiples) == 0:
             raise ValueError("multiples cannot be empty")
@@ -51,8 +51,8 @@ class Demodulation(AbstractResponseMeasure):
 
         n_ts = xs.shape[0]
         n_modes = xs.shape[1]
-        mode_shape = self._resolve_mode_shape(n_modes=n_modes)
-        mode_shape = jnp.asarray(mode_shape, dtype=xs.dtype)
+        modal_contributions = self._resolve_modal_contributions(n_modes=n_modes)
+        modal_contributions = jnp.asarray(modal_contributions, dtype=xs.dtype)
 
         drive_omega = jnp.full((n_modes,), drive_omega)
 
@@ -65,7 +65,7 @@ class Demodulation(AbstractResponseMeasure):
         # C shape: (n_multiples, n_modes)
         C = jnp.sum(exp_term * (xs[None, :, :] * w[None, :, None]), axis=1)
         # Total displacement phasor at the measurement point, per multiple.
-        C_total = jnp.sum(C * mode_shape[None, :], axis=1)
+        C_total = jnp.sum(C * modal_contributions[None, :], axis=1)
 
         cg = w.sum()
         modal_amplitudes = 2.0 * jnp.abs(C) / cg

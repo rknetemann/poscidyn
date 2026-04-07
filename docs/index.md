@@ -15,25 +15,48 @@ Features include:
 
 ## Quick example
 
+A two-degree-of-freedom oscillator including nonlinear coupling and duffing nonlinearity:
+
+$$
+\begin{align}
+  \ddot q_1 + \frac{\omega_{0,1}}{Q_1} \dot q_1 + \omega^2_{0,1} q_1 
+  + a^{(1)}_{12} q_1 q_2 + b^{(1)}_{111} q_1^3 
+  &= f_1 \cos(\omega t), \\
+  \ddot q_2 + \frac{\omega_{0,2}}{Q_2} \dot q_2 + \omega^2_{0,2} q_2 
+  + a^{(2)}_{11} q_1^2 
+  &= f_2 \cos(\omega t),
+\end{align}
+\label{eq:symmetry-breaking-model}
+$$
+
+
 ```python
 import poscidyn
 import numpy as np
 
-Q, omega_0, a, b = np.array([100.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-b[0,0,0,0] = 2.55
-modal_forces = np.array([1.0])
+Q, omega_0, a, b = np.array([50.0, 50.0]), np.array([1.00, 2.00]), np.zeros((2, 2, 2)), np.zeros((2, 2, 2, 2))
+a[0,0,1] = 2.0
+a[1,0,0] = 1.0
+b[0,0,0,0] = 1.0
+modal_forces = np.array([1.0, 1.0])
+modal_contributions = np.array([1.0, 1.0])
 
-driving_frequency = np.linspace(0.9, 1.3, 501)
-driving_amplitude = np.linspace(0.1, 1.0, 10)
+driving_frequency = np.linspace(0.9, 1.13, 256)
+driving_amplitude = np.linspace(0.1, 1.0, 8) * 0.0144
 
-MODEL = poscidyn.NonlinearOscillator(Q=Q, a=a, b=b, omega_0=omega_0)
-EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+model = poscidyn.NonlinearOscillator(Q=Q, a=a, b=b, omega_0=omega_0)
+excitation = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+solver = poscidyn.TimeIntegrationSolver(max_steps=4096 * 20, n_time_steps=100, rtol=1e-5, atol=1e-7, t_steady_state_factor=2.0)
+response_measure = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
 
 frequency_sweep = poscidyn.frequency_sweep(
-    model = MODEL, excitor=EXCITOR,
+    model = model, excitation=excitation, solver=solver, response_measure=response_measure, precision=poscidyn.Precision.DOUBLE
 ) 
-
 ```
+
+When plotting the total response (superposition of modes):
+
+![Frequency sweep](images/frequency_sweeps.png)
 
 ## For who is Poscidyn?
 
