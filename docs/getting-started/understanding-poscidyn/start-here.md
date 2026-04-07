@@ -64,7 +64,7 @@ Increasing \(\texttt{n\_init\_cond}\) improves coverage of the state space and i
 
 Currently, Poscidyn supports one method to determine these bounds:
 
-- [Linear response operating range](../multistarting/linear-response): based on the linear response at resonance.
+- [Linear response operating range](multistarting/linear-response.md): based on the linear response at resonance.
 
 ---
 
@@ -78,7 +78,7 @@ Poscidyn reconstructs a synthetic sweep by selecting one solution per frequency 
 
 Currently implemented:
 
-- [Nearest neighbour method](../artificial-sweeps/nearest-neighbour):  
+- [Nearest neighbour method](artificial-sweeps/nearest-neighbour.md):  
   selects solutions by minimizing local amplitude–phase mismatch between consecutive frequency steps, while penalizing unnecessary switching between initial condition seeds.
 
 ---
@@ -87,14 +87,14 @@ Currently implemented:
 
 Poscidyn provides multiple ways to extract response characteristics from steady-state signals:
 
-- [Demodulation](../response-measures/demodulation):  
-  computes amplitude and phase via discrete Fourier components at multiples of the drive frequency  
+- [Demodulation](response-measures/demodulation.md):  
+  extracts phasors at the drive frequency, superharmonics, or subharmonics  
 
-- [Minimum and maximum](../response-measures/min-max):  
-  extracts extrema of the steady-state signal  
+- [Minimum and maximum](response-measures/min-max.md):  
+  extracts lower and upper bounds directly in the time domain  
 
-- [L2](../response-measures/l2):  
-  computes the root-mean-square (RMS) amplitude, corresponding to a normalized \(L^2\) norm  
+- [L2](response-measures/l2.md):  
+  computes the root-mean-square (RMS) magnitude of the signal  
 
 ---
 
@@ -118,8 +118,8 @@ $$
 
 Implemented method:
 
-- [Time integration]():  
-  integrates the system (e.g. Runge–Kutta methods) until steady-state is reached for each initial condition  
+- [Time integration](solvers/time-integration-solver.md):  
+  integrates each initial condition, retains the steady-state window, and evaluates the chosen response measure there  
 
 ---
 

@@ -2,13 +2,9 @@
 
 # Min and max
 
-The `Min` and `Max` response measures return the minimum or maximum value of the response over the provided time samples.
+`Min` and `Max` return the smallest or largest sampled value of the response over the supplied time window. They are purely time-domain extrema: useful for bounds, peak clipping checks, and asymmetric signals.
 
-These measures are purely time-domain extrema. They do not perform any frequency-domain analysis, and they do not return a meaningful phase or response frequency.
-
-## Definition
-
-For each mode \(i\), the minimum response is defined as
+For each mode \(i\),
 
 $$
 A_i^{\min}
@@ -24,9 +20,9 @@ A_i^{\max}
 \max_{k=1,\dots,N} x_i(t_k)
 $$
 
-where \(x_i(t_k)\) is the modal response of mode \(i\) at time sample \(t_k\).
+where \(x_i(t_k)\) is the modal displacement at sample \(t_k\).
 
-If a mode shape is provided, the total displacement is first reconstructed as
+If $\text{modal_contributions} = (\phi_1, \dots, \phi_{n_{\mathrm{modes}}})$ is provided, the total signal is reconstructed as
 
 $$
 x_{\mathrm{total}}(t_k)
@@ -35,9 +31,7 @@ x_{\mathrm{total}}(t_k)
 \phi_i \, x_i(t_k)
 $$
 
-with \(\phi_i\) the modal contribution at the measurement point.
-
-The total minimum and maximum are then
+and the extrema are then
 
 $$
 A_{\mathrm{total}}^{\min}
@@ -51,28 +45,5 @@ A_{\mathrm{total}}^{\max}
 \max_{k=1,\dots,N} x_{\mathrm{total}}(t_k)
 $$
 
-## Returned fields
+If `modal_contributions` is omitted, unit weights are used. When those weights come from a mode shape at a measurement point, the total entry becomes the physical minimum or maximum displacement at that point.
 
-Both `Min` and `Max` return the standard response-measure dictionary with `"modal"` and `"total"` entries.
-
-For these measures:
-
-- `"amplitude"` contains the minimum or maximum value,
-- `"phase"` is set to `NaN`,
-- `"response_frequency"` is set to `NaN`.
-
-This is because extrema do not correspond to a unique phase or frequency.
-
-## Modal and total response
-
-### Modal response
-For the modal part:
-
-- `Min` returns the minimum of each modal coordinate over time,
-- `Max` returns the maximum of each modal coordinate over time.
-
-### Total response
-For the total part:
-
-- the modal responses are first combined using the mode shape,
-- then the minimum or maximum of the reconstructed total displacement is returned.

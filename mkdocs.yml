@@ -72,20 +72,18 @@ nav:
       - Setting up an excitation model: usage/basic-usage/excitation-models.md
       - Performing a time response: usage/basic-usage/time-response.md
       - Performing a frequency sweep: usage/basic-usage/frequency-sweep.md
-    - Advanced usage:
-      - Choosing a solver: usage/advanced-usage/choosing-a-solver.md
-      - Configuring multistart strategies: usage/advanced-usage/configuring-multistart-strategies.md
-      - Configuring sweep methods: usage/advanced-usage/configuring-sweep-methods.md
     - Extending Poscidyn: usage/extending-poscidyn.md
 
   - Examples: 
     - Overview: examples/overview.md
     - Time Response: 
-      - Duffing oscillator: examples/time-response/duffing-oscillator.md
-      - MDOF oscillator: examples/time-response/mdof-oscillator.md
+      - 1DOF Duffing oscillator: examples/time-response/1dof-duffing-time-response.md
+      - 2DOF Duffing oscillator: examples/time-response/2dof-duffing-time-response.md
+      - Symmetry-breaking 1:2 internal resonance: examples/time-response/symmetry-breaking-1-2-internal-resonance.md
     - Frequency Sweep: 
-      - Duffing oscillator: examples/frequency-sweep/duffing-oscillator.md
-      - MDOF oscillator: examples/frequency-sweep/mdof-oscillator.md
+      - 1DOF Duffing oscillator: examples/frequency-sweep/1dof-duffing-frequency-sweep.md
+      - 2DOF Duffing oscillator: examples/frequency-sweep/2dof-duffing-frequency-sweep.md
+      - Symmetry-breaking 1:2 internal resonance: examples/frequency-sweep/symmetry-breaking-1-2-internal-resonance.md
 
   - API Reference:
       - Methods: 
