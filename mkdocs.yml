@@ -75,15 +75,14 @@ nav:
     - Extending Poscidyn: usage/extending-poscidyn.md
 
   - Examples: 
-    - Overview: examples/overview.md
     - Time Response: 
-      - 1DOF Duffing oscillator: examples/time-response/1dof-duffing-time-response.md
-      - 2DOF Duffing oscillator: examples/time-response/2dof-duffing-time-response.md
-      - Symmetry-breaking 1:2 internal resonance: examples/time-response/symmetry-breaking-1-2-internal-resonance.md
+      - 1DOF Duffing oscillator: examples/time-response/1dof-duffing.md
+      - 2DOF Duffing oscillator: examples/time-response/2dof-duffing.md
+      - Symmetry-breaking 1:2 internal resonance: examples/time-response/symmetry-breaking-1-to-2.md
     - Frequency Sweep: 
-      - 1DOF Duffing oscillator: examples/frequency-sweep/1dof-duffing-frequency-sweep.md
-      - 2DOF Duffing oscillator: examples/frequency-sweep/2dof-duffing-frequency-sweep.md
-      - Symmetry-breaking 1:2 internal resonance: examples/frequency-sweep/symmetry-breaking-1-2-internal-resonance.md
+      - 1DOF Duffing oscillator: examples/frequency-sweep/1dof-duffing.md
+      - 2DOF Duffing oscillator: examples/frequency-sweep/2dof-duffing.md
+      - Symmetry-breaking 1:2 internal resonance: examples/frequency-sweep/symmetry-breaking-1-to-2.md
 
   - API Reference:
       - Methods: 

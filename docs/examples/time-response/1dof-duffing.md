@@ -1,3 +1,4 @@
+```python
 import matplotlib.pyplot as plt
 import numpy as np
 import poscidyn
@@ -36,10 +37,10 @@ excitation = poscidyn.OneToneExcitation(
 )
 solver = poscidyn.TimeIntegrationSolver(
     max_steps=4096 * 8,
-    n_time_steps=160,
+    n_time_steps=500,
     rtol=1e-5,
     atol=1e-7,
-    t_steady_state_factor=1.5,
+    t_steady_state_factor=1.0,
 )
 
 # Run the time response.
@@ -82,3 +83,6 @@ fig.suptitle(
 )
 fig.tight_layout()
 plt.show()
+```
+
+![Time response](../../images/1dof_duffing_time_response.png)
