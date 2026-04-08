@@ -15,12 +15,5 @@ Walk through the **Basic usage** pages in order:
 
     Check out the [Examples](../examples/overview.md) page, it will not only make the usage of Poscidyn more clear, but also demonstrates some of the use cases of using Poscidyn (such as generating large datasets).
 
-## Avanced usage
-Once you have got the hang of the basic usage, move on to **Advanced usage** to explore Poscidyn's advanced (but still simple and powerfull) features:
-
-  - [Choosing a solver](../usage/advanced-usage/choosing-a-solver.md)
-  - [Configuring multistart strategies](../usage/advanced-usage/configuring-multistart-strategies.md)
-  - [Configuring sweep methods](../usage/advanced-usage/configuring-sweep-methods.md)
-
 ## Extending Poscidyn
 If built-in components are not enough, see [Extending Poscidyn](../usage/extending-poscidyn.md) to add custom models or excitation types.
