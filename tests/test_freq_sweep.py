@@ -25,40 +25,40 @@ def F_max(eta, omega_0, Q, b):
 # modal_forces = np.array([1.0])
 
 # 2 mode example:
-Q = np.array([80.0, 40.0])
+Q = np.array([50.0, 50.0])
 omega_0 = np.array([1.0, 2.0])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2.0 * 1000 * 0.08
-a[1,0,0] = 1000 * 0.08
-b[0, 0, 0, 0] = 1000.0
-modal_forces = np.array([1.0, 0.0])
-phi_rm = np.array([1.0, 0.9], dtype=float)
+b[0, 0, 0, 0] = 0.01
+a[0,0,1] = 0.0
+a[1,0,0] = 0.0
+modal_forces = np.array([1.0, 1.0])
+modal_contributions = np.array([1.0, 1.0], dtype=float)
 
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
+F_max_value = F_max(0.30, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.6, 1.4, 256)
-driving_amplitude = np.linspace(0.1, 1.0, 8) * F_max_value
+driving_frequency = np.linspace(0.85, 1.3, 150)
+driving_amplitude = np.linspace(0.1, 1.0, 5) * F_max_value
 
 MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
 print(MODEL)
 EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=32, linear_response_factor=1.0)
+MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=16, linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(
     max_steps=4096 * 5,
-    n_time_steps=50,
+    n_time_steps=100,
     verbose=True,
     throw=False,
-    rtol=1e-4,
+    rtol=1e-5,
     atol=1e-7,
 )
 SWEEPER = poscidyn.NearestNeighbourSweep(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1, 2), mode_shape=phi_rm)
-#RESPONSE_MEASURE = poscidyn.Max(mode_shape=phi_rm)
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
+#RESPONSE_MEASURE = poscidyn.Max(mode_shape=modal_contributions)
 PRECISION = poscidyn.Precision.SINGLE
 
 
@@ -92,7 +92,7 @@ def _format_param_text(
     a: np.ndarray,
     b: np.ndarray,
     modal_forces: np.ndarray,
-    phi_rm: np.ndarray | None = None,
+    modal_contributions: np.ndarray | None = None,
 ) -> str:
     q_vals = np.asarray(Q).ravel()
     omega_vals = np.asarray(omega_0).ravel()
@@ -116,9 +116,9 @@ def _format_param_text(
         parts.append(f"b={formatted_b}")
     if modal_forces.size:
         parts.append(f"modal_forces=[{', '.join(f'{val:.2f}' for val in modal_forces[:4])}]")
-    if phi_rm is not None:
-        phi_vals = np.asarray(phi_rm).ravel()
-        parts.append(f"phi_rm=[{', '.join(f'{val:.3f}' for val in phi_vals[:4])}]")
+    if modal_contributions is not None:
+        phi_vals = np.asarray(modal_contributions).ravel()
+        parts.append(f"modal_contributions=[{', '.join(f'{val:.3f}' for val in phi_vals[:4])}]")
     return "\n".join(parts)
 
 
@@ -448,7 +448,7 @@ fig = plot_sweep_grid(
         a,
         b,
         EXCITATION.modal_forces,
-        phi_rm=phi_rm,
+        modal_contributions=modal_contributions,
     ),
     multiples=np.asarray(RESPONSE_MEASURE.multiples),
     mode_labels=mode_labels,

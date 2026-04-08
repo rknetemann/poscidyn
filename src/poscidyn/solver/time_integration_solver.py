@@ -17,12 +17,13 @@ from .. import constants as const
 
 class TimeIntegrationSolver(AbstractSolver):
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
-                 verbose: bool = False, throw: bool = False):
+                 t_steady_state_factor: float = 1.2, verbose: bool = False, throw: bool = False):
         
         self.max_steps = max_steps
         self.n_time_steps = n_time_steps
         self.rtol = rtol
         self.atol = atol
+        self.t_steady_state_factor = t_steady_state_factor
         self.verbose = verbose
         self.throw = throw
 
@@ -34,6 +35,7 @@ class TimeIntegrationSolver(AbstractSolver):
         """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
         return isinstance(value, jax_core.Tracer)
     
+
     def time_response(self,
                  f_omega: jax.Array,  
                  f_amp: jax.Array, 
@@ -59,7 +61,7 @@ class TimeIntegrationSolver(AbstractSolver):
         period = jnp.max(2.0 * jnp.pi / f_omega)
         periods_to_retain = const.N_PERIODS_TO_RETAIN
         T = period * periods_to_retain
-        t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * const.SAFETY_FACTOR_T_STEADY_STATE
+        t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * self.t_steady_state_factor
         t0 = 0.0
         t1 = t_ss + T
 
@@ -103,7 +105,7 @@ class TimeIntegrationSolver(AbstractSolver):
 
             period = jnp.max(2.0 * jnp.pi / f_omega)
             T = period * periods_to_retain
-            t_ss = jnp.max(self.model.t_steady_state(f_omega, ss_tol=self.rtol)) * const.SAFETY_FACTOR_T_STEADY_STATE
+            t_ss = jnp.max(self.model.t_steady_state(f_omega, ss_tol=self.rtol)) * self.t_steady_state_factor
             
             t0 = 0.0
             t1 = t_ss + T
@@ -187,6 +189,9 @@ class TimeIntegrationSolver(AbstractSolver):
             self.n_time_steps = n_time_steps
         
         f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.model, f_omegas, f_amps)
+        longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
+        t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * self.t_steady_state_factor)
+        t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
 

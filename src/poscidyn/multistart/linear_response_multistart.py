@@ -23,6 +23,7 @@ class LinearResponseMultistart(AbstractMultistart):
     def generate_simulation_grid(self, model, f_omegas, f_amps):
         max_force = jnp.max(f_amps, axis=None)
         max_displacement_per_mode = (max_force * model.Q / model.omega_0**2) * self.linear_response_factor
+        max_velocity_per_mode = (max_force * model.Q / model.omega_0) * self.linear_response_factor
 
         n_f_omegas = f_omegas.shape[0]
         n_f_amps = f_amps.shape[0]
@@ -55,7 +56,7 @@ class LinearResponseMultistart(AbstractMultistart):
         )
 
         x0s_grid = unit_x0s_grid * max_displacement_per_mode[None, :]
-        v0s_grid = unit_v0s_grid * max_displacement_per_mode[None, :]
+        v0s_grid = unit_v0s_grid * max_velocity_per_mode[None, :]
 
         shape = (n_f_omegas, n_f_amps, n_init_cond, 1, n_modes)
         f_omegas_mesh = jnp.broadcast_to(f_omegas_grid[:, None, None, None, :], shape)
