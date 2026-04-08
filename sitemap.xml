@@ -2,94 +2,122 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://rknetemann.github.io/poscidyn/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/for-who-is-poscidyn/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/future-work/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/where-poscidyn-shines/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/api/classes/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/api/methods/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
-         <loc>https://rknetemann.github.io/poscidyn/examples/overview/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <loc>https://rknetemann.github.io/poscidyn/examples/frequency-sweep/1dof-duffing/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
-         <loc>https://rknetemann.github.io/poscidyn/examples/frequency-sweep/duffing-oscillator/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <loc>https://rknetemann.github.io/poscidyn/examples/frequency-sweep/2dof-duffing/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
-         <loc>https://rknetemann.github.io/poscidyn/examples/frequency-sweep/mdof-oscillator/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <loc>https://rknetemann.github.io/poscidyn/examples/frequency-sweep/symmetry-breaking-1-to-2/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
-         <loc>https://rknetemann.github.io/poscidyn/examples/time-response/duffing-oscillator/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <loc>https://rknetemann.github.io/poscidyn/examples/time-response/1dof-duffing/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
-         <loc>https://rknetemann.github.io/poscidyn/examples/time-response/mdof-oscillator/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <loc>https://rknetemann.github.io/poscidyn/examples/time-response/2dof-duffing/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/examples/time-response/symmetry-breaking-1-to-2/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/getting-started/installation/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/getting-started/limitations/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/getting-started/next-steps/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
-         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/start-here/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/multistarting/linear-response/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/response-measures/demodulation/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/response-measures/l2/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/response-measures/min-max/</loc>
+         <lastmod>2026-04-08</lastmod>
+    </url>
+    <url>
+         <loc>https://rknetemann.github.io/poscidyn/getting-started/understanding-poscidyn/solvers/time-integration-solver/</loc>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/extending-poscidyn/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/advanced-usage/choosing-a-solver/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/advanced-usage/configuring-multistart-strategies/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/advanced-usage/configuring-sweep-methods/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/basic-usage/excitation-models/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/basic-usage/frequency-sweep/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/basic-usage/oscillator-models/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
     <url>
          <loc>https://rknetemann.github.io/poscidyn/usage/basic-usage/time-response/</loc>
-         <lastmod>2026-02-16</lastmod>
+         <lastmod>2026-04-08</lastmod>
     </url>
 </urlset>
