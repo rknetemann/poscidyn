@@ -13,7 +13,7 @@ Walk through the **Basic usage** pages in order:
 
 !!! recommended
 
-    Check out the [Examples](../examples/overview.md) page, it will not only make the usage of Poscidyn more clear, but also demonstrates some of the use cases of using Poscidyn (such as generating large datasets).
+    Check out the [Examples](../../examples/frequency-sweep/2dof-duffing) page, it will not only make the usage of Poscidyn more clear, but also demonstrates some of the use cases of using Poscidyn (such as generating large datasets).
 
 ## Extending Poscidyn
 If built-in components are not enough, see [Extending Poscidyn](../usage/extending-poscidyn.md) to add custom models or excitation types.

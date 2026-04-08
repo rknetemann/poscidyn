@@ -125,4 +125,4 @@ Implemented method:
 
 ## Limitations
 
-Synthetic sweep methods approximate continuation behaviour but are not equivalent to true continuation algorithms. Important limitations and caveats are discussed on the [Limitations](../../getting-started/limitations) page.
+Synthetic sweep methods approximate continuation behaviour but are not equivalent to true continuation algorithms. Important limitations and caveats are discussed on the [Limitations](../../limitations) page.
