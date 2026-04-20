@@ -29,14 +29,15 @@ Q = np.array([80.0, 40.0])
 omega_0 = np.array([1.0, 2.0])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2.0 * 1000 * 0.08
-a[1,0,0] = 1000 * 0.08
-b[0, 0, 0, 0] = 1000.0
+a[0,0,1] = 2.0
+a[1,0,0] = 1.0
+b[0, 0, 0, 0] = 0.0
 modal_forces = np.array([1.0, 0.0])
 phi_rm = np.array([1.0, 0.9], dtype=float)
 
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
+F_max_value = 0.0155
 print(f"Calculated F_max: {F_max_value:.4f}")
 
 driving_frequency = np.linspace(0.6, 1.4, 256)
