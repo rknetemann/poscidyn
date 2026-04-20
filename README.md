@@ -1,12 +1,13 @@
 <h1 align='center'>Poscidyn</h1>
-<h2 align='center'>Simulation and Visualization of Nonlinear Oscillator Dynamics in Python</h2>
+<h2 align='center'>Fast Simulation of Nonlinear Oscillator Dynamics in Python</h2>
 
-Poscidyn is a Python toolkit based on [JAX](https://github.com/google/jax), designed to **streamline and accelerate common workflows in nonlinear oscillator dynamics**. It enables the simulation and visualization of (nonlinear) oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.
+Poscidyn (Python oscillator dynamics) is a Python toolkit based on [JAX](https://github.com/google/jax), designed to **streamline and accelerate time-response and frequency-sweep simulations**. It leverages novel parallelization strategies to gain a speed advantages over standard continuation software.
 
 Features include:
+- Frequency sweep simulation (forward and backward)
+- Time-response simulation
 - Built-in models of (nonlinear) oscillators
-- Frequency sweeping (forward and backward)
-- Everything vmappable
+- Everything vmappable (batchable)
 ---
 
 ## Installation

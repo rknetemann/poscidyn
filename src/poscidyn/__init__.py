@@ -1,6 +1,7 @@
 from .frequency_sweep import frequency_sweep
 from .time_response import time_response
 
+from .oscillator.abstract_oscillator import *
 from .oscillator.nonlinear_oscillator import *
 from .oscillator.harmonic_oscillator import *
 

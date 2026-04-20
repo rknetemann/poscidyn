@@ -1,7 +1,7 @@
 Now that you have installed **Poscidyn**, understand its core concepts, and reviewed the limitations, here’s a suggested path to get productive quickly.
 
 ## Basic usage
-Keep the mental model from [Understanding Poscidyn](understanding-poscidyn.md) in mind: pick an oscillator model, choose an excitation model, and decide whether you want a time response or a frequency sweep.
+The basic workflow to setup your simulation in Poscidyn is simple: pick an oscillator model, choose an excitation model, and decide whether you want a time response or a frequency sweep.
 
 Walk through the **Basic usage** pages in order:
 
@@ -13,7 +13,7 @@ Walk through the **Basic usage** pages in order:
 
 !!! recommended
 
-    Check out the [Examples](../examples/overview.md) page, it will not only make the usage of Poscidyn more clear, but also demonstrates some of the use cases of using Poscidyn (such as generating large datasets).
+    Check out the [Examples](../../examples/frequency-sweep/2dof-duffing) page, it will not only make the usage of Poscidyn more clear, but also demonstrates some of the use cases of using Poscidyn (such as generating large datasets).
 
 ## Extending Poscidyn
 If built-in components are not enough, see [Extending Poscidyn](../usage/extending-poscidyn.md) to add custom models or excitation types.

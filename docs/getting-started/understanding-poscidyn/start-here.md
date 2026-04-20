@@ -1,6 +1,6 @@
-To get started with Poscidyn, only a few core concepts need to be understood. Poscidyn provides built-in classes for oscillator models (e.g. the [Duffing oscillator](https://en.wikipedia.org/wiki/Duffing_equation) and the [Van der Pol oscillator](https://en.wikipedia.org/wiki/Van_der_Pol_oscillator)) as well as excitation models (e.g. single-tone and multi-tone forcing). 
+To get started with Poscidyn, only a few core concepts need to be understood. Poscidyn provides built-in classes for oscillator models (e.g. the [Duffing oscillator](https://en.wikipedia.org/wiki/Duffing_equation) *and the [Van der Pol oscillator](https://en.wikipedia.org/wiki/Van_der_Pol_oscillator)*) as well as excitation models (e.g. single-tone and multi-tone forcing). 
 
-However, Poscidyn introduces a fundamentally different workflow compared to traditional continuation-based tools. To use the package effectively—and correctly—it is important to understand how it operates conceptually, and how it compares to established continuation and bifurcation analysis software such as [AUTO](https://sourceforge.net/projects/auto-07p/), [MATCONT](https://sourceforge.net/projects/matcont/), and [COCO](https://sourceforge.net/projects/cocotools/).
+However, Poscidyn introduces a fundamentally different workflow compared to traditional continuation-based tools. To use the package effectively, and correctly, it is important to understand how it operates conceptually, and how it compares to established continuation and bifurcation analysis software such as [AUTO](https://sourceforge.net/projects/auto-07p/), [MATCONT](https://sourceforge.net/projects/matcont/), and [COCO](https://sourceforge.net/projects/cocotools/).
 
 ---
 
@@ -47,7 +47,9 @@ Future development aims to include hybrid approaches combining continuation and 
 
 ## Multistarting
 
-For each combination of drive frequency and amplitude, Poscidyn defines a search space of initial conditions. From this space, \(\texttt{n\_init\_cond}\) initial conditions are sampled.
+For each combination of drive frequency and amplitude, Poscidyn defines a search space of initial conditions. From this space, \(\texttt{n_init_cond}\) initial conditions are randomly sampled.
+
+![Multistarting](../../../images/parallel_integration.jpg)
 
 This increases the probability of capturing all relevant stable attractors.
 
@@ -60,7 +62,7 @@ v_{0,i} &\in [-v_{\max,i},\, v_{\max,i}],
 \end{aligned}
 $$
 
-Increasing \(\texttt{n\_init\_cond}\) improves coverage of the state space and is therefore a key simulation hyperparameter.
+Increasing \(\texttt{n_init_cond}\) improves coverage of the state space and is therefore a key simulation hyperparameter.
 
 Currently, Poscidyn supports one method to determine these bounds:
 
@@ -74,7 +76,7 @@ At a given frequency, multiple steady-state responses may exist due to different
 
 Poscidyn reconstructs a synthetic sweep by selecting one solution per frequency such that the resulting curve remains continuous in amplitude–phase space. This is analogous to continuation.
 
-![Sweeps](../../../images/artificial_sweeps.jpg)
+![Artificial sweeps](../../../images/artificial_sweeps.jpg)
 
 Currently implemented:
 
@@ -125,4 +127,4 @@ Implemented method:
 
 ## Limitations
 
-Synthetic sweep methods approximate continuation behaviour but are not equivalent to true continuation algorithms. Important limitations and caveats are discussed on the [Limitations](../../getting-started/limitations) page.
+Synthetic sweep methods approximate continuation behaviour but are not equivalent to true continuation algorithms. Important limitations and caveats are discussed on the [Limitations](../../limitations) page.
