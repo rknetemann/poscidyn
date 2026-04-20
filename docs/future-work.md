@@ -2,6 +2,9 @@ Poscidyn is still under active development and has not yet reached its full pote
 
 ## Planned Enhancements
 
+- **Remove memory limitation**
+  Currently Poscidyn requires quite some memory to perform sweeps, but cutting the work into smaller pieces allows for a much smaller memory footprint. 
+  
 - **Oscillator models**  
   Extension of the built-in model library to include additional canonical systems such as the Van der Pol, Lorenz, and Rayleigh oscillators.
 

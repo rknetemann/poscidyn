@@ -9,12 +9,13 @@ import time
 from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .solver.time_integration_solver import TimeIntegrationSolver
+from .excitation.abstract_excitation import AbstractExcitation
+from .excitation.one_tone import OneToneExcitation
 from . import constants as const
 
 def time_response(
     model: AbstractOscillator,
-    driving_frequency: jax.Array, # Shape: (1,)
-    driving_amplitude: jax.Array, # Shape: (n_modes,)
+    excitation: AbstractExcitation,
     initial_displacement: jax.Array, # Shape: (n_modes,)
     initial_velocity: jax.Array, # Shape: (n_modes,)
     solver: AbstractSolver = TimeIntegrationSolver(),
@@ -25,8 +26,9 @@ def time_response(
 
     Args:
         model: The dynamical model to simulate.
-        driving_frequency: The driving frequency (shape: (1,)).
-        driving_amplitude: The driving amplitude for each mode (shape: (n_modes,)).
+        excitation: Excitation definition. Currently this helper supports
+            `OneToneExcitation` with exactly one drive frequency and one drive
+            amplitude level.
         initial_displacement: The initial displacement for each mode (shape: (n_modes,)).
         initial_velocity: The initial velocity for each mode (shape: (n_modes,)).
         solver: The time integration solver to use.
@@ -47,9 +49,23 @@ def time_response(
     else:
         raise ValueError(f"Unsupported precision: {precision}")
 
-    # Ensure inputs are jax arrays (handles Python floats, lists, numpy arrays) before dtype enforcement
-    driving_frequency = jnp.asarray(driving_frequency, dtype=dtype)
-    driving_amplitude = jnp.asarray(driving_amplitude, dtype=dtype)
+    if not isinstance(excitation, OneToneExcitation):
+        raise TypeError(
+            "time_response currently only supports OneToneExcitation."
+        )
+    if model.n_modes != len(excitation.modal_forces):
+        raise ValueError(
+            "Number of modes in the model does not match the number of modal forces in the excitation."
+        )
+    if excitation.drive_frequencies.size != 1:
+        raise ValueError(
+            f"time_response requires exactly one drive frequency, got {excitation.drive_frequencies.size}."
+        )
+    if excitation.drive_amplitudes.size != 1:
+        raise ValueError(
+            f"time_response requires exactly one drive amplitude, got {excitation.drive_amplitudes.size}."
+        )
+
     initial_displacement = jnp.asarray(initial_displacement, dtype=dtype)
     initial_velocity = jnp.asarray(initial_velocity, dtype=dtype)
     
@@ -59,7 +75,22 @@ def time_response(
         raise ValueError(f"Model has {model.n_modes} modes, but initial velocity has shape {initial_velocity.shape}. It should have shape ({model.n_modes},).")
     
     model = model.to_dtype(dtype)
+    excitation = excitation.to_dtype(dtype)
     solver.model = model
+
+    driving_frequency = jnp.asarray(excitation.f_omegas, dtype=dtype)
+    driving_amplitude = jnp.asarray(excitation.f_amps, dtype=dtype)
+
+    if driving_frequency.ndim != 1 or driving_frequency.size != 1:
+        raise ValueError(
+            f"time_response requires a single drive frequency with shape (1,), got {driving_frequency.shape}."
+        )
+    if driving_amplitude.ndim != 2 or driving_amplitude.shape[0] != 1:
+        raise ValueError(
+            "time_response requires a single drive amplitude level so the resulting "
+            f"modal forcing has shape (1, n_modes), got {driving_amplitude.shape}."
+        )
+    driving_amplitude = driving_amplitude[0]
 
     print("Time response: ", model)
     start_time = time.time()
