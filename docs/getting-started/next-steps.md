@@ -1,7 +1,7 @@
 Now that you have installed **Poscidyn**, understand its core concepts, and reviewed the limitations, here’s a suggested path to get productive quickly.
 
 ## Basic usage
-Keep the mental model from [Understanding Poscidyn](understanding-poscidyn.md) in mind: pick an oscillator model, choose an excitation model, and decide whether you want a time response or a frequency sweep.
+The basic workflow to setup your simulation in Poscidyn is simple: pick an oscillator model, choose an excitation model, and decide whether you want a time response or a frequency sweep.
 
 Walk through the **Basic usage** pages in order:
 

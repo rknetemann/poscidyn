@@ -62,16 +62,32 @@ result = poscidyn.frequency_sweep(
 
 ## Reading the result
 
-The returned object stores modal and total responses separately.
+The returned object stores modal and total responses separately. 
 
+!!! note
+    With `Demodulation`, the response arrays also retain the demodulated component axis. For a single `multiples=(1.0,)`, that axis has length 1.
+
+Modal coordinates results:
 ```python
-forward_total = result.modal_superposition.amplitudes["forward"]
-backward_total = result.modal_superposition.amplitudes["backward"]
+forward_amps = result.modal_coordinates.amplitudes["forward"]
+backward_amps = result.modal_coordinates.amplitudes["backward"]
+forward_phase = result.modal_coordinates.phases["forward"]
+backward_phase = result.modal_coordinates.phases["backward"]
+```
+
+Modal superposition results:
+```python
+forward_amps = result.modal_superposition.amplitudes["forward"]
+backward_amps = result.modal_superposition.amplitudes["backward"]
 forward_phase = result.modal_superposition.phases["forward"]
+backward_phase = result.modal_superposition.phases["backward"]
+```
+
+Stats:
+```python
 stats = result.stats
 ```
 
-With `Demodulation`, the response arrays also retain the demodulated component axis. For a single `multiples=(1.0,)`, that axis has length 1.
 
 ## Practical notes
 

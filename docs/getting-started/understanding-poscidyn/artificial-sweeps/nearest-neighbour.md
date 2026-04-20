@@ -2,6 +2,8 @@
 
 # Nearest neighbour sweep
 
+![Artificial sweeps](../../../images/nearest_neighbour.jpg)
+
 Let the candidate solutions at frequency step $k$ be indexed by $s = 1, \dots, N_{\mathrm{seeds}}$, with modal amplitude vector $\mathbf{A}_{k,s}$ and phase vector $\boldsymbol{\phi}_{k,s}$. The distance in amplitude to the previously selected solution is defined as
 
 $$
