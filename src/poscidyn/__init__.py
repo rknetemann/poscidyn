@@ -10,6 +10,11 @@ from .solver.time_integration_solver import *
 from .sweep.sweep_directions import *
 from .sweep.nearest_neighbour_sweep import *
 
+from .response_measure.demodulation import *
+from .response_measure.l2 import *
+from .response_measure.min import *
+from .response_measure.max import *
+
 from .multistart.linear_response_multistart import *
 
 from .excitation.one_tone_excitation import *

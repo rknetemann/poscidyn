@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import numpy as np
 from jax import tree_util
 from jaxtyping import PyTree, Float, Array
 
@@ -8,6 +9,13 @@ class OneToneExcitation:
     oscillator: AbstractOscillator = None
 
     def __init__(self, drive_frequencies, drive_amplitudes, modal_forces):
+        if drive_frequencies.ndim != 1:
+            raise ValueError("drive_frequencies must be a 1D array")
+        if drive_amplitudes.ndim != 1:
+            raise ValueError("drive_amplitudes must be a 1D array")
+        if modal_forces.ndim != 1:
+            raise ValueError("modal_forces must be a 1D array")
+
         self.drive_frequencies = drive_frequencies
         self.drive_amplitudes = drive_amplitudes
         self.modal_forces = modal_forces

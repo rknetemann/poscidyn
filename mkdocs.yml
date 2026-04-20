@@ -51,7 +51,18 @@ nav:
 
   - Getting started: 
     - Installation: getting-started/installation.md
-    - Understanding Poscidyn: getting-started/understanding-poscidyn.md
+    - Understanding Poscidyn:
+      - Start here: getting-started/understanding-poscidyn/start-here.md
+      - Multistarting:
+        - Linear response multistart: getting-started/understanding-poscidyn/multistarting/linear-response.md
+      - Artificial sweeps:
+        - Nearest neighbour sweep: getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour.md
+      - Response measures:
+        - Demodulation: getting-started/understanding-poscidyn/response-measures/demodulation.md
+        - Minimum and maximum: getting-started/understanding-poscidyn/response-measures/min-max.md
+        - L2: getting-started/understanding-poscidyn/response-measures/l2.md
+      - Solvers:
+        - Time integration solver: getting-started/understanding-poscidyn/solvers/time-integration-solver.md
     - Limitations: getting-started/limitations.md
     - Next steps: getting-started/next-steps.md
 
@@ -61,20 +72,17 @@ nav:
       - Setting up an excitation model: usage/basic-usage/excitation-models.md
       - Performing a time response: usage/basic-usage/time-response.md
       - Performing a frequency sweep: usage/basic-usage/frequency-sweep.md
-    - Advanced usage:
-      - Choosing a solver: usage/advanced-usage/choosing-a-solver.md
-      - Configuring multistart strategies: usage/advanced-usage/configuring-multistart-strategies.md
-      - Configuring sweep methods: usage/advanced-usage/configuring-sweep-methods.md
     - Extending Poscidyn: usage/extending-poscidyn.md
 
   - Examples: 
-    - Overview: examples/overview.md
     - Time Response: 
-      - Duffing oscillator: examples/time-response/duffing-oscillator.md
-      - MDOF oscillator: examples/time-response/mdof-oscillator.md
+      - 1DOF Duffing oscillator: examples/time-response/1dof-duffing.md
+      - 2DOF Duffing oscillator: examples/time-response/2dof-duffing.md
+      - Symmetry-breaking 1:2 internal resonance: examples/time-response/symmetry-breaking-1-to-2.md
     - Frequency Sweep: 
-      - Duffing oscillator: examples/frequency-sweep/duffing-oscillator.md
-      - MDOF oscillator: examples/frequency-sweep/mdof-oscillator.md
+      - 1DOF Duffing oscillator: examples/frequency-sweep/1dof-duffing.md
+      - 2DOF Duffing oscillator: examples/frequency-sweep/2dof-duffing.md
+      - Symmetry-breaking 1:2 internal resonance: examples/frequency-sweep/symmetry-breaking-1-to-2.md
 
   - API Reference:
       - Methods: 
