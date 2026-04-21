@@ -41,7 +41,7 @@ class DummySolver:
 
 
 def make_model(n_modes=1):
-    return poscidyn.NonlinearOscillator(
+    return poscidyn.Nonlinear(
         omega_0=np.ones((n_modes,)),
         Q=np.full((n_modes,), 100.0),
         a=np.zeros((n_modes, n_modes, n_modes)),
@@ -116,7 +116,7 @@ class TimeResponseTests(unittest.TestCase):
 
     @unittest.skipUnless(plt is not None, "matplotlib not installed")
     def test_time_response_plot_smoke(self):
-        model = poscidyn.NonlinearOscillator(
+        model = poscidyn.Nonlinear(
             omega_0=np.array([1.0]),
             Q=np.array([5.0]),
             a=np.zeros((1, 1, 1)),
@@ -127,7 +127,7 @@ class TimeResponseTests(unittest.TestCase):
             drive_amplitude=0.05,
             modal_forces=np.array([1.0]),
         )
-        solver = poscidyn.TimeIntegrationSolver(
+        solver = poscidyn.TimeIntegration(
             n_time_steps=64,
             max_steps=4096,
             rtol=1e-3,

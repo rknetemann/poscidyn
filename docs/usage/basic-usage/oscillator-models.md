@@ -2,11 +2,11 @@
 
 Poscidyn currently exposes one oscillator class:
 
-- `NonlinearOscillator`: a modal oscillator model with linear, quadratic, and cubic terms.
+- `Nonlinear`: a modal oscillator model with linear, quadratic, and cubic terms.
 
-For most structural-dynamics workflows, `NonlinearOscillator` is the main entry point.
+For most structural-dynamics workflows, `Nonlinear` is the main entry point.
 
-## `NonlinearOscillator`
+## `Nonlinear`
 
 The model is defined in modal coordinates as
 
@@ -40,7 +40,7 @@ a = np.zeros((1, 1, 1))
 b = np.zeros((1, 1, 1, 1))
 b[0, 0, 0, 0] = 0.1
 
-model = poscidyn.NonlinearOscillator(
+model = poscidyn.Nonlinear(
     omega_0=omega_0,
     Q=Q,
     a=a,
@@ -60,7 +60,7 @@ a[0, 0, 1] = 0.16
 a[1, 0, 0] = 0.08
 b[0, 0, 0, 0] = 1.0
 
-model = poscidyn.NonlinearOscillator(
+model = poscidyn.Nonlinear(
     omega_0=omega_0,
     Q=Q,
     a=a,

@@ -9,12 +9,12 @@ import numpy as np
 from .abstract_solver import AbstractSolver
 from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
-from ..multistart.linear_response_multistart import LinearResponseMultistart
+from ..multistart.linear_response import LinearResponse
 from .. import constants as const 
 from .utils.polynomials import LagrangeBasis
 
 class CollocationSolver(AbstractSolver):
-    def __init__(self,  max_iterations: int = 20, N_elements: int = 10, m_collocation_points: int = 2, multistart: AbstractMultistart = LinearResponseMultistart(),
+    def __init__(self,  max_iterations: int = 20, N_elements: int = 10, m_collocation_points: int = 2, multistart: AbstractMultistart = LinearResponse(),
                  rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
                  verbose: bool = False, throw: bool = False):
 
@@ -235,4 +235,3 @@ class CollocationSolver(AbstractSolver):
         dy_dt = self.model.f(tau, y, args) * dtau_dt
 
         return dy_dt
-

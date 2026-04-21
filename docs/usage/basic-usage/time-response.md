@@ -10,7 +10,7 @@ The public function expects:
 - `excitation`: currently a `OneToneExcitation` with exactly one drive frequency and one drive amplitude
 - `initial_displacement`: shape `(n_modes,)`
 - `initial_velocity`: shape `(n_modes,)`
-- `solver`: usually `TimeIntegrationSolver(...)`
+- `solver`: usually `TimeIntegration(...)`
 
 ## Minimal example
 
@@ -23,13 +23,13 @@ Q = np.array([100.0])
 a = np.zeros((1, 1, 1))
 b = np.zeros((1, 1, 1, 1))
 
-model = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q, a=a, b=b)
+model = poscidyn.Nonlinear(omega_0=omega_0, Q=Q, a=a, b=b)
 excitation = poscidyn.OneToneExcitation(
     drive_frequencies=np.array([1.0]),
     drive_amplitudes=np.array([0.01]),
     modal_forces=np.array([1.0]),
 )
-solver = poscidyn.TimeIntegrationSolver(
+solver = poscidyn.TimeIntegration(
     n_time_steps=200,
     rtol=1e-5,
     atol=1e-7,

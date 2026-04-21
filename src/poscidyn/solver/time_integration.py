@@ -8,28 +8,35 @@ from jax import core as jax_core
 from .abstract_solver import AbstractSolver
 from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
+from ..multistart.linear_response import LinearResponse
 from ..excitation.abstract_excitation import AbstractExcitation
+from ..synthetic_sweep.abstract_synthetic_sweep import AbstractSyntheticSweep
+from ..synthetic_sweep.nearest_neighbour import NearestNeighbour
 from ..response_measure.abstract_response_measure import AbstractResponseMeasure
-from ..sweep.abstract_sweep import AbstractSweep
-from ..result.frequency_sweep_result import FrequencySweep, Phasors
+from ..result.frequency_sweep import FrequencySweep, Phasors
 
-from .. import constants as const 
-
-class TimeIntegrationSolver(AbstractSolver):
+class TimeIntegration(AbstractSolver):
     def __init__(self, rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, 
-                 t_steady_state_factor: float = 1.2, verbose: bool = False, throw: bool = False):
+                 multistart: AbstractMultistart = LinearResponse(), synthetic_sweep: AbstractSyntheticSweep = NearestNeighbour(),
+                 t_steady_state_factor: float = 1.2, periods_to_retain: int = 4, max_order_superharmonics: int = 3,
+                 verbose: bool = False, throw: bool = False):
         
         self.max_steps = max_steps
         self.n_time_steps = n_time_steps
         self.rtol = rtol
         self.atol = atol
         self.t_steady_state_factor = t_steady_state_factor
+        self.periods_to_retain = periods_to_retain
+        self.max_order_superharmonics = max_order_superharmonics
         self.verbose = verbose
         self.throw = throw
 
+        self.multistart = multistart
+        self.synthetic_sweep = synthetic_sweep
+
         self.oscillator: AbstractOscillator = None
         self.excitation: AbstractExcitation = None
-        self.multistarter: AbstractMultistart = None
+        self.response_measure: AbstractResponseMeasure = None
 
     @staticmethod
     def _is_tracer(value) -> bool:
@@ -48,7 +55,7 @@ class TimeIntegrationSolver(AbstractSolver):
 
         if self.n_time_steps is None and not self._is_tracer(f_omega):
             rtol = 0.01
-            max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * jnp.max(f_omega)
+            max_frequency_component = self.max_order_superharmonics * jnp.max(f_omega)
             
             one_period = 2.0 * jnp.pi / max_frequency_component
             sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
@@ -59,7 +66,7 @@ class TimeIntegrationSolver(AbstractSolver):
             raise ValueError("n_time_steps must be set before calling time_response when tracing.")
 
         period = jnp.max(2.0 * jnp.pi / f_omega)
-        periods_to_retain = const.N_PERIODS_TO_RETAIN
+        periods_to_retain = self.periods_to_retain
         T = period * periods_to_retain
         t_ss = jnp.max(self.oscillator.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * self.t_steady_state_factor
         t0 = 0.0
@@ -89,14 +96,7 @@ class TimeIntegrationSolver(AbstractSolver):
 
         return sol.ts, sol.ys
         
-    def frequency_sweep(self,
-             excitation: AbstractExcitation,
-             sweeper: AbstractSweep,
-             response_measure: AbstractResponseMeasure,
-            ) -> FrequencySweep:
-        
-        periods_to_retain = const.N_PERIODS_TO_RETAIN
-
+    def frequency_sweep(self) -> FrequencySweep:
         @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
             x0 = jnp.full((self.oscillator.n_modes,), x0)         
@@ -104,12 +104,12 @@ class TimeIntegrationSolver(AbstractSolver):
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
             period = jnp.max(2.0 * jnp.pi / f_omega)
-            T = period * periods_to_retain
+            T = period * self.periods_to_retain
             t_ss = jnp.max(self.oscillator.t_steady_state(f_omega, ss_tol=self.rtol)) * self.t_steady_state_factor
             
             t0 = 0.0
             t1 = t_ss + T
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps * const.N_PERIODS_TO_RETAIN)
+            ts = jnp.linspace(t_ss, t1, self.n_time_steps * self.periods_to_retain)
 
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
@@ -133,7 +133,7 @@ class TimeIntegrationSolver(AbstractSolver):
             xs = sol.ys[:, :self.oscillator.n_dof]
             vs = sol.ys[:, self.oscillator.n_dof:]
 
-            response = response_measure(
+            response = self.response_measure(
                 xs=xs,
                 ts=ts,
                 drive_omega=f_omega,
@@ -172,15 +172,15 @@ class TimeIntegrationSolver(AbstractSolver):
                 successful=successful
             )
             
-        f_omegas = excitation.f_omegas
-        f_amps = excitation.f_amps
+        f_omegas = self.excitation.f_omegas
+        f_amps = self.excitation.f_amps
         
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
             if self._is_tracer(f_omegas):
                 raise ValueError("n_time_steps must be set before calling frequency_sweep when tracing.")
             rtol = 0.01
-            max_frequency_component = const.MAXIMUM_ORDER_SUPERHARMONICS * jnp.max(f_omegas)
+            max_frequency_component = self.max_order_superharmonics * jnp.max(f_omegas)
             
             one_period = 2.0 * jnp.pi / max_frequency_component
             sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
@@ -188,10 +188,10 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = int(math.ceil(float(one_period * sampling_frequency)))
             self.n_time_steps = n_time_steps
         
-        f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.oscillator, f_omegas, f_amps)
+        f_omegas, f_amps, x0s, v0s, shape = self.multistart.generate_simulation_grid(self.oscillator, f_omegas, f_amps)
         longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
         t_ss_estimate = jnp.max(self.oscillator.t_steady_state(f_omegas, ss_tol=self.rtol) * self.t_steady_state_factor)
-        t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
+        t_span_estimate = t_ss_estimate + longest_period * self.periods_to_retain
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
 
@@ -209,7 +209,7 @@ class TimeIntegrationSolver(AbstractSolver):
         if not self._is_tracer(success_rate):
             success_rate = float(success_rate)
         
-        sweeped_periodic_solutions = sweeper.sweep(periodic_solutions)
+        sweeped_periodic_solutions = self.synthetic_sweep.sweep(periodic_solutions)
                 
         modal_coordinates = Phasors(
             amplitudes={

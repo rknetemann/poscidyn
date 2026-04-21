@@ -4,9 +4,9 @@ Poscidyn has several limitations. Please review them before using the library fo
 
 ### Transient response estimation
 
-Time-integration solvers estimate the duration of the transient response using an approximation derived from a **linear single-degree-of-freedom (SDOF)** system. This estimate may therefore be inaccurate for **nonlinear multi-degree-of-freedom (MDOF)** systems. In practice, the estimate works well for many parameter combinations and system sizes. If you suspect that this estimate is too low, `TimeIntegrationSolver` allows setting the `t_steady_state_factor`.
+Time-integration solvers estimate the duration of the transient response using an approximation derived from a **linear single-degree-of-freedom (SDOF)** system. This estimate may therefore be inaccurate for **nonlinear multi-degree-of-freedom (MDOF)** systems. In practice, the estimate works well for many parameter combinations and system sizes. If you suspect that this estimate is too low, `TimeIntegration` allows setting the `t_steady_state_factor`.
 
-For the `NonlinearOscillator` model, the estimated time to steady state used for time integration is
+For the `Nonlinear` model, the estimated time to steady state used for time integration is
 
 $$
 \tau_d =
@@ -27,9 +27,9 @@ Synthetic frequency sweeps implemented in Poscidyn do not fully reproduce the ph
 
 ### Multistart initial-condition range
 
-The built-in multistart method generates a grid of initial conditions to explore stable solution branches. When using `LinearResponseMultistart`, the estimated range of initial conditions may be inaccurate because nonlinearities can significantly increase the oscillation amplitude.
+The built-in multistart method generates a grid of initial conditions to explore stable solution branches. When using `LinearResponse`, the estimated range of initial conditions may be inaccurate because nonlinearities can significantly increase the oscillation amplitude.
 
-In such cases, manual tuning of the parameter `linear_response_factor` in `LinearResponseMultistart` may be required.
+In such cases, manual tuning of the parameter `linear_response_factor` in `LinearResponse` may be required.
 
 ---
 

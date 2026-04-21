@@ -16,4 +16,4 @@ class ParametricExcitation(AbstractExcitation):
             args (PyTree): Additional arguments
         """
         q, dq_dt = jnp.split(y, 2)
-        return 0.5 * jnp.cos(args['f_omega'] * t) * q + args['f_amp'] * jnp.cos(args['f_omega'] * t)
+        return args['f_amp'] * jnp.cos(args['f_omega'] * t) * q + 0.0 * jnp.cos(args['f_omega'] * t)

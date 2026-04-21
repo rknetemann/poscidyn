@@ -5,7 +5,7 @@ from jaxtyping import Array, Float, PyTree
 
 from ..abstract_oscillator import AbstractOscillator
 
-class VanDerPolOscillator(AbstractOscillator):
+class VanDerPol(AbstractOscillator):
     mu: jax.Array
 
     def __post_init__(self):

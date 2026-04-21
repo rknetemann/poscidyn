@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from .abstract_multistart import AbstractMultistart
 
-class LinearResponseMultistart(AbstractMultistart):
+class LinearResponse(AbstractMultistart):
     def __init__(
         self,
         n_init_cond: int = 16,
@@ -73,7 +73,7 @@ class LinearResponseMultistart(AbstractMultistart):
         return (f_omegas_mesh, f_amps_mesh, x0_mesh, v0_mesh, shape)
     
     def to_dtype(self, dtype: jnp.dtype):
-        return LinearResponseMultistart(
+        return LinearResponse(
             n_init_cond=self.n_init_cond,
             linear_response_factor=self.linear_response_factor,
             random_seed=self.random_seed,

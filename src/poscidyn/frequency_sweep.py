@@ -8,29 +8,28 @@ import jax.numpy as jnp
 from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .excitation.abstract_excitation import AbstractExcitation
-from .multistart.abstract_multistart import AbstractMultistart
 from .response_measure.abstract_response_measure import AbstractResponseMeasure
-from .sweep.abstract_sweep import AbstractSweep
-
-from .excitation.one_tone_excitation import OneToneExcitation
-
-from .result.frequency_sweep_result import FrequencySweep 
-
-from .solver.time_integration_solver import TimeIntegrationSolver
-from .multistart.linear_response_multistart import LinearResponseMultistart
-from .sweep.nearest_neighbour_sweep import NearestNeighbourSweep
+from .excitation.one_tone import OneToneExcitation
+from .result.frequency_sweep import FrequencySweep 
+from .solver.time_integration import TimeIntegration
 from .response_measure.demodulation import Demodulation
+from .multistart.abstract_multistart import AbstractMultistart
+from .synthetic_sweep.abstract_synthetic_sweep import AbstractSyntheticSweep
 
 from . import constants as const
+
+
+def _to_dtype_if_supported(obj, dtype):
+    if hasattr(obj, "to_dtype"):
+        return obj.to_dtype(dtype)
+    return obj
 
 def frequency_sweep(
     oscillator: AbstractOscillator,
     excitation: AbstractExcitation,
-    sweeper: AbstractSweep = NearestNeighbourSweep(),
-    solver: AbstractSolver = TimeIntegrationSolver(),
-    multistarter: AbstractMultistart = LinearResponseMultistart(),
+    solver: AbstractSolver = TimeIntegration(),
     response_measure: AbstractResponseMeasure = Demodulation(),
-    precision: const.Precision = const.Precision.SINGLE,
+    precision: const.Precision = const.Precision.SINGLE
 ) -> FrequencySweep:
 
     if isinstance(excitation, OneToneExcitation):
@@ -45,11 +44,14 @@ def frequency_sweep(
         dtype = jnp.float32
     else:
         raise ValueError(f"Unsupported precision: {precision}")
-    
-    solver.oscillator = oscillator
-    solver.multistarter = multistarter
-    solver.excitation = excitation
 
-    frequency_sweep = solver.frequency_sweep(excitation, sweeper, response_measure)
+    oscillator = _to_dtype_if_supported(oscillator, dtype)
+    excitation = _to_dtype_if_supported(excitation, dtype)
+
+    solver.oscillator = oscillator
+    solver.excitation = excitation
+    solver.response_measure = response_measure
+
+    frequency_sweep = solver.frequency_sweep()
 
     return frequency_sweep

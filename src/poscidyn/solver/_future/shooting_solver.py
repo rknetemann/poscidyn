@@ -8,11 +8,11 @@ import lineax as lx
 from .abstract_solver import AbstractSolver
 from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
-from ..multistart.linear_response_multistart import LinearResponseMultistart
+from ..multistart.linear_response import LinearResponse
 from .. import constants as const 
 
 class MultipleShootingSolver(AbstractSolver):
-    def __init__(self,  max_shooting_iterations: int = 20, m_segments: int = 20, multistart: AbstractMultistart = LinearResponseMultistart(),
+    def __init__(self,  max_shooting_iterations: int = 20, m_segments: int = 20, multistart: AbstractMultistart = LinearResponse(),
                  rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = None, max_steps: int = 4096, verbose: bool = False):
 
         self.n_time_steps = n_time_steps

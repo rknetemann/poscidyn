@@ -20,43 +20,45 @@ def F_max(eta, omega_0, Q, b):
 # ============================================================
 
 # 1 mode example:
-# n_modes = 2
-# Q, omega_0, a, b = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-# b[0,0,0,0] = 1.0
-# modal_forces = np.array([1.0])
-# modal_contributions = np.array([1.0], dtype=float)
+n_modes = 2
+Q, omega_0, a, b = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+b[0,0,0,0] = 1.0
+modal_forces = np.array([1.0])
+modal_contributions = np.array([1.0], dtype=float)
 
 # 2 mode example:
-n_modes = 2
-Q = np.array([50.0, 50.0])
-omega_0 = np.array([1.0, 2.0])
-a = np.zeros((n_modes, n_modes, n_modes))
-b = np.zeros((n_modes, n_modes, n_modes, n_modes))
-b[0, 0, 0, 0] = 1.0
-a[0,0,1] = 1.0
-a[1,0,0] = 0.5
-modal_forces = np.array([1.0, 1.0])
-modal_contributions = np.array([1.0, 1.0], dtype=float)
+# n_modes = 2
+# Q = np.array([50.0, 50.0])
+# omega_0 = np.array([1.0, 2.0])
+# a = np.zeros((n_modes, n_modes, n_modes))
+# b = np.zeros((n_modes, n_modes, n_modes, n_modes))
+# b[0, 0, 0, 0] = 0.0
+# b[1, 1, 1, 1] = 10.0
+# a[0,0,1] = 0.0
+# a[1,0,0] = 0.0
+# modal_forces = np.array([1.0, 1.0])
+# modal_contributions = np.array([1.0, 1.0], dtype=float)
 
 
 F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
 driving_frequency = np.linspace(0.7, 2.3, 250)
-driving_amplitude = np.linspace(0.1, 1.0, 50) * F_max_value
+driving_amplitude = np.linspace(0.1, 1.0, 5) * F_max_value
+driving_amplitude = np.array([1.0]) * F_max_value
 
-OSCILLATOR = poscidyn.oscillator.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
-EXCITATION = poscidyn.excitation.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-#EXCITATION = poscidyn.excitation.ParametricExcitation(driving_frequency, driving_amplitude, modal_forces)
-SYNTHETIC_SWEEP = poscidyn.synthetic_sweep.NearestNeighbour(sweep_direction=[poscidyn.synthetic_sweep.Forward(), poscidyn.synthetic_sweep.Backward()])
-MULTISTART = poscidyn.multistart.LinearResponse(n_init_cond=16, linear_response_factor=1.0)
-SOLVER = poscidyn.solver.TimeIntegration(
+OSCILLATOR = poscidyn.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
+EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+#EXCITATION = poscidyn.ParametricExcitation(driving_frequency, driving_amplitude, modal_forces)
+SYNTHETIC_SWEEP = poscidyn.NearestNeighbour(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
+MULTISTART = poscidyn.LinearResponse(n_init_cond=16, linear_response_factor=1.0)
+SOLVER = poscidyn.TimeIntegration(
     multistart=MULTISTART, synthetic_sweep=SYNTHETIC_SWEEP,
-    max_steps=4096 * 5, n_time_steps=5, verbose=True, throw=False, rtol=1e-4, atol=1e-7,
+    max_steps=4096 * 5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7,
     periods_to_retain=4
 )
 
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions, window="hann")
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
 #RESPONSE_MEASURE = poscidyn.Max(mode_shape=modal_contributions)
 PRECISION = poscidyn.Precision.SINGLE
 

@@ -12,7 +12,7 @@ class Demodulation(AbstractResponseMeasure):
     def __init__(
         self,
         multiples: Sequence[float] = (1.0,),
-        window: str | None = None,
+        window: str | None = "hann",
         modal_contributions: jnp.ndarray | None = None,
     ):
         super().__init__(modal_contributions=modal_contributions)

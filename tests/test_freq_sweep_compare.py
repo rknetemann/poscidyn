@@ -50,13 +50,13 @@ driving_frequency = np.linspace(0.6322645545005798, 2.2314629554748535, 400)
 driving_amplitude = np.linspace(0.1, 1.0, 10) * 1
 modal_forces = np.array([0.01101661, 0.00740971])
 
-MODEL = poscidyn.NonlinearOscillator(Q=Q, a=a, b=b, omega_0=omega_0)
+MODEL = poscidyn.Nonlinear(Q=Q, a=a, b=b, omega_0=omega_0)
 EXCITOR = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=9, linear_response_factor=1.0)
-SOLVER = poscidyn.TimeIntegrationSolver(
+MULTISTART = poscidyn.LinearResponse(n_init_cond=9, linear_response_factor=1.0)
+SOLVER = poscidyn.TimeIntegration(
     max_steps=4096 * 5, n_time_steps=50, verbose=True, throw=False, rtol=1e-4, atol=1e-7
 )
-SWEEPER = poscidyn.NearestNeighbourSweep(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
+SWEEPER = poscidyn.NearestNeighbour(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 PRECISION = poscidyn.Precision.SINGLE
 
 

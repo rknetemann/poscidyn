@@ -13,9 +13,9 @@ A sweep combines four pieces:
 
 If you do not specify them, Poscidyn defaults to:
 
-- `TimeIntegrationSolver()`
-- `LinearResponseMultistart()`
-- `NearestNeighbourSweep()`
+- `TimeIntegration()`
+- `LinearResponse()`
+- `NearestNeighbour()`
 - `Demodulation()`
 
 ## Minimal example
@@ -30,7 +30,7 @@ a = np.zeros((1, 1, 1))
 b = np.zeros((1, 1, 1, 1))
 b[0, 0, 0, 0] = 0.2
 
-model = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q, a=a, b=b)
+model = poscidyn.Nonlinear(omega_0=omega_0, Q=Q, a=a, b=b)
 
 excitation = poscidyn.OneToneExcitation(
     drive_frequencies=np.linspace(0.8, 1.2, 200),
@@ -38,7 +38,7 @@ excitation = poscidyn.OneToneExcitation(
     modal_forces=np.array([1.0]),
 )
 
-solver = poscidyn.TimeIntegrationSolver(
+solver = poscidyn.TimeIntegration(
     n_time_steps=100,
     max_steps=4096 * 20,
     rtol=1e-5,

@@ -20,10 +20,10 @@ driving_frequency = np.linspace(0.75, 1.25, 256)
 driving_amplitude = np.linspace(0.1, 1.0, 8) * F_max(0.2, omega_0[0], Q[0], b[0,0,0,0])
 
 # Define classes
-model = poscidyn.NonlinearOscillator(Q=Q, a=a, b=b, omega_0=omega_0)
+model = poscidyn.Nonlinear(Q=Q, a=a, b=b, omega_0=omega_0)
 excitation = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-multistarter = poscidyn.LinearResponseMultistart(n_init_cond=32)
-solver = poscidyn.TimeIntegrationSolver(max_steps=4096 * 8, n_time_steps=100, rtol=1e-4, atol=1e-7)
+multistarter = poscidyn.LinearResponse(n_init_cond=32)
+solver = poscidyn.TimeIntegration(max_steps=4096 * 8, n_time_steps=100, rtol=1e-4, atol=1e-7)
 response_measure = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
 
 # Run the sweep

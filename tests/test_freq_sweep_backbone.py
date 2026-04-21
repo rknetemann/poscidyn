@@ -43,11 +43,11 @@ print(f"Calculated F_max: {F_max_value:.4f}")
 driving_frequency = np.linspace(0.8, 2.0, 256)
 driving_amplitude = np.linspace(0.1, 1.0, 8) * F_max_value
 
-MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
+MODEL = poscidyn.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
 print(MODEL)
 EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
-MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=32, linear_response_factor=1.0)
-SOLVER = poscidyn.TimeIntegrationSolver(
+MULTISTART = poscidyn.LinearResponse(n_init_cond=32, linear_response_factor=1.0)
+SOLVER = poscidyn.TimeIntegration(
     max_steps=4096 * 5,
     n_time_steps=50,
     verbose=True,
@@ -55,7 +55,7 @@ SOLVER = poscidyn.TimeIntegrationSolver(
     rtol=1e-4,
     atol=1e-7,
 )
-SWEEPER = poscidyn.NearestNeighbourSweep(
+SWEEPER = poscidyn.NearestNeighbour(
     sweep_direction=[poscidyn.Forward(), poscidyn.Backward()]
 )
 RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,))

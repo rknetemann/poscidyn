@@ -2,7 +2,7 @@
 
 # Time integration solver
 
-`TimeIntegrationSolver` is the default solver in Poscidyn. It computes responses by integrating the equations of motion in time and then extracting the steady-state part of the trajectory.
+`TimeIntegration` is the default solver in Poscidyn. It computes responses by integrating the equations of motion in time and then extracting the steady-state part of the trajectory.
 
 ## Core idea
 

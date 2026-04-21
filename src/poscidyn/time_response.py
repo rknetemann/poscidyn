@@ -8,9 +8,9 @@ import time
 
 from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
-from .solver.time_integration_solver import TimeIntegrationSolver
+from .solver.time_integration import TimeIntegration
 from .excitation.abstract_excitation import AbstractExcitation
-from .excitation.one_tone_excitation import OneToneExcitation
+from .excitation.one_tone import OneToneExcitation
 from . import constants as const
 
 def time_response(
@@ -18,7 +18,7 @@ def time_response(
     excitation: AbstractExcitation,
     initial_displacement: jax.Array, # Shape: (n_modes,)
     initial_velocity: jax.Array, # Shape: (n_modes,)
-    solver: AbstractSolver = TimeIntegrationSolver(),
+    solver: AbstractSolver = TimeIntegration(),
     precision: const.Precision = const.Precision.DOUBLE,
     **kwargs
 ) -> tuple:

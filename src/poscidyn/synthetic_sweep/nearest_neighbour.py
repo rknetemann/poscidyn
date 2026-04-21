@@ -1,14 +1,12 @@
-from .abstract_sweep import AbstractSweep
-from .sweep_directions import AbstractSweepDirection
-from .sweep_directions import Forward, Backward
+from .abstract_synthetic_sweep import AbstractSyntheticSweep, AbstractSyntheticSweepDirection, Forward, Backward
 import jax.numpy as jnp
 from equinox import filter_jit
 from jax import lax
 
-class NearestNeighbourSweep(AbstractSweep):
+class NearestNeighbour(AbstractSyntheticSweep):
     def __init__(
         self,
-        sweep_direction: AbstractSweepDirection | list[AbstractSweepDirection] = [Forward(), Backward()],
+        sweep_direction: AbstractSyntheticSweepDirection | list[AbstractSyntheticSweepDirection] = [Forward(), Backward()],
         phase_weight: float = 0.25,
         seed_switch_penalty: float = 0.05,
     ):
@@ -18,7 +16,7 @@ class NearestNeighbourSweep(AbstractSweep):
         self.seed_switch_penalty = seed_switch_penalty
 
     def to_dtype(self, dtype):
-        return NearestNeighbourSweep(
+        return NearestNeighbour(
             sweep_direction=self.sweep_direction,
             phase_weight=self.phase_weight,
             seed_switch_penalty=self.seed_switch_penalty,
