@@ -3,7 +3,6 @@ from jaxtyping import Float, Array, PyTree
 from abc import abstractmethod, ABC
 
 class AbstractOscillator (ABC):
-    
     def __init__(self):
         pass
 
