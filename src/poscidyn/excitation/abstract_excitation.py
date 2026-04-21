@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from jaxtyping import Float, Array, PyTree
 import jax.numpy as jnp
 
-from .. import constants as const
-
 class AbstractExcitation(ABC):
     def __init__(self, drive_frequencies, drive_amplitudes, modal_forces):
         if drive_frequencies.ndim != 1:
@@ -21,9 +19,12 @@ class AbstractExcitation(ABC):
         self.f_amps = jnp.outer(jnp.asarray(drive_amplitudes), jnp.asarray(modal_forces))
 
     @abstractmethod
-    def f_d(self, t: Float, state: Array, args: PyTree) -> float:
-        return 0.0
+    def f_e(self, t: Float, y: Array, args: PyTree) -> float:
+        """External forces of the equations of motion.
 
-    @abstractmethod
-    def f_p(self, t: Float, state: Array, args: PyTree) -> float:
-        return 0.0
+        Args:
+            t (float): Time
+            y (Array): State vector
+            args (PyTree): Additional arguments
+        """
+        pass

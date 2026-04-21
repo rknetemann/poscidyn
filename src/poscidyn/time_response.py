@@ -10,7 +10,7 @@ from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .solver.time_integration_solver import TimeIntegrationSolver
 from .excitation.abstract_excitation import AbstractExcitation
-from .excitation.one_tone import OneToneExcitation
+from .excitation.one_tone_excitation import OneToneExcitation
 from . import constants as const
 
 def time_response(

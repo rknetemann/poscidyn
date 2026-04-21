@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jaxtyping import Array
+from jaxtyping import Array, Float, PyTree
 
 from .abstract_oscillator import AbstractOscillator
 
@@ -39,30 +39,25 @@ class NonlinearOscillator(AbstractOscillator):
         self.a = a
         self.b = b
 
-    def f_i(self, tau: float, state, args, omega_ref=1.0, x_ref=1.0):
-        q, dq_dtau   = jnp.split(state, 2)
-        f_amp, f_omega = [jnp.asarray(v).squeeze(()) for v in args]
+    def f_i(self, t: Float, y: Array, args: PyTree, omega_ref: float = 1.0, x_ref: float = 1.0) -> Array:
+        q, dq_dt   = jnp.split(y, 2)
 
-        #omega_ref = f_omega[0]
-
-        damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dtau
+        damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dt
         linear_stiffness_term = (1/omega_ref**2) * self.omega_0**2 * q
         quadratic_stiffness_term = (x_ref / omega_ref**2) * jnp.einsum("ijk,j,k->i", self.a, q, q)
         cubic_stiffness_term = (x_ref**2 / omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.b, q, q, q) # Shape: (n_modes,)
-        forcing_term = f_amp / (omega_ref**2 * x_ref) * jnp.cos(f_omega/omega_ref * tau)
 
-        d2q_dtau2 = (
+        d2q_dt2 = (
             - damping_term
             - linear_stiffness_term
             - quadratic_stiffness_term
             - cubic_stiffness_term
-            + forcing_term
         ) 
-        return jnp.concatenate([dq_dtau, d2q_dtau2])
+        return d2q_dt2
 
     # Not yet used, but for future shooting and collocation methods we will need it
-    def f_y(self, tau, state, args):
-        q, dq_dtau = jnp.split(state, 2)
+    def f_i_y(self, t: Float, y: Array, args: PyTree) -> Array:
+        q, dq_dt = jnp.split(y, 2)
 
         zero_block = jnp.zeros((self.n_modes, self.n_modes))
         identity_block = jnp.eye(self.n_modes)
@@ -79,9 +74,13 @@ class NonlinearOscillator(AbstractOscillator):
         Equation from Eq.5.10b Vibrations 2nd edition by Balakumar Balachandran | Edward B. Magrab
         '''
         #driving_frequency = 1.0
-        t_steady_state = jnp.max(-2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / (driving_frequency))).reshape(())
+        t_steady_y = jnp.max(-2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / (driving_frequency))).reshape(())
 
-        return t_steady_state
+        return t_steady_y
+
+    @property
+    def n_dof(self) -> int:
+        return self.n_modes
     
     def __repr__(self):
         Q_terms = ", ".join([f"Q[{i}]={float(v):.6f}" for i, v in enumerate(self.Q)])

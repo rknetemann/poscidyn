@@ -30,7 +30,7 @@ class LinearResponseMultistart(AbstractMultistart):
         n_init_cond = self.n_init_cond
         n_modes = model.n_modes
 
-        f_omegas_grid = jnp.tile(f_omegas[:, None], (1, n_dof))
+        f_omegas_grid = jnp.tile(f_omegas[:, None], (1, n_modes))
         f_amps_grid = f_amps
 
         if self.random_seed is None:

@@ -27,7 +27,7 @@ class TimeIntegrationSolver(AbstractSolver):
         self.verbose = verbose
         self.throw = throw
 
-        self.model: AbstractOscillator = None
+        self.oscillator: AbstractOscillator = None
         self.excitation: AbstractExcitation = None
         self.multistarter: AbstractMultistart = None
 
@@ -61,7 +61,7 @@ class TimeIntegrationSolver(AbstractSolver):
         period = jnp.max(2.0 * jnp.pi / f_omega)
         periods_to_retain = const.N_PERIODS_TO_RETAIN
         T = period * periods_to_retain
-        t_ss = jnp.max(self.model.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * self.t_steady_state_factor
+        t_ss = jnp.max(self.oscillator.t_steady_state(f_omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * self.t_steady_state_factor
         t0 = 0.0
         t1 = t_ss + T
 
@@ -99,13 +99,13 @@ class TimeIntegrationSolver(AbstractSolver):
 
         @filter_jit
         def solve_one_case(f_omega, f_amp, x0, v0):  
-            x0 = jnp.full((self.model.n_dof,), x0)         
-            v0 = jnp.full((self.model.n_dof,), v0)
+            x0 = jnp.full((self.oscillator.n_modes,), x0)         
+            v0 = jnp.full((self.oscillator.n_modes,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
             period = jnp.max(2.0 * jnp.pi / f_omega)
             T = period * periods_to_retain
-            t_ss = jnp.max(self.model.t_steady_state(f_omega, ss_tol=self.rtol)) * self.t_steady_state_factor
+            t_ss = jnp.max(self.oscillator.t_steady_state(f_omega, ss_tol=self.rtol)) * self.t_steady_state_factor
             
             t0 = 0.0
             t1 = t_ss + T
@@ -130,8 +130,8 @@ class TimeIntegrationSolver(AbstractSolver):
                 is_finite,
             )
 
-            xs = sol.ys[:, :self.model.n_dof]
-            vs = sol.ys[:, self.model.n_dof:]
+            xs = sol.ys[:, :self.oscillator.n_dof]
+            vs = sol.ys[:, self.oscillator.n_dof:]
 
             response = response_measure(
                 xs=xs,
@@ -188,9 +188,9 @@ class TimeIntegrationSolver(AbstractSolver):
             n_time_steps = int(math.ceil(float(one_period * sampling_frequency)))
             self.n_time_steps = n_time_steps
         
-        f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.model, f_omegas, f_amps)
+        f_omegas, f_amps, x0s, v0s, shape = self.multistarter.generate_simulation_grid(self.oscillator, f_omegas, f_amps)
         longest_period = jnp.max(2.0 * jnp.pi / f_omegas)
-        t_ss_estimate = jnp.max(self.model.t_steady_state(f_omegas, ss_tol=self.rtol) * self.t_steady_state_factor)
+        t_ss_estimate = jnp.max(self.oscillator.t_steady_state(f_omegas, ss_tol=self.rtol) * self.t_steady_state_factor)
         t_span_estimate = t_ss_estimate + longest_period * periods_to_retain
 
         flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(f_omegas, f_amps, x0s, v0s)
@@ -255,5 +255,7 @@ class TimeIntegrationSolver(AbstractSolver):
 
     @filter_jit
     def _rhs(self, t, y, args):
-        dy_dt = self.model.f_i(t, y, args) - self.excitation.f_d(t, y, args) - self.excitation.f_p(t, y, args)
+        q, dq_dt   = jnp.split(y, 2)
+
+        dy_dt = jnp.concatenate([dq_dt,  self.oscillator.f_i(t, y, args) - self.excitation.f_e(t, y, args)], axis=0)
         return dy_dt

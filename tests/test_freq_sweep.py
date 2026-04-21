@@ -455,3 +455,4 @@ fig = plot_sweep_grid(
 )
 
 plt.show()
+plt.savefig("tmp/frequency_sweep.png", dpi=300, bbox_inches="tight")
