@@ -5,16 +5,9 @@ import numpy as np
 
 from jaxtyping import Array
 
-from .abstract_oscillator import AbstractOscillator, oscillator
+from .abstract_oscillator import AbstractOscillator
 
-@oscillator
 class NonlinearOscillator(AbstractOscillator):
-    n_modes: int
-    omega_0: Array
-    Q: Array
-    a: Array
-    b: Array
-
     def __init__(self, omega_0: Array = None, Q: Array = None, a: Array = None, b: Array = None, n_modes: int = None):
         if n_modes is not None:
             if omega_0 is None:
@@ -46,8 +39,7 @@ class NonlinearOscillator(AbstractOscillator):
         self.a = a
         self.b = b
 
-
-    def f(self, tau: float, state, args, omega_ref=1.0, x_ref=1.0):
+    def f_i(self, tau: float, state, args, omega_ref=1.0, x_ref=1.0):
         q, dq_dtau   = jnp.split(state, 2)
         f_amp, f_omega = [jnp.asarray(v).squeeze(()) for v in args]
 
@@ -68,7 +60,7 @@ class NonlinearOscillator(AbstractOscillator):
         ) 
         return jnp.concatenate([dq_dtau, d2q_dtau2])
 
-    # Not yet used, but for future shooting and collocation methods already built-in
+    # Not yet used, but for future shooting and collocation methods we will need it
     def f_y(self, tau, state, args):
         q, dq_dtau = jnp.split(state, 2)
 
@@ -81,10 +73,6 @@ class NonlinearOscillator(AbstractOscillator):
                        [A_bottom_left, A_bottom_right]])
         return A
 
-    @property
-    def n_states(self) -> int:
-        return self.n_dof * 2
-
     def t_steady_state(self, driving_frequency: jax.Array, ss_tol: float) -> float:
         '''driving_frequency
         Calculates the settling time for a given Q-factor and driving frequency.
@@ -94,14 +82,6 @@ class NonlinearOscillator(AbstractOscillator):
         t_steady_state = jnp.max(-2 * jnp.max(self.Q) * jnp.log(ss_tol * jnp.sqrt(1 - 1 / (4 * jnp.max(self.Q)**2)) / (driving_frequency))).reshape(())
 
         return t_steady_state
-    
-    def to_dtype(self, dtype: jnp.dtype) -> NonlinearOscillator:
-        return NonlinearOscillator(
-            Q=jnp.asarray(self.Q, dtype=dtype),
-            omega_0=jnp.asarray(self.omega_0, dtype=dtype),
-            a=jnp.asarray(self.a, dtype=dtype),
-            b=jnp.asarray(self.b, dtype=dtype)
-        )
     
     def __repr__(self):
         Q_terms = ", ".join([f"Q[{i}]={float(v):.6f}" for i, v in enumerate(self.Q)])

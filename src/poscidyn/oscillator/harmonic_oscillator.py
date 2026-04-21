@@ -1,22 +1,18 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-from functools import partial
 from typing import Optional
+from jaxtyping import Float, Array, PyTree
 
-from jax import tree_util
+from .abstract_oscillator import AbstractOscillator
 
-from .. import constants as const
-from .abstract_oscillator import AbstractOscillator, oscillator
-
-@oscillator
 class HarmonicOscillator(AbstractOscillator):
+    omega_0: jax.Array
+
     zeta: Optional[jax.Array] = None
     Q: Optional[jax.Array] = None
 
-    omega_0: jax.Array
-
-    def __post_init__(self):
+    def __init__(self, omega_0: Array = None, Q: Array = None, zeta: Array = None):
         if self.Q is None:
             if self.zeta is None:
                 raise ValueError("Either Q or zeta must be provided.")
@@ -26,7 +22,7 @@ class HarmonicOscillator(AbstractOscillator):
         else:
             raise ValueError("Only one of Q or zeta should be provided.")
 
-        self.omega_0 = jnp.asarray(self.omega_0)
+        self.omega_0 = omega_0
 
     def damping_term(self, t, state, args):
         q, dq_dt = jnp.split(state, 2)

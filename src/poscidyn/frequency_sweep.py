@@ -12,7 +12,7 @@ from .multistart.abstract_multistart import AbstractMultistart
 from .response_measure.abstract_response_measure import AbstractResponseMeasure
 from .sweep.abstract_sweep import AbstractSweep
 
-from .excitation.one_tone import OneToneExcitation
+from .excitation.one_tone_excitation import OneToneExcitation
 
 from .result.frequency_sweep_result import FrequencySweep 
 
@@ -45,11 +45,6 @@ def frequency_sweep(
         dtype = jnp.float32
     else:
         raise ValueError(f"Unsupported precision: {precision}")
-
-    model = model.to_dtype(dtype)
-    excitation = excitation.to_dtype(dtype)
-    sweeper = sweeper.to_dtype(dtype)
-    multistarter = multistarter.to_dtype(dtype)
     
     solver.model = model
     solver.multistarter = multistarter

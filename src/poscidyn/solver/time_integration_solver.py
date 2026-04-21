@@ -28,13 +28,13 @@ class TimeIntegrationSolver(AbstractSolver):
         self.throw = throw
 
         self.model: AbstractOscillator = None
+        self.excitation: AbstractExcitation = None
         self.multistarter: AbstractMultistart = None
 
     @staticmethod
     def _is_tracer(value) -> bool:
         """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
         return isinstance(value, jax_core.Tracer)
-    
 
     def time_response(self,
                  f_omega: jax.Array,  
@@ -255,5 +255,5 @@ class TimeIntegrationSolver(AbstractSolver):
 
     @filter_jit
     def _rhs(self, t, y, args):
-        dy_dt = self.model.rhs(t, y, args)
+        dy_dt = self.model.f_i(t, y, args) - self.excitation.f_d(t, y, args) - self.excitation.f_p(t, y, args)
         return dy_dt

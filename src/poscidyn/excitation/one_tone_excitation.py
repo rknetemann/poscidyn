@@ -1,50 +1,13 @@
 import jax.numpy as jnp
-import numpy as np
-from jax import tree_util
 from jaxtyping import PyTree, Float, Array
 
-from ..oscillator.abstract_oscillator import AbstractOscillator
+from .abstract_excitation import AstractExcitation
 
-class OneToneExcitation:
-    oscillator: AbstractOscillator = None
-
+class OneToneExcitation(AstractExcitation):
     def __init__(self, drive_frequencies, drive_amplitudes, modal_forces):
-        if drive_frequencies.ndim != 1:
-            raise ValueError("drive_frequencies must be a 1D array")
-        if drive_amplitudes.ndim != 1:
-            raise ValueError("drive_amplitudes must be a 1D array")
-        if modal_forces.ndim != 1:
-            raise ValueError("modal_forces must be a 1D array")
-
-        self.drive_frequencies = drive_frequencies
-        self.drive_amplitudes = drive_amplitudes
-        self.modal_forces = modal_forces
-                
-        self.f_omegas = jnp.asarray(drive_frequencies)
-        self.f_amps = jnp.outer(jnp.asarray(drive_amplitudes), jnp.asarray(modal_forces))
+        super().__init__(drive_frequencies, drive_amplitudes, modal_forces)
         
-    def direct_drive(self, t: Float, state: Array, args: PyTree):
+    def f_d(self, t: Float, state: Array, args: PyTree):
         return args['f_amp'] * jnp.cos(args['f_omega'] * t) 
-        
-    def to_dtype(self, dtype):
-        return OneToneExcitation(
-            drive_frequencies=self.drive_frequencies.astype(dtype),
-            drive_amplitudes=self.drive_amplitudes.astype(dtype),
-            modal_forces=self.modal_forces.astype(dtype)
-        )
-
-# Register OneToneExcitation as a pytree
-def _tree_flatten(obj):
-    leaves = (obj.f_omegas, obj.f_amps)
-    aux_data = (obj.drive_frequencies, obj.drive_amplitudes, obj.modal_forces)
-    return leaves, aux_data
-
-def _tree_unflatten(aux_data, leaves):
-    f_omegas, f_amps = leaves
-    drive_frequencies, drive_amplitudes, modal_forces = aux_data
-    obj = OneToneExcitation(drive_frequencies, drive_amplitudes, modal_forces)
-    obj.f_omegas = f_omegas
-    obj.f_amps = f_amps
-    return obj
-
-tree_util.register_pytree_node(OneToneExcitation, _tree_flatten, _tree_unflatten)
+    
+    
