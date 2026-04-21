@@ -16,7 +16,7 @@ def F_max(eta, omega_0, Q, b):
 
 
 # ============================================================
-# Model definition
+# OSCILLATOR definition
 # ============================================================
 
 # 1 mode example:
@@ -29,22 +29,24 @@ Q = np.array([50.0, 50.0])
 omega_0 = np.array([1.0, 2.0])
 a = np.zeros((2, 2, 2))
 b = np.zeros((2, 2, 2, 2))
-b[0, 0, 0, 0] = 0.01
+b[0, 0, 0, 0] = 0.0
+b[1, 1, 1, 1] = 0.1
 a[0,0,1] = 0.0
 a[1,0,0] = 0.0
 modal_forces = np.array([1.0, 1.0])
 modal_contributions = np.array([1.0, 1.0], dtype=float)
 
 
-F_max_value = F_max(0.30, omega_0[0], Q[0], b[0, 0, 0, 0])
+F_max_value = F_max(0.30, omega_0[1], Q[1], b[1, 1, 1, 1])
 print(f"Calculated F_max: {F_max_value:.4f}")
 
-driving_frequency = np.linspace(0.85, 1.3, 150)
+driving_frequency = np.linspace(1.7, 2.3, 150)
 driving_amplitude = np.linspace(0.1, 1.0, 5) * F_max_value
 
-MODEL = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
-print(MODEL)
+OSCILLATOR = poscidyn.NonlinearOscillator(omega_0=omega_0, Q=Q,a=a, b=b)
+print(OSCILLATOR)
 EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+EXCITATION = poscidyn.ParametricExcitation(driving_frequency, driving_amplitude, modal_forces)
 MULTISTART = poscidyn.LinearResponseMultistart(n_init_cond=16, linear_response_factor=1.0)
 SOLVER = poscidyn.TimeIntegrationSolver(
     max_steps=4096 * 5,
@@ -403,7 +405,7 @@ def plot_sweep_grid(
 start_time = time.time()
 
 frequency_sweep = poscidyn.frequency_sweep(
-    model=MODEL,
+    oscillator=OSCILLATOR,
     sweeper=SWEEPER,
     excitation=EXCITATION,
     solver=SOLVER,

@@ -3,7 +3,9 @@ from .time_response import time_response
 
 from .oscillator.abstract_oscillator import *
 from .oscillator.nonlinear_oscillator import *
-from .oscillator.harmonic_oscillator import *
+
+from .excitation.one_tone_excitation import *
+from .excitation.parametric_excitation import *
 
 from .solver.abstract_solver import *
 from .solver.time_integration_solver import *
@@ -17,8 +19,6 @@ from .response_measure.min import *
 from .response_measure.max import *
 
 from .multistart.linear_response_multistart import *
-
-from .excitation.one_tone_excitation import *
 
 from .utils.plotting import *
 

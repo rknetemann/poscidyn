@@ -24,7 +24,7 @@ from .response_measure.demodulation import Demodulation
 from . import constants as const
 
 def frequency_sweep(
-    model: AbstractOscillator,
+    oscillator: AbstractOscillator,
     excitation: AbstractExcitation,
     sweeper: AbstractSweep = NearestNeighbourSweep(),
     solver: AbstractSolver = TimeIntegrationSolver(),
@@ -34,8 +34,8 @@ def frequency_sweep(
 ) -> FrequencySweep:
 
     if isinstance(excitation, OneToneExcitation):
-        if model.n_modes != len(excitation.modal_forces):
-            raise ValueError("Number of modes in the model does not match the number of modal forces in the excitation.")
+        if oscillator.n_modes != len(excitation.modal_forces):
+            raise ValueError("Number of modes in the oscillator does not match the number of modal forces in the excitation.")
 
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)
@@ -46,13 +46,9 @@ def frequency_sweep(
     else:
         raise ValueError(f"Unsupported precision: {precision}")
     
-    solver.model = model
+    solver.oscillator = oscillator
     solver.multistarter = multistarter
     solver.excitation = excitation
-
-    model.excitation = excitation
-
-    excitation.model = model
 
     frequency_sweep = solver.frequency_sweep(excitation, sweeper, response_measure)
 
