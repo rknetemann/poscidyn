@@ -94,25 +94,25 @@ class CollocationSolver(AbstractSolver):
         return ts, ys
     
     def frequency_sweep(self,
-             f_omega: jax.Array,
+             omega: jax.Array,
              f_amp: jax.Array, 
              sweep_direction: const.SweepDirection,
             ):
 
-        f_omega_mesh, f_amp_mesh, x0_mesh, v0_mesh = self.multistart.generate_simulation_grid(
-            self.model, f_omega.flatten(), f_amp.flatten()
+        omega_mesh, f_amp_mesh, x0_mesh, v0_mesh = self.multistart.generate_simulation_grid(
+            self.model, omega.flatten(), f_amp.flatten()
         )
 
-        f_omega_mesh_flat = f_omega_mesh.ravel()
+        omega_mesh_flat = omega_mesh.ravel()
         f_amp_mesh_flat  = f_amp_mesh.ravel()
         y0_guess = jnp.stack([x0_mesh, v0_mesh], axis=-1).reshape(-1, self.model.n_states) 
 
         Y0 = jax.vmap(self._calc_Y0, in_axes=((0,0), 0))(
-            (f_amp_mesh_flat, f_omega_mesh_flat), y0_guess
+            (f_amp_mesh_flat, omega_mesh_flat), y0_guess
         )  # Y0: (n_sim, N_elements*(m_collocation_points+1), n_states)
 
         y0, y_max = jax.vmap(self._calc_periodic_solution, in_axes=((0,0), 0))(
-            (f_amp_mesh_flat, f_omega_mesh_flat), Y0
+            (f_amp_mesh_flat, omega_mesh_flat), Y0
         )  # y0: (n_sim, n_states)  y_max: (n_sim, n_modes)
 
         return {
@@ -227,9 +227,9 @@ class CollocationSolver(AbstractSolver):
 
     @filter_jit
     def _rhs(self, t, y, args):
-        f_amp, f_omega  = args
+        f_amp, omega  = args
 
-        dtau_dt = 2.0 * jnp.pi * (self.model.omega_ref / f_omega)
+        dtau_dt = 2.0 * jnp.pi * (self.model.omega_ref / omega)
         tau = dtau_dt * t
 
         dy_dt = self.model.f(tau, y, args) * dtau_dt

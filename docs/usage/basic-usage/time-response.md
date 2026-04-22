@@ -7,7 +7,7 @@ Use `poscidyn.time_response(...)` when you want the simulated trajectory itself 
 The public function expects:
 
 - `model`: an oscillator model
-- `excitation`: currently a `OneToneExcitation` with exactly one drive frequency and one drive amplitude
+- `excitation`: currently a `DirectExcitation` with exactly one drive frequency and one drive amplitude
 - `initial_displacement`: shape `(n_modes,)`
 - `initial_velocity`: shape `(n_modes,)`
 - `solver`: usually `TimeIntegration(...)`
@@ -24,7 +24,7 @@ a = np.zeros((1, 1, 1))
 b = np.zeros((1, 1, 1, 1))
 
 model = poscidyn.Nonlinear(omega_0=omega_0, Q=Q, a=a, b=b)
-excitation = poscidyn.OneToneExcitation(
+excitation = poscidyn.DirectExcitation(
     drive_frequencies=np.array([1.0]),
     drive_amplitudes=np.array([0.01]),
     modal_forces=np.array([1.0]),

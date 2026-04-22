@@ -1,3 +1,3 @@
 from .abstract_excitation import *
-from .one_tone import *
+from .direct import *
 from .parametric import *

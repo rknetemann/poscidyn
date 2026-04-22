@@ -30,7 +30,7 @@ driving_amplitude = np.array([0.30 * F_max(0.3, omega_0[0], Q[0], b[0, 0, 0, 0])
 
 # Define classes.
 model = poscidyn.Nonlinear(Q=Q, a=a, b=b, omega_0=omega_0)
-excitation = poscidyn.OneToneExcitation(
+excitation = poscidyn.DirectExcitation(
     drive_frequencies=driving_frequency,
     drive_amplitudes=driving_amplitude,
     modal_forces=modal_forces,

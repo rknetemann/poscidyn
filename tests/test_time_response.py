@@ -52,7 +52,7 @@ def make_model(n_modes=1):
 def make_excitation(drive_frequency=1.0, drive_amplitude=0.1, modal_forces=None):
     if modal_forces is None:
         modal_forces = np.array([1.0])
-    return poscidyn.OneToneExcitation(
+    return poscidyn.DirectExcitation(
         drive_frequencies=np.array([drive_frequency]),
         drive_amplitudes=np.array([drive_amplitude]),
         modal_forces=np.asarray(modal_forces),
@@ -87,7 +87,7 @@ def plot_time_response(ts, xs, vs, title="Time response validation"):
 class TimeResponseTests(unittest.TestCase):
     def test_time_response_accepts_single_case_one_tone_excitation(self):
         model = make_model(n_modes=2)
-        excitation = poscidyn.OneToneExcitation(
+        excitation = poscidyn.DirectExcitation(
             drive_frequencies=np.array([1.0]),
             drive_amplitudes=np.array([0.1]),
             modal_forces=np.array([1.0, 0.25]),
@@ -166,7 +166,7 @@ class TimeResponseTests(unittest.TestCase):
 
     def test_time_response_rejects_multiple_frequencies(self):
         model = make_model()
-        excitation = poscidyn.OneToneExcitation(
+        excitation = poscidyn.DirectExcitation(
             drive_frequencies=np.array([0.9, 1.0]),
             drive_amplitudes=np.array([0.1]),
             modal_forces=np.array([1.0]),
@@ -183,7 +183,7 @@ class TimeResponseTests(unittest.TestCase):
 
     def test_time_response_rejects_multiple_amplitudes(self):
         model = make_model()
-        excitation = poscidyn.OneToneExcitation(
+        excitation = poscidyn.DirectExcitation(
             drive_frequencies=np.array([1.0]),
             drive_amplitudes=np.array([0.1, 0.2]),
             modal_forces=np.array([1.0]),
@@ -200,7 +200,7 @@ class TimeResponseTests(unittest.TestCase):
 
     def test_time_response_rejects_modal_force_mismatch(self):
         model = make_model(n_modes=2)
-        excitation = poscidyn.OneToneExcitation(
+        excitation = poscidyn.DirectExcitation(
             drive_frequencies=np.array([1.0]),
             drive_amplitudes=np.array([0.1]),
             modal_forces=np.array([1.0]),

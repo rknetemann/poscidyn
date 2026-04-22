@@ -45,7 +45,7 @@ driving_frequency = np.linspace(0.9, 1.13, 256)
 driving_amplitude = np.linspace(0.1, 1.0, 8) * 0.0144
 
 model = poscidyn.Nonlinear(Q=Q, a=a, b=b, omega_0=omega_0)
-excitation = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+excitation = poscidyn.DirectExcitation(driving_frequency, driving_amplitude, modal_forces)
 solver = poscidyn.TimeIntegration(max_steps=4096 * 20, n_time_steps=100, rtol=1e-5, atol=1e-7, t_steady_state_factor=2.0)
 response_measure = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
 

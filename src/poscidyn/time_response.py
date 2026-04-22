@@ -10,7 +10,7 @@ from .oscillator.abstract_oscillator import AbstractOscillator
 from .solver.abstract_solver import AbstractSolver
 from .solver.time_integration import TimeIntegration
 from .excitation.abstract_excitation import AbstractExcitation
-from .excitation.one_tone import OneToneExcitation
+from .excitation.direct import DirectExcitation
 from . import constants as const
 
 def time_response(
@@ -22,23 +22,6 @@ def time_response(
     precision: const.Precision = const.Precision.DOUBLE,
     **kwargs
 ) -> tuple:
-    """Compute the time response of a dynamical model to a one-tone excitation.
-
-    Args:
-        model: The dynamical model to simulate.
-        excitation: Excitation definition. Currently this helper supports
-            `OneToneExcitation` with exactly one drive frequency and one drive
-            amplitude level.
-        initial_displacement: The initial displacement for each mode (shape: (n_modes,)).
-        initial_velocity: The initial velocity for each mode (shape: (n_modes,)).
-        solver: The time integration solver to use.
-        precision: The numerical precision to use.
-        **kwargs: Additional keyword arguments to pass to the solver's time_response method.
-
-    Returns:
-        A tuple (ts, xs, vs) where ts is the time array (shape: (n_steps,)),
-        xs is the displacement array (shape: (n_steps, n_modes)), and vs is the velocity array (shape: (n_steps, n_modes)).
-    """
     
     if precision == const.Precision.DOUBLE:
         jax.config.update("jax_enable_x64", True)
@@ -48,23 +31,6 @@ def time_response(
         dtype = jnp.float32
     else:
         raise ValueError(f"Unsupported precision: {precision}")
-
-    if not isinstance(excitation, OneToneExcitation):
-        raise TypeError(
-            "time_response currently only supports OneToneExcitation."
-        )
-    if model.n_modes != len(excitation.modal_forces):
-        raise ValueError(
-            "Number of modes in the model does not match the number of modal forces in the excitation."
-        )
-    if excitation.drive_frequencies.size != 1:
-        raise ValueError(
-            f"time_response requires exactly one drive frequency, got {excitation.drive_frequencies.size}."
-        )
-    if excitation.drive_amplitudes.size != 1:
-        raise ValueError(
-            f"time_response requires exactly one drive amplitude, got {excitation.drive_amplitudes.size}."
-        )
 
     initial_displacement = jnp.asarray(initial_displacement, dtype=dtype)
     initial_velocity = jnp.asarray(initial_velocity, dtype=dtype)
@@ -78,7 +44,7 @@ def time_response(
     excitation = excitation.to_dtype(dtype)
     solver.model = model
 
-    driving_frequency = jnp.asarray(excitation.f_omegas, dtype=dtype)
+    driving_frequency = jnp.asarray(excitation.omegas, dtype=dtype)
     driving_amplitude = jnp.asarray(excitation.f_amps, dtype=dtype)
 
     if driving_frequency.ndim != 1 or driving_frequency.size != 1:

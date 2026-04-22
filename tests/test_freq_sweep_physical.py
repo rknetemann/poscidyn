@@ -48,7 +48,7 @@ driving_amplitude = np.linspace(0.1, 1.0, 5) * F_max_value
 driving_amplitude = np.array([1.0]) * F_max_value
 
 OSCILLATOR = poscidyn.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
-EXCITATION = poscidyn.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+EXCITATION = poscidyn.DirectExcitation(driving_frequency, driving_amplitude, modal_forces)
 #EXCITATION = poscidyn.ParametricExcitation(driving_frequency, driving_amplitude, modal_forces)
 SYNTHETIC_SWEEP = poscidyn.NearestNeighbour(sweep_direction=[poscidyn.Forward(), poscidyn.Backward()])
 MULTISTART = poscidyn.LinearResponse(n_init_cond=16, linear_response_factor=1.0)

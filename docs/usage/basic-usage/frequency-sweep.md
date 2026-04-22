@@ -32,7 +32,7 @@ b[0, 0, 0, 0] = 0.2
 
 model = poscidyn.Nonlinear(omega_0=omega_0, Q=Q, a=a, b=b)
 
-excitation = poscidyn.OneToneExcitation(
+excitation = poscidyn.DirectExcitation(
     drive_frequencies=np.linspace(0.8, 1.2, 200),
     drive_amplitudes=np.array([0.002, 0.004, 0.006]),
     modal_forces=np.array([1.0]),

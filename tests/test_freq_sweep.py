@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 
-def F_max(eta, omega_0, Q, b):
+def f_d_max(eta, omega_0, Q, b):
     return np.sqrt(
         4 * omega_0**6 / (3 * b * Q**2)
         * (eta + 1 / (2 * Q**2))
@@ -38,15 +38,15 @@ a[1,0,0] = 0.5
 modal_forces = np.array([1.0, 1.0])
 modal_contributions = np.array([1.0, 1.0], dtype=float)
 
+f_d_max_value = f_d_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
+f_d = f_d_max_value * modal_forces
+print(f"Calculated F_max: {f_d_max_value:.4f}")
 
-F_max_value = F_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
-print(f"Calculated F_max: {F_max_value:.4f}")
-
-driving_frequency = np.linspace(0.7, 2.3, 250)
-driving_amplitude = np.linspace(0.1, 1.0, 50) * F_max_value
+drive_frequencies = np.linspace(0.7, 2.3, 250)
+drive_levels = np.linspace(0.1, 1.0, 5)
 
 OSCILLATOR = poscidyn.oscillator.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
-EXCITATION = poscidyn.excitation.OneToneExcitation(driving_frequency, driving_amplitude, modal_forces)
+EXCITATION = poscidyn.excitation.DirectExcitation(f_d=f_d, omegas=drive_frequencies, lambdas=drive_levels)
 #EXCITATION = poscidyn.excitation.ParametricExcitation(driving_frequency, driving_amplitude, modal_forces)
 SYNTHETIC_SWEEP = poscidyn.synthetic_sweep.NearestNeighbour(sweep_direction=[poscidyn.synthetic_sweep.Forward(), poscidyn.synthetic_sweep.Backward()])
 MULTISTART = poscidyn.multistart.LinearResponse(n_init_cond=16, linear_response_factor=1.0)
@@ -437,15 +437,15 @@ sweeped_with_total, mode_labels = append_total_response_mode(
 # ============================================================
 
 fig = plot_sweep_grid(
-    drive_freqs=EXCITATION.drive_frequencies,
-    drive_amps=EXCITATION.drive_amplitudes,
+    drive_freqs=drive_frequencies,
+    drive_amps=f_d_max_value*drive_levels,
     sweeped_solutions=sweeped_with_total,
     param_text=_format_param_text(
         Q,
         omega_0,
         a,
         b,
-        EXCITATION.modal_forces,
+        modal_forces,
         modal_contributions=modal_contributions,
     ),
     multiples=np.asarray(RESPONSE_MEASURE.multiples),

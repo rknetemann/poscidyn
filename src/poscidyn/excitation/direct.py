@@ -3,22 +3,24 @@ from jaxtyping import PyTree, Float, Array
 
 from .abstract_excitation import AbstractExcitation
 
-class ParametricExcitation(AbstractExcitation):
-    def __init__(self, f_p: Array, omegas: Array, lambdas: Array):
+class DirectExcitation(AbstractExcitation):
+    def __init__(self, f_d: Array, omegas: Array, lambdas: Array = jnp.array([1.0])):
         super().__init__(omegas, lambdas)
 
-        self.f_p = f_p
+        self.f_d = f_d
 
     def f_e(self, t: Float, y: Array, args: PyTree) -> float:
-        """Parametric external forces of the equations of motion.
+        """Direct external forces of the equations of motion.
 
         Args:
             t (float): Time
             y (Array): y vector
             args (PyTree): Additional arguments
         """
-        q, dq_dt = jnp.split(y, 2)
         f_amp = args.get("f_amp")
         if f_amp is None:
-            f_amp = self.f_p * args["lambda"]
-        return f_amp * jnp.cos(args["omega"] * t) * q
+            f_amp = self.f_d * args["lambda"]
+        return f_amp * jnp.cos(args["omega"] * t)
+        
+    
+    
