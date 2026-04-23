@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poscidyn"
-version = "0.1.3"
-description = "Simulation and Visualization of Nonlinear Oscillator Dynamics in Python"
+version = "0.1.4"
+description = "Fast Simulation of Nonlinear Oscillator Dynamics in Python"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -14,7 +14,7 @@ authors = [
   { name = "Raymond Knetemann", email = "rknetemann@student.tudelft.nl" }
 ]
 
-keywords = ["nonlinear dynamics", "duffing", "oscillators", "simulation", "jax"]
+keywords = ["nonlinear-dynamics", "duffing", "oscillators", "simulation", "jax", "dynamics", "time-response", "frequency-sweep"]
 
 classifiers = [
   "Development Status :: 3 - Alpha",
