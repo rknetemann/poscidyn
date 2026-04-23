@@ -3,10 +3,8 @@ from abc import ABC, abstractmethod
 
 class AbstractResponseMeasure(ABC):
     def __init__(self, modal_contributions: jnp.ndarray | None = None):
-        # Default to the fundamental component so callers can treat
-        # all response measures uniformly (Demodulation overrides this).
         self.multiples = jnp.asarray((1.0,))
-        self.modal_contributions = None if modal_contributions is None else jnp.asarray(modal_contributions)
+        self.modal_contributions = modal_contributions
 
     def _resolve_modal_contributions(
         self,
@@ -14,7 +12,6 @@ class AbstractResponseMeasure(ABC):
     ) -> jnp.ndarray:
         shape = self.modal_contributions
         if shape is None:
-            # Backward-compatible default: equal weighting of all modal coordinates.
             return jnp.ones((n_modes,))
         shape = jnp.asarray(shape)
         if shape.ndim != 1:

@@ -27,23 +27,25 @@ def f_d_max(eta, omega_0, Q, b):
 # modal_contributions = np.array([1.0], dtype=float)
 
 # 2 mode example:
+DTYPE = np.float32
+
 n_modes = 2
-Q = np.array([50.0, 50.0])
-omega_0 = np.array([1.0, 2.0])
-a = np.zeros((n_modes, n_modes, n_modes))
-b = np.zeros((n_modes, n_modes, n_modes, n_modes))
+Q = np.array([88.37544, 112.25272], dtype=DTYPE)
+omega_0 = np.array([0.924636, 1.945411], dtype=DTYPE)
+a = np.zeros((n_modes, n_modes, n_modes), dtype=DTYPE)
+b = np.zeros((n_modes, n_modes, n_modes, n_modes), dtype=DTYPE)
 b[0, 0, 0, 0] = 1.0
 a[0,0,1] = 1.0
 a[1,0,0] = 0.5
-modal_forces = np.array([1.0, 1.0])
-modal_contributions = np.array([1.0, 1.0], dtype=float)
+modal_forces = np.array([1.0, 0.01044967], dtype=DTYPE)
+modal_contributions = np.array([1.0, 0.8104949], dtype=DTYPE)
 
 f_d_max_value = f_d_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
-f_d = f_d_max_value * modal_forces
 print(f"Calculated F_max: {f_d_max_value:.4f}")
+f_d = f_d_max_value * modal_forces
 
-drive_frequencies = np.linspace(0.7, 2.3, 250)
-drive_levels = np.linspace(0.1, 1.0, 5)
+drive_frequencies = np.linspace(0.1, 2.5, 512, dtype=DTYPE)
+drive_levels = np.linspace(0.1, 1.0, 3, dtype=DTYPE)
 
 OSCILLATOR = poscidyn.oscillator.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
 EXCITATION = poscidyn.excitation.DirectExcitation(f_d=f_d, omegas=drive_frequencies, lambdas=drive_levels)
@@ -52,13 +54,13 @@ SYNTHETIC_SWEEP = poscidyn.synthetic_sweep.NearestNeighbour(sweep_direction=[pos
 MULTISTART = poscidyn.multistart.LinearResponse(n_init_cond=16, linear_response_factor=1.0)
 SOLVER = poscidyn.solver.TimeIntegration(
     multistart=MULTISTART, synthetic_sweep=SYNTHETIC_SWEEP,
-    max_steps=4096 * 5, n_time_steps=5, verbose=True, throw=False, rtol=1e-4, atol=1e-7,
-    periods_to_retain=4
+    max_steps=4096 * 5, n_time_steps=20, verbose=True, throw=False, rtol=1e-5, atol=1e-7,
+    periods_to_retain=2
 )
 
-RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions, window="hann")
+RESPONSE_MEASURE = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions, window=None)
 #RESPONSE_MEASURE = poscidyn.Max(mode_shape=modal_contributions)
-PRECISION = poscidyn.Precision.SINGLE
+PRECISION = poscidyn.Precision.DOUBLE
 
 print(OSCILLATOR)
 

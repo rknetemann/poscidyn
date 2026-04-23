@@ -109,7 +109,13 @@ class TimeIntegration(AbstractSolver):
             
             t0 = 0.0
             t1 = t_ss + T
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps * self.periods_to_retain)
+
+            ts = jnp.linspace(
+                t_ss,
+                t1,
+                self.n_time_steps * self.periods_to_retain,
+                endpoint=False,
+            )
 
             sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
