@@ -42,17 +42,14 @@ class Nonlinear(AbstractOscillator):
     def f_i(self, t: Float, y: Array, args: PyTree, omega_ref: float = 1.0, x_ref: float = 1.0) -> Array:
         q, dq_dt   = jnp.split(y, 2)
 
-        ETA = 0.01
-
         damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dt
-        nonlinear_damping_term = ETA * q**2 * dq_dt
+        
         linear_stiffness_term = (1/omega_ref**2) * self.omega_0**2 * q
         quadratic_stiffness_term = (x_ref / omega_ref**2) * jnp.einsum("ijk,j,k->i", self.a, q, q)
         cubic_stiffness_term = (x_ref**2 / omega_ref**2) * jnp.einsum("ijkl,j,k,l->i", self.b, q, q, q) # Shape: (n_modes,)
 
         d2q_dt2 = (
             - damping_term
-            - nonlinear_damping_term
             - linear_stiffness_term
             - quadratic_stiffness_term
             - cubic_stiffness_term
