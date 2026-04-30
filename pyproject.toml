@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poscidyn"
-version = "0.1.4"
+version = "0.1.5"
 description = "Fast Simulation of Nonlinear Oscillator Dynamics in Python"
 readme = "README.md"
 requires-python = ">=3.10"
