@@ -100,24 +100,42 @@ class NearestNeighbour(AbstractSyntheticSweep):
                 start_total_phase = total_phases_seed[start_idx, amp_idx]
                 start_total_freq = total_response_frequencies_seed[start_idx, amp_idx]
 
+                # Medoid selection using amplitude + phase cost (consistent with per-step cost).
                 start_modal_flat = start_modal.reshape((n_seeds, -1))
+                start_modal_phase_flat = start_modal_phase.reshape((n_seeds, -1))
                 finite_mask = jnp.all(jnp.isfinite(start_modal_flat), axis=1)
 
-                # Medoid selection:
-                # choose the valid seed whose average RMS distance to all other valid seeds is minimal.
-                pairwise_diffs = start_modal_flat[:, None, :] - start_modal_flat[None, :, :]
-                pairwise_dist = jnp.sqrt(jnp.mean(pairwise_diffs**2, axis=-1))
+                # Pairwise RMS amplitude distance, normalised by the candidate's own RMS scale.
+                pairwise_amp_diffs = start_modal_flat[:, None, :] - start_modal_flat[None, :, :]
+                pairwise_amp_dist = jnp.sqrt(jnp.mean(pairwise_amp_diffs ** 2, axis=-1))  # (n_seeds, n_seeds)
+                pairwise_amp_scale = jnp.sqrt(jnp.mean(start_modal_flat ** 2, axis=-1)) + 1e-12  # (n_seeds,)
+                pairwise_amp_cost = pairwise_amp_dist / pairwise_amp_scale[:, None]  # normalise by the "reference" row
+
+                # Pairwise circular phase distance.
+                pairwise_phase_delta = jnp.angle(
+                    jnp.exp(1j * (start_modal_phase_flat[:, None, :] - start_modal_phase_flat[None, :, :]))
+                )
+                phase_finite = jnp.isfinite(start_modal_phase_flat)
+                pairwise_phase_finite = jnp.logical_and(phase_finite[:, None, :], phase_finite[None, :, :])
+                phase_count = jnp.sum(pairwise_phase_finite, axis=-1)  # (n_seeds, n_seeds)
+                safe_phase_count = jnp.maximum(phase_count, 1)
+                pairwise_phase_rms = jnp.sqrt(
+                    jnp.sum(jnp.where(pairwise_phase_finite, pairwise_phase_delta ** 2, 0.0), axis=-1)
+                    / safe_phase_count
+                )
+                pairwise_phase_cost = pairwise_phase_rms / jnp.pi
+
+                pairwise_cost = pairwise_amp_cost + self.phase_weight * pairwise_phase_cost  # (n_seeds, n_seeds)
 
                 valid_pair_mask = jnp.logical_and(finite_mask[:, None], finite_mask[None, :])
-                pairwise_dist_masked = jnp.where(valid_pair_mask, pairwise_dist, 0.0)
+                pairwise_cost_masked = jnp.where(valid_pair_mask, pairwise_cost, 0.0)
 
                 valid_counts = jnp.sum(valid_pair_mask, axis=1)
                 safe_valid_counts = jnp.maximum(valid_counts, 1)
+                mean_cost_to_others = jnp.sum(pairwise_cost_masked, axis=1) / safe_valid_counts
+                safe_mean_cost_to_others = jnp.where(finite_mask, mean_cost_to_others, jnp.inf)
 
-                mean_dist_to_others = jnp.sum(pairwise_dist_masked, axis=1) / safe_valid_counts
-                safe_mean_dist_to_others = jnp.where(finite_mask, mean_dist_to_others, jnp.inf)
-
-                start_choice_idx_raw = jnp.argmin(safe_mean_dist_to_others)
+                start_choice_idx_raw = jnp.argmin(safe_mean_cost_to_others)
                 has_valid_start = jnp.any(finite_mask)
 
                 start_modal_choice = jnp.where(
