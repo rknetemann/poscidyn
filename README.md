@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/poscidyn_logo.png" alt="Poscidyn" width="400">
+  <img src="docs/images/poscidyn_logo.png" alt="Poscidyn" width="200">
 </p>
 <h2 align='center'>Fast Simulation of Nonlinear Oscillator Dynamics in Python</h2>
 
