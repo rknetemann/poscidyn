@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -2300,8 +2300,8 @@
 
   <h1>Start here</h1>
 
-<p>To get started with Poscidyn, only a few core concepts need to be understood. Poscidyn provides built-in classes for oscillator models (e.g. the <a href="https://en.wikipedia.org/wiki/Duffing_equation">Duffing oscillator</a> and the <a href="https://en.wikipedia.org/wiki/Van_der_Pol_oscillator">Van der Pol oscillator</a>) as well as excitation models (e.g. single-tone and multi-tone forcing). </p>
-<p>However, Poscidyn introduces a fundamentally different workflow compared to traditional continuation-based tools. To use the package effectively—and correctly—it is important to understand how it operates conceptually, and how it compares to established continuation and bifurcation analysis software such as <a href="https://sourceforge.net/projects/auto-07p/">AUTO</a>, <a href="https://sourceforge.net/projects/matcont/">MATCONT</a>, and <a href="https://sourceforge.net/projects/cocotools/">COCO</a>.</p>
+<p>To get started with Poscidyn, only a few core concepts need to be understood. Poscidyn provides built-in classes for oscillator models (e.g. the <a href="https://en.wikipedia.org/wiki/Duffing_equation">Duffing oscillator</a> <em>and the <a href="https://en.wikipedia.org/wiki/Van_der_Pol_oscillator">Van der Pol oscillator</a></em>) as well as excitation models (e.g. single-tone and multi-tone forcing). </p>
+<p>However, Poscidyn introduces a fundamentally different workflow compared to traditional continuation-based tools. To use the package effectively, and correctly, it is important to understand how it operates conceptually, and how it compares to established continuation and bifurcation analysis software such as <a href="https://sourceforge.net/projects/auto-07p/">AUTO</a>, <a href="https://sourceforge.net/projects/matcont/">MATCONT</a>, and <a href="https://sourceforge.net/projects/cocotools/">COCO</a>.</p>
 <hr />
 <h2 id="numerical-frequency-sweeping">Numerical frequency sweeping</h2>
 <p>In experiments, a frequency sweep is typically performed by slowly varying the excitation frequency while allowing the system to reach steady state at each step. Once steady state is reached, a response metric (e.g. amplitude) is recorded. </p>
@@ -2333,7 +2333,8 @@
 <p>Future development aims to include hybrid approaches combining continuation and parallel methods (see <a href="../../future-work">Future work</a>).</p>
 <hr />
 <h2 id="multistarting">Multistarting</h2>
-<p>For each combination of drive frequency and amplitude, Poscidyn defines a search space of initial conditions. From this space, <span class="arithmatex">\(\texttt{n\_init\_cond}\)</span> initial conditions are sampled.</p>
+<p>For each combination of drive frequency and amplitude, Poscidyn defines a search space of initial conditions. From this space, <span class="arithmatex">\(\texttt{n_init_cond}\)</span> initial conditions are randomly sampled.</p>
+<p><img alt="Multistarting" src="../../../images/parallel_integration.jpg" /></p>
 <p>This increases the probability of capturing all relevant stable attractors.</p>
 <p>The search space is defined as:</p>
 <div class="arithmatex">\[
@@ -2342,7 +2343,7 @@ x_{0,i} &amp;\in [-x_{\max,i},\, x_{\max,i}], \\
 v_{0,i} &amp;\in [-v_{\max,i},\, v_{\max,i}],
 \end{aligned}
 \]</div>
-<p>Increasing <span class="arithmatex">\(\texttt{n\_init\_cond}\)</span> improves coverage of the state space and is therefore a key simulation hyperparameter.</p>
+<p>Increasing <span class="arithmatex">\(\texttt{n_init_cond}\)</span> improves coverage of the state space and is therefore a key simulation hyperparameter.</p>
 <p>Currently, Poscidyn supports one method to determine these bounds:</p>
 <ul>
 <li><a href="../multistarting/linear-response/">Linear response operating range</a>: based on the linear response at resonance.</li>
@@ -2351,7 +2352,7 @@ v_{0,i} &amp;\in [-v_{\max,i},\, v_{\max,i}],
 <h2 id="artificial-sweeps">Artificial sweeps</h2>
 <p>At a given frequency, multiple steady-state responses may exist due to different basins of attraction. In contrast, experiments typically observe only a single response.</p>
 <p>Poscidyn reconstructs a synthetic sweep by selecting one solution per frequency such that the resulting curve remains continuous in amplitude–phase space. This is analogous to continuation.</p>
-<p><img alt="Sweeps" src="../../../images/artificial_sweeps.jpg" /></p>
+<p><img alt="Artificial sweeps" src="../../../images/artificial_sweeps.jpg" /></p>
 <p>Currently implemented:</p>
 <ul>
 <li><a href="../artificial-sweeps/nearest-neighbour/">Nearest neighbour method</a>:<br />
@@ -2453,7 +2454,7 @@ v_{0,i} &amp;\in [-v_{\max,i},\, v_{\max,i}],
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "content.code.copy", "search.highlight", "search.suggest"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../../javascripts/mathjax.js"></script>
       

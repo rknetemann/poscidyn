@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -1183,15 +1183,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#nonlinearoscillator" class="md-nav__link">
+  <a href="#nonlinear" class="md-nav__link">
     <span class="md-ellipsis">
       
-        NonlinearOscillator
+        Nonlinear
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="NonlinearOscillator">
+    <nav class="md-nav" aria-label="Nonlinear">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2181,15 +2181,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#nonlinearoscillator" class="md-nav__link">
+  <a href="#nonlinear" class="md-nav__link">
     <span class="md-ellipsis">
       
-        NonlinearOscillator
+        Nonlinear
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="NonlinearOscillator">
+    <nav class="md-nav" aria-label="Nonlinear">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2253,10 +2253,10 @@
 <h1 id="oscillator-models">Oscillator models</h1>
 <p>Poscidyn currently exposes one oscillator class:</p>
 <ul>
-<li><code>NonlinearOscillator</code>: a modal oscillator model with linear, quadratic, and cubic terms.</li>
+<li><code>Nonlinear</code>: a modal oscillator model with linear, quadratic, and cubic terms.</li>
 </ul>
-<p>For most structural-dynamics workflows, <code>NonlinearOscillator</code> is the main entry point.</p>
-<h2 id="nonlinearoscillator"><code>NonlinearOscillator</code></h2>
+<p>For most structural-dynamics workflows, <code>Nonlinear</code> is the main entry point.</p>
+<h2 id="nonlinear"><code>Nonlinear</code></h2>
 <p>The model is defined in modal coordinates as</p>
 <div class="arithmatex">\[
 \ddot q_i
@@ -2284,7 +2284,7 @@
 <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">NonlinearOscillator</span><span class="p">(</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">Nonlinear</span><span class="p">(</span>
     <span class="n">omega_0</span><span class="o">=</span><span class="n">omega_0</span><span class="p">,</span>
     <span class="n">Q</span><span class="o">=</span><span class="n">Q</span><span class="p">,</span>
     <span class="n">a</span><span class="o">=</span><span class="n">a</span><span class="p">,</span>
@@ -2301,7 +2301,7 @@
 <span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.08</span>
 <span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">NonlinearOscillator</span><span class="p">(</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">Nonlinear</span><span class="p">(</span>
     <span class="n">omega_0</span><span class="o">=</span><span class="n">omega_0</span><span class="p">,</span>
     <span class="n">Q</span><span class="o">=</span><span class="n">Q</span><span class="p">,</span>
     <span class="n">a</span><span class="o">=</span><span class="n">a</span><span class="p">,</span>
@@ -2368,7 +2368,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "content.code.copy", "search.highlight", "search.suggest"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../../javascripts/mathjax.js"></script>
       

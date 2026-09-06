@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -2325,8 +2325,8 @@
 <p>Poscidyn has several limitations. Please review them before using the library for your application.</p>
 <h2 id="physics-limitations">Physics limitations</h2>
 <h3 id="transient-response-estimation">Transient response estimation</h3>
-<p>Time-integration solvers estimate the duration of the transient response using an approximation derived from a <strong>linear single-degree-of-freedom (SDOF)</strong> system. This estimate may therefore be inaccurate for <strong>nonlinear multi-degree-of-freedom (MDOF)</strong> systems. In practice, the estimate works well for many parameter combinations and system sizes. If you suspect that this estimate is too low, <code>TimeIntegrationSolver</code> allows setting the <code>t_steady_state_factor</code>.</p>
-<p>For the <code>NonlinearOscillator</code> model, the estimated time to steady state used for time integration is</p>
+<p>Time-integration solvers estimate the duration of the transient response using an approximation derived from a <strong>linear single-degree-of-freedom (SDOF)</strong> system. This estimate may therefore be inaccurate for <strong>nonlinear multi-degree-of-freedom (MDOF)</strong> systems. In practice, the estimate works well for many parameter combinations and system sizes. If you suspect that this estimate is too low, <code>TimeIntegration</code> allows setting the <code>t_steady_state_factor</code>.</p>
+<p>For the <code>Nonlinear</code> model, the estimated time to steady state used for time integration is</p>
 <div class="arithmatex">\[
 \tau_d =
 -2Q
@@ -2339,8 +2339,8 @@
 <h3 id="synthetic-frequency-sweeps">Synthetic frequency sweeps</h3>
 <p>Synthetic frequency sweeps implemented in Poscidyn do not fully reproduce the physics of real quasi-static experiments. Instead of simulating a continuous frequency sweep, the solver evaluates multiple initial conditions independently in parallel and applies a nearest-neighbour selection to approximate experiments where only one solution is observed per frequency. Consequently, the simulated sweep may differ from a true quasi-static experiment.</p>
 <h3 id="multistart-initial-condition-range">Multistart initial-condition range</h3>
-<p>The built-in multistart method generates a grid of initial conditions to explore stable solution branches. When using <code>LinearResponseMultistart</code>, the estimated range of initial conditions may be inaccurate because nonlinearities can significantly increase the oscillation amplitude.</p>
-<p>In such cases, manual tuning of the parameter <code>linear_response_factor</code> in <code>LinearResponseMultistart</code> may be required.</p>
+<p>The built-in multistart method generates a grid of initial conditions to explore stable solution branches. When using <code>LinearResponse</code>, the estimated range of initial conditions may be inaccurate because nonlinearities can significantly increase the oscillation amplitude.</p>
+<p>In such cases, manual tuning of the parameter <code>linear_response_factor</code> in <code>LinearResponse</code> may be required.</p>
 <hr />
 <h2 id="computational-limitations">Computational limitations</h2>
 <h3 id="batched-execution-using-jaxvmap">Batched execution using <code>jax.vmap</code></h3>
@@ -2409,7 +2409,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "content.code.copy", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../javascripts/mathjax.js"></script>
       

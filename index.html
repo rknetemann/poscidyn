@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -2211,17 +2211,18 @@
 
 
 <h1 id="poscidyn-in-a-nutshell">Poscidyn in a nutshell</h1>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This project is in its early stages, some functionality is missing, some docs are missing and/or might not yet fully align with the (future) API. It is recommeded to use the quick example to get started and go from there.</p>
-</div>
-<p>Poscidyn is a Python toolkit based on <a href="https://github.com/google/jax">JAX</a>, designed to <strong>streamline and accelerate common workflows in nonlinear oscillator dynamics</strong>. It enables the simulation and visualization of (nonlinear) oscillators using experimentally realistic setups, supporting both time- and frequency-domain analyses.</p>
+<p>Poscidyn (Python oscillator dynamics) is a Python toolkit based on <a href="https://github.com/google/jax">JAX</a>, designed to <strong>streamline and accelerate time-response and frequency-sweep simulations</strong>. It leverages novel parallelization strategies to gain a speed advantages over standard continuation software.</p>
 <p>Features include:</p>
 <ul>
-<li>Frequency sweeping (forward and backward)</li>
-<li>Vmappable (batched) frequency sweeping </li>
+<li>Frequency sweep simulation (forward and backward)</li>
+<li>Time-response simulation</li>
 <li>Built-in models of (nonlinear) oscillators</li>
+<li>Everything vmappable (batchable)</li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This project is in its early stages, some functionality is missing, some docs are missing and/or might not yet fully align with the (future) API. </p>
+</div>
 <h2 id="quick-example">Quick example</h2>
 <p>A two-degree-of-freedom oscillator including nonlinear coupling and duffing nonlinearity:</p>
 <div class="arithmatex">\[
@@ -2248,9 +2249,9 @@
 <span class="n">driving_frequency</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.13</span><span class="p">,</span> <span class="mi">256</span><span class="p">)</span>
 <span class="n">driving_amplitude</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.0144</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">NonlinearOscillator</span><span class="p">(</span><span class="n">Q</span><span class="o">=</span><span class="n">Q</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="n">b</span><span class="p">,</span> <span class="n">omega_0</span><span class="o">=</span><span class="n">omega_0</span><span class="p">)</span>
-<span class="n">excitation</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">OneToneExcitation</span><span class="p">(</span><span class="n">driving_frequency</span><span class="p">,</span> <span class="n">driving_amplitude</span><span class="p">,</span> <span class="n">modal_forces</span><span class="p">)</span>
-<span class="n">solver</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">TimeIntegrationSolver</span><span class="p">(</span><span class="n">max_steps</span><span class="o">=</span><span class="mi">4096</span> <span class="o">*</span> <span class="mi">20</span><span class="p">,</span> <span class="n">n_time_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-7</span><span class="p">,</span> <span class="n">t_steady_state_factor</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">Nonlinear</span><span class="p">(</span><span class="n">Q</span><span class="o">=</span><span class="n">Q</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="n">b</span><span class="p">,</span> <span class="n">omega_0</span><span class="o">=</span><span class="n">omega_0</span><span class="p">)</span>
+<span class="n">excitation</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">DirectExcitation</span><span class="p">(</span><span class="n">driving_frequency</span><span class="p">,</span> <span class="n">driving_amplitude</span><span class="p">,</span> <span class="n">modal_forces</span><span class="p">)</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">TimeIntegration</span><span class="p">(</span><span class="n">max_steps</span><span class="o">=</span><span class="mi">4096</span> <span class="o">*</span> <span class="mi">20</span><span class="p">,</span> <span class="n">n_time_steps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-7</span><span class="p">,</span> <span class="n">t_steady_state_factor</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
 <span class="n">response_measure</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">Demodulation</span><span class="p">(</span><span class="n">multiples</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,),</span> <span class="n">modal_contributions</span><span class="o">=</span><span class="n">modal_contributions</span><span class="p">)</span>
 
 <span class="n">frequency_sweep</span> <span class="o">=</span> <span class="n">poscidyn</span><span class="o">.</span><span class="n">frequency_sweep</span><span class="p">(</span>
@@ -2260,7 +2261,7 @@
 <p>When plotting the total response (superposition of modes):</p>
 <p><img alt="Frequency sweep" src="images/frequency_sweeps.png" /></p>
 <h2 id="for-who-is-poscidyn">For who is Poscidyn?</h2>
-<p>If you want to know more for who Poscidyn could be a useful package, have a look at the <a href="../for-who-is-poscidyn">For who is Poscidyn?</a> page.</p>
+<p>If you want to know more for who Poscidyn could be a useful package, have a look at the <a href="for-who-is-poscidyn">For who is Poscidyn?</a> page.</p>
 <h2 id="credits-where-they-are-due">Credits where they are due</h2>
 <p><a href="https://github.com/google/jax">JAX</a>: a Python library for accelerator-oriented array computation and program transformation, designed for high-performance numerical computing and large-scale machine learning.</p>
 <p><a href="https://github.com/patrick-kidger/diffrax">Diffrax</a>: JAX-based library providing numerical differential equation solvers.</p>
@@ -2323,7 +2324,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "content.code.copy", "search.highlight", "search.suggest"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="javascripts/mathjax.js"></script>
       

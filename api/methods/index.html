@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -2172,185 +2172,6 @@
 
 
 
-<div class="doc doc-object doc-function">
-
-
-<h2 id="poscidyn.time_response.time_response" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">time_response</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">excitation</span><span class="p">,</span> <span class="n">initial_displacement</span><span class="p">,</span> <span class="n">initial_velocity</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="n">TimeIntegrationSolver</span><span class="p">(),</span> <span class="n">precision</span><span class="o">=</span><span class="n">const</span><span class="o">.</span><span class="n">Precision</span><span class="o">.</span><span class="n">DOUBLE</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
-
-</h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Compute the time response of a dynamical model to a one-tone excitation.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>model</code>
-            </td>
-            <td>
-                  <code><span title="poscidyn.oscillator.abstract_oscillator.AbstractOscillator">AbstractOscillator</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The dynamical model to simulate.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>excitation</code>
-            </td>
-            <td>
-                  <code><span title="poscidyn.excitation.abstract_excitation.AbstractExcitation">AbstractExcitation</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Excitation definition. Currently this helper supports
-<code>OneToneExcitation</code> with exactly one drive frequency and one drive
-amplitude level.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>initial_displacement</code>
-            </td>
-            <td>
-                  <code><span title="jax.Array">Array</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The initial displacement for each mode (shape: (n_modes,)).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>initial_velocity</code>
-            </td>
-            <td>
-                  <code><span title="jax.Array">Array</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The initial velocity for each mode (shape: (n_modes,)).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>solver</code>
-            </td>
-            <td>
-                  <code><span title="poscidyn.solver.abstract_solver.AbstractSolver">AbstractSolver</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The time integration solver to use.</p>
-              </div>
-            </td>
-            <td>
-                  <code><span title="poscidyn.solver.time_integration_solver.TimeIntegrationSolver">TimeIntegrationSolver</span>()</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>precision</code>
-            </td>
-            <td>
-                  <code><span title="poscidyn.constants.Precision">Precision</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The numerical precision to use.</p>
-              </div>
-            </td>
-            <td>
-                  <code><span title="poscidyn.constants.Precision.DOUBLE">DOUBLE</span></code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>**kwargs</code>
-            </td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Additional keyword arguments to pass to the solver's time_response method.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="tuple">tuple</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A tuple (ts, xs, vs) where ts is the time array (shape: (n_steps,)),</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="tuple">tuple</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>xs is the displacement array (shape: (n_steps, n_modes)), and vs is the velocity array (shape: (n_steps, n_modes)).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
 
 
   </div>
@@ -2416,7 +2237,7 @@ amplitude level.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "content.code.copy", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../javascripts/mathjax.js"></script>
       
