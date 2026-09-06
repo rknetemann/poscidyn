@@ -60,7 +60,7 @@ When plotting the total response (superposition of modes):
 
 ## For who is Poscidyn?
 
-If you want to know more for who Poscidyn could be a useful package, have a look at the [For who is Poscidyn?](../for-who-is-poscidyn) page.
+If you want to know more for who Poscidyn could be a useful package, have a look at the [For who is Poscidyn?](for-who-is-poscidyn) page.
 
 ## Credits where they are due
 
