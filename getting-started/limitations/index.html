@@ -2346,7 +2346,7 @@
 <h3 id="batched-execution-using-jaxvmap">Batched execution using <code>jax.vmap</code></h3>
 <p>The term <em>parallel</em> in this package refers to <strong>batched execution</strong> using <code>jax.vmap</code>, not embarrassingly parallel execution. <code>vmap</code> fuses multiple function evaluations into a single compiled kernel.</p>
 <p>Because the computation is executed as a batched operation, intermediate arrays are also batched. As a result, memory usage scales approximately <strong>linearly with the batch size</strong>.</p>
-<p>Increasing the multistart parameter <code>n_init_cond</code> therefore increases memory usage and may eventually exceed the available CPU or GPU memory.</p>
+<p>Increasing the multistart parameter <code>n_init_cond</code> therefore increases memory usage and may eventually exceed the available CPU or GPU memory. This is something that would be fixed with a hybrid approach where continuation and parallization are combined (see <a href="../future-work">Future work</a>)</p>
 <h3 id="compilation-overhead">Compilation overhead</h3>
 <p>Poscidyn relies heavily on Just-In-Time (JIT) compilation provided by <code>jax.jit</code>. Before a simulation can be executed, JAX traces the computation graph and compiles it into an optimized kernel. This compilation step can take a noticeable amount of time, depending on the complexity of the model and the size of the computational graph.</p>
 <p>As a result, the first execution of a simulation may be significantly slower due to this compilation overhead. Subsequent executions with the same function structure and input shapes are typically much faster because the compiled kernel can be reused.</p>
