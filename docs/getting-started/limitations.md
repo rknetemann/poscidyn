@@ -41,7 +41,7 @@ The term *parallel* in this package refers to **batched execution** using `jax.v
 
 Because the computation is executed as a batched operation, intermediate arrays are also batched. As a result, memory usage scales approximately **linearly with the batch size**.
 
-Increasing the multistart parameter `n_init_cond` therefore increases memory usage and may eventually exceed the available CPU or GPU memory.
+Increasing the multistart parameter `n_init_cond` therefore increases memory usage and may eventually exceed the available CPU or GPU memory. This is something that would be fixed with a hybrid approach where continuation and parallization are combined (see [Future work](../future-work))
 
 ### Compilation overhead
 
