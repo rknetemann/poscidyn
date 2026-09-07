@@ -1,30 +1,29 @@
-Poscidyn is still under active development and has not yet reached its full potential. This page outlines the planned enhancements and long-term vision for the package.
+# Future work
 
-## Planned Enhancements
+Poscidyn is still under active development. This page describes possible enhancements and longer-term directions; it is not a release commitment.
 
-- **Remove memory limitation**
-  Currently Poscidyn requires quite some memory to perform sweeps, but cutting the work into smaller pieces allows for a much smaller memory footprint. 
-  
-- **Oscillator models**  
-  Extension of the built-in model library to include additional canonical systems such as the Van der Pol, Lorenz, and Rayleigh oscillators.
+## Planned enhancements
 
-- **Parametric excitation**  
-  Support for parametric excitation mechanisms, enabling the study of parametrically driven systems.
+- **Additional solvers**
+  Add shooting, collocation, and possibly standard continuation methods while preserving efficient batching. A hybrid strategy could segment a sweep and use continuation within smaller batches to reduce memory use.
 
-- **Solvers**  
-  Integration of additional solvers, including shooting methods and potentially standard continuation techniques, while preserving Poscidyn’s ability to batch computations efficiently.
+- **Oscillator models**
+  Expand the library with canonical systems such as Van der Pol, Lorenz, and Rayleigh oscillators. Improve the component interface so users can define custom dynamical systems without having to understand solver internals.
 
-- **Visualization tools**  
-  Built-in plotting and visualization utilities for common analyses, such as phase-space trajectories, frequency response curves, and time-domain responses.
+- **Parametric excitation**
+  Complete end-to-end solver support for the existing `ParametricExcitation` class.
 
-- **Sweep methods**  
-  Development of more physically motivated synthetic sweep strategies to better emulate experimental frequency sweep behavior for non-continuation methods.
+- **Visualization tools**
+  Add plotting utilities for phase-space trajectories, frequency-response curves, and time-domain responses.
 
-## Long-Term Ideas
+- **Sweep methods**
+  Develop physically motivated synthetic sweep strategies that better emulate experimental frequency sweeps.
 
-- **Hybrid approaches**  
-  Combination of multistart batching with localized continuation methods, for example by segmenting sweeps and performing parallel continuations.
+## Long-term ideas
 
-## How to Contribute
+- **Hybrid approaches**
+  Combine multistart batching with localized continuation, for example by segmenting sweeps and performing parallel continuations.
 
-Contribution guidelines and development workflows will be documented in a future release.
+## Contributing
+
+See [Extending Poscidyn](usage/extending-poscidyn.md) for current component interfaces and the local documentation build workflow.

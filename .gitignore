@@ -1,6 +1,7 @@
 .profiling/
 profiling/
 site/
+tmp/
 
 # Python build artifacts
 __pycache__/
