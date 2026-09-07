@@ -3,7 +3,7 @@ from jaxtyping import PyTree, Float, Array
 
 from .abstract_excitation import AbstractExcitation
 
-class ParametricExcitation(AbstractExcitation):
+class ParametricHarmonicExcitation(AbstractExcitation):
     def __init__(self, f_p: Array, omegas: Array, lambdas: Array):
         super().__init__(omegas, lambdas)
 
