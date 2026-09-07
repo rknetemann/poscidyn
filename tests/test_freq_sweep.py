@@ -1,4 +1,6 @@
 import numpy as np
+import os
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 import poscidyn
 import time
 import sys
@@ -19,33 +21,33 @@ def f_d_max(eta, omega_0, Q, b):
 # OSCILLATOR definition
 # ============================================================
 
-# 1 mode example:
-# n_modes = 2
-# Q, omega_0, a, b = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
-# b[0,0,0,0] = 1.0
-# modal_forces = np.array([1.0])
-# modal_contributions = np.array([1.0], dtype=float)
-
-# 2 mode example:
 DTYPE = np.float32
 
+#1 mode example:
 n_modes = 2
-Q = np.array([88.37544, 112.25272], dtype=DTYPE)
-omega_0 = np.array([0.924636, 1.945411], dtype=DTYPE)
-a = np.zeros((n_modes, n_modes, n_modes), dtype=DTYPE)
-b = np.zeros((n_modes, n_modes, n_modes, n_modes), dtype=DTYPE)
-b[0, 0, 0, 0] = 1.0
-a[0,0,1] = 1.0
-a[1,0,0] = 0.5
-modal_forces = np.array([1.0, 0.01044967], dtype=DTYPE)
-modal_contributions = np.array([1.0, 0.8104949], dtype=DTYPE)
+Q, omega_0, a, b = np.array([50.0]), np.array([1.00]), np.zeros((1,1,1)), np.zeros((1,1,1,1))
+b[0,0,0,0] = 1.0
+modal_forces = np.array([1.0])
+modal_contributions = np.array([1.0], dtype=float)
+
+# 2 mode example:
+# n_modes = 2
+# Q = np.array([88.37544, 112.25272], dtype=DTYPE)
+# omega_0 = np.array([0.924636, 1.945411], dtype=DTYPE)
+# a = np.zeros((n_modes, n_modes, n_modes), dtype=DTYPE)
+# b = np.zeros((n_modes, n_modes, n_modes, n_modes), dtype=DTYPE)
+# b[0, 0, 0, 0] = 1.0
+# a[0,0,1] = 1.0
+# a[1,0,0] = 0.5
+# modal_forces = np.array([1.0, 0.01044967], dtype=DTYPE)
+# modal_contributions = np.array([1.0, 0.8104949], dtype=DTYPE)
 
 f_d_max_value = f_d_max(0.20, omega_0[0], Q[0], b[0, 0, 0, 0])
 print(f"Calculated F_max: {f_d_max_value:.4f}")
 f_d = f_d_max_value * modal_forces
 
-drive_frequencies = np.linspace(0.1, 2.5, 512, dtype=DTYPE)
-drive_levels = np.linspace(0.1, 1.0, 3, dtype=DTYPE)
+drive_frequencies = np.linspace(0.8, 1.2, 256, dtype=DTYPE)
+drive_levels = np.array([0.8], dtype=DTYPE)
 
 OSCILLATOR = poscidyn.oscillator.Nonlinear(omega_0=omega_0, Q=Q,a=a, b=b)
 EXCITATION = poscidyn.excitation.DirectExcitation(f_d=f_d, omegas=drive_frequencies, lambdas=drive_levels)

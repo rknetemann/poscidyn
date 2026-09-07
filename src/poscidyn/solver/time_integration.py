@@ -44,12 +44,10 @@ class TimeIntegration(AbstractSolver):
         return isinstance(value, jax_core.Tracer)
 
     def time_response(self,
-                 omega: jax.Array,  
-                 f_amp: jax.Array, 
-                 x0: jax.Array,  
-                 v0: jax.Array,
-                **kwargs
-                ):
+            x0: jax.Array,  
+            v0: jax.Array,
+        **kwargs
+        ):
 
         y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 

@@ -19,18 +19,8 @@ def frequency_sweep(
     oscillator: AbstractOscillator,
     excitation: AbstractExcitation,
     solver: AbstractSolver = TimeIntegration(),
-    response_measure: AbstractResponseMeasure = Demodulation(),
-    precision: const.Precision = const.Precision.SINGLE
+    response_measure: AbstractResponseMeasure = Demodulation()
 ) -> FrequencySweep:
-
-    if precision == const.Precision.DOUBLE:
-        jax.config.update("jax_enable_x64", True)
-        dtype = jnp.float64
-    elif precision == const.Precision.SINGLE:
-        jax.config.update("jax_enable_x64", False)
-        dtype = jnp.float32
-    else:
-        raise ValueError(f"Unsupported precision: {precision}")
 
     solver.oscillator = oscillator
     solver.excitation = excitation
