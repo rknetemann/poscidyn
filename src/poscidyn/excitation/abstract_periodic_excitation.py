@@ -2,21 +2,14 @@ from abc import ABC, abstractmethod
 from jaxtyping import Float, Array, PyTree
 import jax.numpy as jnp
 
-class AbstractExcitation(ABC):
+from .abstract_excitation import AbstractExcitation
+
+class AbstractPeriodicExcitation(AbstractExcitation):
     """ Abstract interface for excitation functions.
 
     Subclasses implement specific excitation functions, such as free vibration, harmonic excitation, etc.
-
+    
     """
-    def __init__(self, lambdas: Array = jnp.array([1.0])):
-        """Initialize an excitation.
-
-        Args:
-            lambdas (Array): Scaling factors for the excitation. Defaults to
-                ``jnp.array([1.0])``.
-        """
-        
-        self.lambdas = lambdas
 
     @abstractmethod
     def f_e(self, t: Float, y: Array, args: PyTree, **kwargs) -> Array:
@@ -28,4 +21,5 @@ class AbstractExcitation(ABC):
             args (PyTree): Additional arguments
             **kwargs: Additional keyword arguments
         """
+        omega = args.get("omega")
         pass

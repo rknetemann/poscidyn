@@ -7,7 +7,7 @@ from jaxtyping import Array, Float, PyTree
 
 from .abstract_oscillator import AbstractOscillator
 
-class Nonlinear(AbstractOscillator):
+class NonlinearOscillator(AbstractOscillator):
     def __init__(self, omega_0: Array = None, Q: Array = None, a: Array = None, b: Array = None, n_modes: int = None):
         if n_modes is not None:
             if omega_0 is None:
@@ -39,7 +39,7 @@ class Nonlinear(AbstractOscillator):
         self.a = a
         self.b = b
 
-    def f_i(self, t: Float, y: Array, args: PyTree, omega_ref: float = 1.0, x_ref: float = 1.0) -> Array:
+    def f_i(self, t: Float, y: Array, args: PyTree, *, omega_ref: float = 1.0, x_ref: float = 1.0) -> Array:
         q, dq_dt   = jnp.split(y, 2)
 
         damping_term = (self.omega_0/omega_ref) * 1/self.Q * dq_dt
@@ -57,7 +57,7 @@ class Nonlinear(AbstractOscillator):
         return d2q_dt2
 
     # Not yet used, but for future shooting and collocation methods we will need it
-    def f_i_y(self, t: Float, y: Array, args: PyTree) -> Array:
+    def f_i_y(self, t: Float, y: Array, args: PyTree, *, omega_ref: float = 1.0, x_ref: float = 1.0) -> Array:
         q, dq_dt = jnp.split(y, 2)
 
         zero_block = jnp.zeros((self.n_modes, self.n_modes))

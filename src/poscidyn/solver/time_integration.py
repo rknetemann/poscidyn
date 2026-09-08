@@ -1,5 +1,6 @@
 import math
 import jax
+from jaxtyping import Array, PyTree
 import jax.numpy as jnp
 from equinox import filter_jit
 import diffrax
@@ -10,16 +11,22 @@ from ..oscillator.abstract_oscillator import AbstractOscillator
 from ..multistart.abstract_multistart import AbstractMultistart
 from ..multistart.linear_response import LinearResponse
 from ..excitation.abstract_excitation import AbstractExcitation
+from ..excitation.abstract_periodic_excitation import AbstractPeriodicExcitation
+from ..excitation.free_vibration import FreeVibration
 from ..synthetic_sweep.abstract_synthetic_sweep import AbstractSyntheticSweep
 from ..synthetic_sweep.nearest_neighbour import NearestNeighbour
 from ..response_measure.abstract_response_measure import AbstractResponseMeasure
 from ..result.frequency_sweep import FrequencySweep, Phasors
 
 class TimeIntegration(AbstractSolver):
-    def __init__(self, rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = 8, max_steps: int = 4096, 
+    def __init__(self, oscillator: AbstractOscillator, excitation: AbstractExcitation = FreeVibration(), 
+                 response_measure: AbstractResponseMeasure = None,
+                 rtol: float = 1e-4, atol: float = 1e-7, n_time_steps: int = 8, max_steps: int = 4096, 
                  multistart: AbstractMultistart = LinearResponse(), synthetic_sweep: AbstractSyntheticSweep = NearestNeighbour(),
                  t_steady_state_factor: float = 1.2, periods_to_retain: int = 4, max_order_superharmonics: int = 3,
                  verbose: bool = False, throw: bool = False):
+
+        super().__init__(oscillator, excitation, response_measure)
         
         self.max_steps = max_steps
         self.n_time_steps = n_time_steps
@@ -34,20 +41,28 @@ class TimeIntegration(AbstractSolver):
         self.multistart = multistart
         self.synthetic_sweep = synthetic_sweep
 
-        self.oscillator: AbstractOscillator = None
-        self.excitation: AbstractExcitation = None
-        self.response_measure: AbstractResponseMeasure = None
-
     @staticmethod
     def _is_tracer(value) -> bool:
-        """Check whether a value is being traced by JAX (e.g. inside vmap/jit)."""
+        """Check whether a value is being traced by JAX."""
         return isinstance(value, jax_core.Tracer)
 
     def time_response(self,
             x0: jax.Array,  
             v0: jax.Array,
-        **kwargs
+            *,
+            omega: Array,
+            **kwargs,
         ):
+        """Compute the time response for one excitation frequency.
+
+        Args:
+            x0: Initial displacement.
+            v0: Initial velocity.
+            omega: Excitation frequency used for the integration window.
+            **kwargs: Additional solver options, such as
+                ``only_save_steady_state``.
+        """
+        omega = jnp.asarray(omega)
 
         y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
 
@@ -89,14 +104,16 @@ class TimeIntegration(AbstractSolver):
                 throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args={"f_amp": f_amp, "omega": omega},
+                args={"omega": omega},
         )
 
         return sol.ts, sol.ys
         
-    def frequency_sweep(self) -> FrequencySweep:
+    def frequency_sweep(self, omegas: Array) -> FrequencySweep:
+        self._validate_frequency_sweep()
+
         @filter_jit
-        def solve_one_case(omega, f_amp, x0, v0):  
+        def solve_one_case(omega, x0, v0):
             x0 = jnp.full((self.oscillator.n_modes,), x0)         
             v0 = jnp.full((self.oscillator.n_modes,), v0)
             y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
@@ -124,7 +141,7 @@ class TimeIntegration(AbstractSolver):
                 throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args={"f_amp": f_amp, "omega": omega},
+                args={"omega": omega},
             )
 
             # Treat any non-finite trajectories as failures to avoid polluting sweeps
@@ -164,7 +181,6 @@ class TimeIntegration(AbstractSolver):
 
             return dict(
                 omega=omega, 
-                f_amp=f_amp,
                 x0=x0, 
                 v0=v0,
                 modal_amplitude=modal_amplitude,
@@ -176,13 +192,10 @@ class TimeIntegration(AbstractSolver):
                 successful=successful
             )
             
-        omegas = self.excitation.omegas
-        f_d_amps = jnp.outer(self.excitation.f_d, self.excitation.lambdas)
-        
         # TO DO: Check if this is appropriate
         if self.n_time_steps is None:
             if self._is_tracer(omegas):
-                raise ValueError("n_time_steps must be set before calling frequency_sweep when tracing.")
+                raise ValueError("n_time_steps must be set before calling frequency_sweep when tracing. ")
             rtol = 0.01
             max_frequency_component = self.max_order_superharmonics * jnp.max(omegas)
             
@@ -192,12 +205,12 @@ class TimeIntegration(AbstractSolver):
             n_time_steps = int(math.ceil(float(one_period * sampling_frequency)))
             self.n_time_steps = n_time_steps
         
-        omegas, f_d_amps, x0s, v0s, shape = self.multistart.generate_simulation_grid(self.oscillator, omegas, f_d_amps)
+        omegas, x0s, v0s, shape = self.multistart.generate_simulation_grid(self.oscillator, omegas)
         longest_period = jnp.max(2.0 * jnp.pi / omegas)
         t_ss_estimate = jnp.max(self.oscillator.t_steady_state(omegas, ss_tol=self.rtol) * self.t_steady_state_factor)
         t_span_estimate = t_ss_estimate + longest_period * self.periods_to_retain
 
-        flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0, 0))(omegas, f_d_amps, x0s, v0s)
+        flat_solutions = jax.vmap(solve_one_case, in_axes=(0, 0, 0))(omegas, x0s, v0s)
 
         periodic_solutions = jax.tree_util.tree_map(
             lambda leaf: leaf.reshape(shape[:-1] + leaf.shape[1:]),
@@ -258,8 +271,8 @@ class TimeIntegration(AbstractSolver):
         return result
 
     @filter_jit
-    def _rhs(self, t, y, args):
+    def _rhs(self, t, y, args, **kwargs):
         q, dq_dt   = jnp.split(y, 2)
 
-        dy_dt = jnp.concatenate([dq_dt,  self.oscillator.f_i(t, y, args) - self.excitation.f_e(t, y, args)], axis=0)
+        dy_dt = jnp.concatenate([dq_dt,  self.oscillator.f_i(t, y, args, **kwargs) - self.excitation.f_e(t, y, args, **kwargs)], axis=0)
         return dy_dt

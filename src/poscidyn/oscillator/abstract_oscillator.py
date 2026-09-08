@@ -6,12 +6,13 @@ class AbstractOscillator (ABC):
     def __init__(self):
         pass
 
-    def f_i(self, t: Float, y: Array, args: PyTree):
+    def f_i(self, t: Float, y: Array, args: PyTree, **kwargs) -> Array:
         """Internal forces of the equations of motion.
 
         Args:
             t (float): Time
             y (Array): State vector
             args (PyTree): Additional arguments
+            **kwargs: Additional keyword arguments
         """
         pass
