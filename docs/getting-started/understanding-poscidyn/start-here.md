@@ -87,7 +87,8 @@ Currently implemented:
 
 ## Response measures
 
-Poscidyn provides multiple ways to extract response characteristics from steady-state signals:
+In a stepped frequency sweep, the excitation frequency is held at each point until the measured response, such as displacement versus time, has reached steady state. The required settling time may be estimated beforehand from the system dynamics, calculated for each excitation condition, or determined online using a convergence criterion based on changes in successive cycles.
+At each frequency, the response may be summarized using time-domain measures such as minimum, maximum, mean, peak-to-peak value, or RMS value. However, for frequency-response characterization, it is usually more informative to extract the response components through synchronous demodulation. Demodulation at the excitation frequency yields the fundamental phasor, containing amplitude and phase relative to the input. Demodulation at integer multiples of the excitation frequency yields harmonic components, which can reveal nonlinear behavior. Demodulation can also be evaluated at other chosen analysis frequencies, though these are not, strictly speaking, harmonics unless they are integer multiples of the excitation frequency.
 
 - [Demodulation](response-measures/demodulation.md):  
   extracts phasors at the drive frequency, superharmonics, or subharmonics  
@@ -95,7 +96,7 @@ Poscidyn provides multiple ways to extract response characteristics from steady-
 - [Minimum and maximum](response-measures/min-max.md):  
   extracts lower and upper bounds directly in the time domain  
 
-- [L2](response-measures/l2.md):  
+- [RMS](response-measures/rms.md):  
   computes the root-mean-square (RMS) magnitude of the signal  
 
 ---
