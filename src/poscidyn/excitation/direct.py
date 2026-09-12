@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from jaxtyping import PyTree, Float, Array
+from typing import Optional
 
 from .abstract_periodic_excitation import AbstractPeriodicExcitation
 
@@ -9,17 +10,19 @@ class DirectHarmonicExcitation(AbstractPeriodicExcitation):
     The external forces are applied to the system as a harmonic function, i.e., f_e = f_d * cos(omega * t).
     
     """
-    def __init__(self, f_d: Array, lambdas: Array = jnp.array([1.0])):
+    def __init__(self, f_d: Array, omega: Optional[Float] = None, lambdas: Array = jnp.array([1.0])):
         """Initialize DirectHarmonicExcitation.
 
         Args:
             f_d (Array): Amplitude of the harmonic excitation.
+            omega (Optional[Float]): Frequency of the periodic excitation. Not required for frequency sweeps, as it can be provided in frequency_sweep arguments.
             lambdas (Array): Scaling factors for the excitation. Defaults to
                 ``jnp.array([1.0])``.
         """
         super().__init__(lambdas)
 
         self.f_d = f_d
+        self.omega = omega
 
     def f_e(self, t: Float, y: Array, args: PyTree, **kwargs) -> Array:
         """Direct external forces of the equations of motion.

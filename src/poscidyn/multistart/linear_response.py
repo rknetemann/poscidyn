@@ -56,10 +56,12 @@ class LinearResponse(AbstractMultistart):
         x0s_grid = unit_x0s_grid * max_displacement_per_mode[None, :]
         v0s_grid = unit_v0s_grid * max_velocity_per_mode[None, :]
 
-        shape = (n_omegas, n_init_cond, 1, n_modes)
+        # Keep the grid axes in the order expected by the synthetic sweep:
+        # frequency, amplitude, initial condition, mode.
+        shape = (n_omegas, 1, n_init_cond, n_modes)
         omegas_mesh = jnp.broadcast_to(omegas_grid[:, None, None, :], shape)
-        x0_mesh = jnp.broadcast_to(x0s_grid[None, :, None, :], shape)
-        v0_mesh = jnp.broadcast_to(v0s_grid[None, :, None, :], shape)
+        x0_mesh = jnp.broadcast_to(x0s_grid[None, None, :, :], shape)
+        v0_mesh = jnp.broadcast_to(v0s_grid[None, None, :, :], shape)
 
         n_combinations = n_omegas * n_init_cond
         omegas_mesh = omegas_mesh.reshape(n_combinations, n_modes)

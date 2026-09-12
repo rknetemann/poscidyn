@@ -1,10 +1,12 @@
 import math
+import warnings
 import jax
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, PyTree, Float
 import jax.numpy as jnp
 from equinox import filter_jit
 import diffrax
 from jax import core as jax_core
+from typing import Optional
 
 from .abstract_solver import AbstractSolver
 from ..oscillator.abstract_oscillator import AbstractOscillator
@@ -16,7 +18,12 @@ from ..excitation.free_vibration import FreeVibration
 from ..synthetic_sweep.abstract_synthetic_sweep import AbstractSyntheticSweep
 from ..synthetic_sweep.nearest_neighbour import NearestNeighbour
 from ..response_measure.abstract_response_measure import AbstractResponseMeasure
-from ..result.frequency_sweep import FrequencySweep, Phasors
+from ..result.frequency_sweep import FrequencySweep, ResponseData, DemodulationResult, ScalarResponseResult, BranchResult
+from ..response_measure.demodulation import Demodulation
+from ..response_measure.rms import RMS
+from ..response_measure.min import Min
+from ..response_measure.max import Max
+from ..result.time_response import TimeResponse
 
 class TimeIntegration(AbstractSolver):
     def __init__(self, oscillator: AbstractOscillator, excitation: AbstractExcitation = FreeVibration(), 
@@ -50,7 +57,7 @@ class TimeIntegration(AbstractSolver):
             x0: jax.Array,  
             v0: jax.Array,
             *,
-            omega: Array,
+            t: Optional[Float] = None,
             **kwargs,
         ):
         """Compute the time response for one excitation frequency.
@@ -58,42 +65,88 @@ class TimeIntegration(AbstractSolver):
         Args:
             x0: Initial displacement.
             v0: Initial velocity.
-            omega: Excitation frequency used for the integration window.
+            t: Time to compute the response for. If not provided, the time will be computed based on the excitation frequency and the number of periods to retain.
             **kwargs: Additional solver options, such as
                 ``only_save_steady_state``.
         """
-        omega = jnp.asarray(omega)
+        is_periodic = isinstance(self.excitation, AbstractPeriodicExcitation)
+        omega = None
+        if is_periodic:
+            if self.excitation.omega is None:
+                raise ValueError(
+                    "Time response requires an omega for periodic excitations."
+                )
+            omega = jnp.asarray(self.excitation.omega)
+            if omega.size != 1:
+                raise ValueError(
+                    "Time response requires exactly one excitation frequency."
+                )
+            if not self._is_tracer(omega) and bool(jnp.any(omega <= 0)):
+                raise ValueError("omega must contain only positive frequencies.")
+            args = {"omega": omega, "lambda": self.excitation.lambdas}
+        else:
+            args = {"lambda": self.excitation.lambdas}
+
+        if t is not None:
+            t = jnp.asarray(t)
+            if t.ndim != 0:
+                raise ValueError("t must be a positive scalar duration.")
+            if not self._is_tracer(t) and bool(t <= 0):
+                raise ValueError("t must be a positive scalar duration.")
+            if kwargs.get("only_save_steady_state"):
+                raise ValueError(
+                    "only_save_steady_state cannot be used when t is specified."
+                )
+            if self.n_time_steps is None:
+                raise ValueError(
+                    "n_time_steps must be set when t is specified."
+                )
+            t0 = 0.0
+            t1 = t
+            ts = jnp.linspace(t0, t1, self.n_time_steps)
+        else:
+            if not is_periodic:
+                raise ValueError(
+                    "Time response requires t for a non-periodic excitation."
+                )
+
+            if self.n_time_steps is None:
+                if self._is_tracer(omega):
+                    raise ValueError(
+                        "n_time_steps must be set before calling time_response when tracing."
+                    )
+                resolution_rtol = 0.01
+                max_frequency_component = self.max_order_superharmonics * jnp.max(omega)
+                one_period = 2.0 * jnp.pi / max_frequency_component
+                sampling_frequency = (
+                    jnp.pi / jnp.sqrt(2 * resolution_rtol) * max_frequency_component
+                )
+                self.n_time_steps = int(
+                    math.ceil(float(one_period * sampling_frequency))
+                )
+
+            period = jnp.max(2.0 * jnp.pi / omega)
+            retained_duration = period * self.periods_to_retain
+            steady_state_time = (
+                jnp.max(self.oscillator.t_steady_state(omega, ss_tol=self.rtol))
+                * self.t_steady_state_factor
+            )
+            t0 = 0.0
+            t1 = steady_state_time + retained_duration
+
+            if kwargs.get("only_save_steady_state"):
+                ts = jnp.linspace(steady_state_time, t1, self.n_time_steps)
+            else:
+                n_periods = (t1 - t0) / retained_duration
+                if self._is_tracer(n_periods):
+                    n_time_steps_total = self.n_time_steps * self.periods_to_retain
+                else:
+                    n_time_steps_total = self.n_time_steps * int(
+                        math.ceil(float(n_periods))
+                    )
+                ts = jnp.linspace(t0, t1, n_time_steps_total)
 
         y0 = jnp.concatenate([jnp.atleast_1d(x0), jnp.atleast_1d(v0)], axis=-1)
-
-        if self.n_time_steps is None and not self._is_tracer(omega):
-            rtol = 0.01
-            max_frequency_component = self.max_order_superharmonics * jnp.max(omega)
-            
-            one_period = 2.0 * jnp.pi / max_frequency_component
-            sampling_frequency = jnp.pi / (jnp.sqrt(2 * rtol)) * max_frequency_component
-            
-            n_time_steps = int(math.ceil(float(one_period * sampling_frequency)))
-            self.n_time_steps = n_time_steps
-        elif self.n_time_steps is None:
-            raise ValueError("n_time_steps must be set before calling time_response when tracing.")
-
-        period = jnp.max(2.0 * jnp.pi / omega)
-        periods_to_retain = self.periods_to_retain
-        T = period * periods_to_retain
-        t_ss = jnp.max(self.oscillator.t_steady_state(omega * 2.0 * jnp.pi, ss_tol=self.rtol)) * self.t_steady_state_factor
-        t0 = 0.0
-        t1 = t_ss + T
-
-        if kwargs.get("only_save_steady_state"):
-            ts = jnp.linspace(t_ss, t1, self.n_time_steps * 10)
-        else:
-            n_periods = (t1 - t0) / T
-            if self._is_tracer(n_periods):
-                n_time_steps_total = self.n_time_steps * periods_to_retain
-            else:
-                n_time_steps_total = self.n_time_steps * int(math.ceil(float(n_periods)))
-            ts = jnp.linspace(t0, t1, n_time_steps_total)
 
         sol = diffrax.diffeqsolve(
                 terms=diffrax.ODETerm(self._rhs),
@@ -104,13 +157,18 @@ class TimeIntegration(AbstractSolver):
                 throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args={"omega": omega},
+                args=args,
         )
 
-        return sol.ts, sol.ys
+        return TimeResponse(
+            time=sol.ts,
+            displacement=sol.ys[:, :self.oscillator.n_dof],
+            velocity=sol.ys[:, self.oscillator.n_dof:],
+        )
         
     def frequency_sweep(self, omegas: Array) -> FrequencySweep:
         self._validate_frequency_sweep()
+        sweep_frequencies = jnp.asarray(omegas)
 
         @filter_jit
         def solve_one_case(omega, x0, v0):
@@ -228,46 +286,27 @@ class TimeIntegration(AbstractSolver):
         
         sweeped_periodic_solutions = self.synthetic_sweep.sweep(periodic_solutions)
                 
-        modal_coordinates = Phasors(
-            amplitudes={
-                "forward": sweeped_periodic_solutions.get("forward"),
-                "backward": sweeped_periodic_solutions.get("backward"),
-            },
-            phases={
-                "forward": sweeped_periodic_solutions.get("forward_phase"),
-                "backward": sweeped_periodic_solutions.get("backward_phase"),
-            },
-            demod_freqs={
-                "forward": sweeped_periodic_solutions.get("forward_demod_freq"),
-                "backward": sweeped_periodic_solutions.get("backward_demod_freq"),
-            }
-        )
-
-        modal_superposition = Phasors(
-            amplitudes={
-                "forward": sweeped_periodic_solutions.get("forward_total"),
-                "backward": sweeped_periodic_solutions.get("backward_total"),
-            },
-            phases={
-                "forward": sweeped_periodic_solutions.get("forward_total_phase"),
-                "backward": sweeped_periodic_solutions.get("backward_total_phase"),
-            },
-            demod_freqs={
-                "forward": sweeped_periodic_solutions.get("forward_total_demod_freq"),
-                "backward": sweeped_periodic_solutions.get("backward_total_demod_freq"),
-            },
-        )
-
+        def make_response(direction, total=False):
+            suffix = "_total" if total else ""
+            value = sweeped_periodic_solutions.get(direction + suffix)
+            if isinstance(self.response_measure, Demodulation):
+                return DemodulationResult(
+                    value, sweeped_periodic_solutions.get(direction + suffix + "_phase"),
+                    sweeped_periodic_solutions.get(direction + suffix + "_demod_freq"))
+            measure = "rms" if isinstance(self.response_measure, RMS) else "minimum" if isinstance(self.response_measure, Min) else "maximum" if isinstance(self.response_measure, Max) else "value"
+            return ScalarResponseResult(value, measure)
+        forward = BranchResult(make_response("forward"), make_response("forward", True))
+        backward = BranchResult(make_response("backward"), make_response("backward", True))
         result = FrequencySweep(
-            modal_coordinates=modal_coordinates,
-            modal_superposition=modal_superposition,
+            frequency=sweep_frequencies,
+            forward=forward,
+            backward=backward,
             stats={
                 "n_successful": n_successful,
                 "n_total": n_total,
                 "success_rate": success_rate,
             },
         )
-
         return result
 
     @filter_jit
