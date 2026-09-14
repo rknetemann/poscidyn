@@ -19,10 +19,9 @@ class DirectHarmonicExcitation(AbstractPeriodicExcitation):
             lambdas (Array): Scaling factors for the excitation. Defaults to
                 ``jnp.array([1.0])``.
         """
-        super().__init__(lambdas)
+        super().__init__(omega=omega, lambdas=lambdas)
 
         self.f_d = f_d
-        self.omega = omega
 
     def f_e(self, t: Float, y: Array, args: PyTree, **kwargs) -> Array:
         """Direct external forces of the equations of motion.

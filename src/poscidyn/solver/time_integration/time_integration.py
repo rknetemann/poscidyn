@@ -8,22 +8,22 @@ import diffrax
 from jax import core as jax_core
 from typing import Optional
 
-from .abstract_solver import AbstractSolver
-from ..oscillator.abstract_oscillator import AbstractOscillator
-from ..multistart.abstract_multistart import AbstractMultistart
-from ..multistart.linear_response import LinearResponse
-from ..excitation.abstract_excitation import AbstractExcitation
-from ..excitation.abstract_periodic_excitation import AbstractPeriodicExcitation
-from ..excitation.free_vibration import FreeVibration
-from ..synthetic_sweep.abstract_synthetic_sweep import AbstractSyntheticSweep
-from ..synthetic_sweep.nearest_neighbour import NearestNeighbour
-from ..response_measure.abstract_response_measure import AbstractResponseMeasure
-from ..result.frequency_sweep import FrequencySweep, ResponseData, DemodulationResult, ScalarResponseResult, BranchResult
-from ..response_measure.demodulation import Demodulation
-from ..response_measure.rms import RMS
-from ..response_measure.min import Min
-from ..response_measure.max import Max
-from ..result.time_response import TimeResponse
+from ..abstract_solver import AbstractSolver
+from ...oscillator.abstract_oscillator import AbstractOscillator
+from ...multistart.abstract_multistart import AbstractMultistart
+from ...multistart.linear_response import LinearResponse
+from ...excitation.abstract_excitation import AbstractExcitation
+from ...excitation.abstract_periodic_excitation import AbstractPeriodicExcitation
+from ...excitation.free_vibration import FreeVibration
+from .synthetic_sweep.abstract_synthetic_sweep import AbstractSyntheticSweep
+from .synthetic_sweep.nearest_neighbour import NearestNeighbour
+from ...response_measure.abstract_response_measure import AbstractResponseMeasure
+from ...result.frequency_sweep import FrequencySweep, ResponseData, DemodulationResult, ScalarResponseResult, BranchResult
+from ...response_measure.demodulation import Demodulation
+from ...response_measure.rms import RMS
+from ...response_measure.min import Min
+from ...response_measure.max import Max
+from ...result.time_response import TimeResponse
 
 class TimeIntegration(AbstractSolver):
     def __init__(self, oscillator: AbstractOscillator, excitation: AbstractExcitation = FreeVibration(), 
@@ -199,7 +199,7 @@ class TimeIntegration(AbstractSolver):
                 throw=self.throw,
                 progress_meter=diffrax.NoProgressMeter(),
                 stepsize_controller=diffrax.PIDController(rtol=self.rtol, atol=self.atol),
-                args={"omega": omega},
+                args={"omega": omega, "lambda": self.excitation.lambdas},
             )
 
             # Treat any non-finite trajectories as failures to avoid polluting sweeps

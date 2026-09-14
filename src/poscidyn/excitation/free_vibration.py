@@ -10,7 +10,7 @@ class FreeVibration(AbstractExcitation):
     
     """
 
-    def f_e(self, t: Float, y: Array, args: PyTree) -> Array:
+    def f_e(self, t: Float, y: Array, args: PyTree, **kwargs) -> Array:
         """Direct external forces of the equations of motion.
 
         Args:
@@ -19,8 +19,8 @@ class FreeVibration(AbstractExcitation):
             args (PyTree): Additional arguments
         """
 
-        f_amp = 0.0 * args["lambda"]
-        return f_amp
+        q, _ = jnp.split(y, 2)
+        return jnp.zeros_like(q)
         
     
     

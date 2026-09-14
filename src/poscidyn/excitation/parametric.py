@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from jaxtyping import PyTree, Float, Array
+from typing import Optional
 
 from .abstract_periodic_excitation import AbstractPeriodicExcitation
 
@@ -9,15 +10,22 @@ class ParametricHarmonicExcitation(AbstractPeriodicExcitation):
     The external forces are applied to the system as a parametric harmonic function, i.e., f_e = f_p * cos(omega * t) * q.
 
     """
-    def __init__(self, f_p: Array, lambdas: Array):
+    def __init__(
+        self,
+        f_p: Array,
+        lambdas: Array = jnp.array([1.0]),
+        omega: Optional[Float] = None,
+    ):
         """Initialize ParametricHarmonicExcitation.
         
         Args:
             f_p (Array): Amplitude of the parametric harmonic excitation.
             lambdas (Array): Scaling factors for the excitation. Defaults to
                 ``jnp.array([1.0])``.
+            omega (Optional[Float]): Drive frequency for a time response. It
+                is supplied by ``frequency_sweep`` during a sweep.
         """
-        super().__init__(lambdas)
+        super().__init__(omega=omega, lambdas=lambdas)
 
         self.f_p = f_p
 

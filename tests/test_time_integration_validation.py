@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from poscidyn.excitation.direct import DirectHarmonicExcitation
 from poscidyn.excitation.free_vibration import FreeVibration
 from poscidyn.oscillator.nonlinear import NonlinearOscillator
-from poscidyn.solver.time_integration import TimeIntegration
+from poscidyn.solver.time_integration.time_integration import TimeIntegration
 
 
 def make_oscillator():
