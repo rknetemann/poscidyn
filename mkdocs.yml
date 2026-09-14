@@ -22,7 +22,6 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.arithmatex:
       generic: true
-  - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
 
@@ -44,54 +43,40 @@ plugins:
             merge_init_into_class: true
 
 nav:
-  - Poscidyn in a nutshell: index.md
-  - For who is Poscidyn?: for-who-is-poscidyn.md
-  - Where Poscidyn shines: where-poscidyn-shines.md
-  - Future work: future-work.md
+  - Overview: index.md
+  - Is Poscidyn for me?: for-who-is-poscidyn.md
+  - Installation: getting-started/installation.md
 
-  - Getting started: 
-    - Installation: getting-started/installation.md
-    - Understanding Poscidyn:
-      - Start here: getting-started/understanding-poscidyn/start-here.md
-      - Multistarting:
-        - Linear response multistart: getting-started/understanding-poscidyn/multistarting/linear-response.md
-      - Artificial sweeps:
-        - Nearest neighbour sweep: getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour.md
-      - Response measures:
-        - Demodulation: getting-started/understanding-poscidyn/response-measures/demodulation.md
-        - Minimum and maximum: getting-started/understanding-poscidyn/response-measures/min-max.md
-        - L2: getting-started/understanding-poscidyn/response-measures/l2.md
-      - Solvers:
-        - Time integration solver: getting-started/understanding-poscidyn/solvers/time-integration-solver.md
-    - Limitations: getting-started/limitations.md
-    - Next steps: getting-started/next-steps.md
+  - Quickstart:
+    - First frequency sweep: quickstart/frequency-sweep.md
+    - First time response: quickstart/time-response.md
 
-  - Usage: 
-    - Basic usage: 
-      - Setting up an oscillator model: usage/basic-usage/oscillator-models.md
-      - Setting up an excitation model: usage/basic-usage/excitation-models.md
-      - Performing a time response: usage/basic-usage/time-response.md
-      - Performing a frequency sweep: usage/basic-usage/frequency-sweep.md
+  - Concepts:
+    - The Poscidyn workflow: concepts/workflow.md
+    - Multistart and synthetic sweeps: getting-started/understanding-poscidyn/start-here.md
+    - Response measures:
+      - Demodulation: getting-started/understanding-poscidyn/response-measures/demodulation.md
+      - RMS, minimum, and maximum: concepts/response-measures.md
+    - Accuracy, performance, and limitations: getting-started/limitations.md
+
+  - Guides:
+    - Define an oscillator: usage/basic-usage/oscillator-models.md
+    - Define an excitation: usage/basic-usage/excitation-models.md
+    - Run a time response: usage/basic-usage/time-response.md
+    - Run a frequency sweep: usage/basic-usage/frequency-sweep.md
+    - Configure time integration: getting-started/understanding-poscidyn/solvers/time-integration-solver.md
+    - Configure multistart: getting-started/understanding-poscidyn/multistarting/linear-response.md
+    - Configure synthetic sweeps: getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour.md
+    - Interpret sweep results: guides/interpreting-results.md
+
+  - Examples:
+    - 1-DOF Duffing sweep: examples/frequency-sweep/1dof-duffing.md
+    - 1-DOF Duffing time response: examples/time-response/1dof-duffing.md
+    - Coupled Duffing systems: examples/coupled-duffing.md
+
+  - Reference:
+    - Public API and result objects: api/classes.md
+
+  - Development:
     - Extending Poscidyn: usage/extending-poscidyn.md
-
-  - Examples: 
-    - Time Response: 
-      - 1DOF Duffing oscillator: examples/time-response/1dof-duffing.md
-      - 2DOF Duffing oscillator: examples/time-response/2dof-duffing.md
-      - Symmetry-breaking 1:2 internal resonance: examples/time-response/symmetry-breaking-1-to-2.md
-    - Frequency Sweep: 
-      - 1DOF Duffing oscillator: examples/frequency-sweep/1dof-duffing.md
-      - 2DOF Duffing oscillator: examples/frequency-sweep/2dof-duffing.md
-      - Symmetry-breaking 1:2 internal resonance: examples/frequency-sweep/symmetry-breaking-1-to-2.md
-
-  - API Reference:
-      - Methods: 
-        - time_response: api/methods.md#time-response
-        - frequency_sweep: api/methods.md#frequency-sweep
-      - Classes:
-        - Oscillator models: api/classes.md#oscillator-models
-        - Excitation models: api/classes.md#excitation-models
-        - Solvers: api/classes.md#solvers
-        - Multistart strategies: api/classes.md#multistart-strategies
-        - Frequency sweep methods: api/classes.md#frequency-sweep-strategies
-        - Results analysis: api/classes.md#results-analysis
+    - Status and roadmap: future-work.md

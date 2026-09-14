@@ -1,5 +1,3 @@
-[<-- Go back to artificial sweeps](../start-here.md#artificial-sweeps)
-
 # Nearest neighbour sweep
 
 ![Artificial sweeps](../../../images/nearest_neighbour.jpg)
@@ -98,4 +96,9 @@ $$
 
 This initialization selects a representative candidate among the available responses while ensuring that the starting point corresponds to an actually computed solution.
 
-Overall, this procedure can be interpreted as a greedy continuation method in frequency space. By minimizing the local mismatch in amplitude and phase between consecutive frequency steps, and by discouraging unnecessary switching between seeds, Poscidyn reconstructs smooth response branches that closely resemble experimentally measured frequency sweeps. The package therefore provides an efficient and experimentally relevant tool for generating large datasets of nonlinear frequency responses for subsequent machine-learning-based parameter identification.
+Overall, this is a greedy selection rule in frequency space. It can produce
+smooth, experiment-like response paths by minimizing local mismatch in
+amplitude and phase while discouraging unnecessary seed changes. It is not
+continuation and does not establish stability, completeness, or physical
+realizability of every selected path. Interpret it together with multistart
+coverage and the documented [limitations](../../limitations.md).

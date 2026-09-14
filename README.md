@@ -3,13 +3,13 @@
 </p>
 <h2 align='center'>Fast Simulation of Nonlinear Oscillator Dynamics in Python</h2>
 
-Poscidyn (Python oscillator dynamics) is a Python toolkit based on [JAX](https://github.com/google/jax), designed to **streamline and accelerate time-response and frequency-sweep simulations**. It leverages novel parallelization strategies to gain a speed advantages over standard continuation software.
+Poscidyn (Python oscillator dynamics) is a [JAX](https://github.com/google/jax)-based toolkit for **batched nonlinear time responses and frequency sweeps**. Its supported public workflow uses a solver instance: build the model and excitation once, then call `solver.time_response(...)` or `solver.frequency_sweep(...)`.
 
 Features include:
-- Frequency sweep simulation (forward and backward)
 - Time-response simulation
-- Built-in models of (nonlinear) oscillators
-- Everything vmappable (batchable)
+- Batched forward and backward synthetic frequency sweeps
+- Nonlinear modal oscillators with quadratic and cubic stiffness
+- JAX-oriented batching through `vmap`
 ---
 
 ## Installation
@@ -24,30 +24,29 @@ Have a look at our extensive documentation on how to install, use and extend thi
 ## Quick example
 
 ```python
+import jax.numpy as jnp
 import poscidyn
-import numpy as np
 
-Q, omega_0, a, b = np.array([50.0, 50.0]), np.array([1.00, 2.00]), np.zeros((2, 2, 2)), np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2.0
-a[1,0,0] = 1.0
-b[0,0,0,0] = 1.0
-modal_forces = np.array([1.0, 1.0])
-modal_contributions = np.array([1.0, 1.0])
-
-driving_frequency = np.linspace(0.9, 1.13, 256)
-driving_amplitude = np.linspace(0.1, 1.0, 8) * 0.0144
-
-model = poscidyn.Nonlinear(Q=Q, a=a, b=b, omega_0=omega_0)
-excitation = poscidyn.DirectExcitation(driving_frequency, driving_amplitude, modal_forces)
-solver = poscidyn.TimeIntegration(max_steps=4096 * 20, n_time_steps=100, rtol=1e-5, atol=1e-7, t_steady_state_factor=2.0)
-response_measure = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
-
-frequency_sweep = poscidyn.frequency_sweep(
-    model = model, excitation=excitation, solver=solver, response_measure=response_measure, precision=poscidyn.Precision.DOUBLE
-) 
+oscillator = poscidyn.NonlinearOscillator(
+    omega_0=jnp.array([1.0]),
+    Q=jnp.array([80.0]),
+    a=jnp.zeros((1, 1, 1)),
+    b=jnp.array([[[[0.2]]]]),
+)
+excitation = poscidyn.DirectHarmonicExcitation(f_d=jnp.array([0.002]))
+solver = poscidyn.TimeIntegration(
+    oscillator=oscillator,
+    excitation=excitation,
+    response_measure=poscidyn.Demodulation(),
+    multistart=poscidyn.LinearResponse(n_init_cond=8),
+    n_time_steps=64,
+)
+result = solver.frequency_sweep(jnp.linspace(0.8, 1.2, 100))
 ```
 
-![Frequency sweep](docs/images/symmetry_breaking_1_to_2_frequency_sweep.jpeg)
+The [documentation](https://rknetemann.github.io/poscidyn/) provides an
+executable first sweep, a time-response quickstart, numerical guidance, and a
+clear distinction between supported features and research directions.
 
 ## Credits where they are due
 

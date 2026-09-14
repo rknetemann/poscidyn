@@ -1,29 +1,51 @@
-# Future work
+# Status and roadmap
 
-Poscidyn is still under active development. This page describes possible enhancements and longer-term directions; it is not a release commitment.
+Poscidyn is under active development. This page makes the project's direction
+visible without presenting unfinished work as a release commitment.
 
-## Planned enhancements
+## Available and supported
 
-- **Additional solvers**
-  Add shooting, collocation, and possibly standard continuation methods while preserving efficient batching. A hybrid strategy could segment a sweep and use continuation within smaller batches to reduce memory use.
+The documented solver-instance workflow supports `NonlinearOscillator`,
+`DirectHarmonicExcitation`, `TimeIntegration`, `LinearResponse`,
+`NearestNeighbour`, and the built-in response measures. These are the
+components used by the quickstarts, guides, and reference.
 
-- **Oscillator models**
-  Expand the library with canonical systems such as Van der Pol, Lorenz, and Rayleigh oscillators. Improve the component interface so users can define custom dynamical systems without having to understand solver internals.
+## Experimental work
 
-- **Parametric excitation**
-  Complete end-to-end solver support for the existing `ParametricExcitation` class.
+Prototype collocation and multiple-shooting solvers exist in the source tree.
+They are **not** part of the supported public contract: their interfaces are
+not aligned with `TimeIntegration`, their validation is incomplete, and they
+should not be used as drop-in production solvers. They are retained as research
+and development work rather than documented as normal user features.
 
-- **Visualization tools**
-  Add plotting utilities for phase-space trajectories, frequency-response curves, and time-domain responses.
+The same distinction applies to partially implemented model or excitation
+prototypes. A class appearing in the repository does not by itself make it a
+supported feature.
 
-- **Sweep methods**
-  Develop physically motivated synthetic sweep strategies that better emulate experimental frequency sweeps.
+## Intended directions
 
-## Long-term ideas
+The following are design directions, not promises of order or delivery date.
 
-- **Hybrid approaches**
-  Combine multistart batching with localized continuation, for example by segmenting sweeps and performing parallel continuations.
+- **Periodic-solution methods:** collocation and shooting methods for finding
+  periodic solutions more directly.
+- **Continuation and hybrid methods:** localized continuation combined with
+  batched multistart calculations, aiming to reduce memory pressure while
+  retaining parallel throughput.
+- **Hybrid dynamics:** support for systems with events, switching, impacts, or
+  other non-smooth behaviour.
+- **Excitation families:** robust parametric support, multi-tone drives, and
+  additional custom excitation interfaces.
+- **Model and analysis ecosystem:** more canonical oscillators, stability and
+  bifurcation analysis, and focused plotting tools.
+- **Extension ergonomics:** clearer, stable interfaces that let users add
+  models and methods without depending on solver internals.
 
-## Contributing
+## Documentation policy as the project grows
 
-See [Extending Poscidyn](usage/extending-poscidyn.md) for current component interfaces and the local documentation build workflow.
+New capabilities will be labelled in one of three ways: **supported**,
+**experimental**, or **planned**. A feature becomes supported only after it has
+a stable public interface, a tested example, reference documentation, and an
+explicit statement of important limitations.
+
+This policy keeps the first-use path small while allowing the documentation to
+remain a useful map of the research frontier.

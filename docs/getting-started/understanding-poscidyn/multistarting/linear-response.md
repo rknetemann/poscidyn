@@ -1,23 +1,31 @@
-[<-- Go back to multistarting](../start-here.md#multistarting)
+# Configure multistart
 
-# Linear response multistart
-
-For each combination of drive frequency and drive amplitude, Poscidyn generates a set of random initial conditions. The search space for these initial conditions is estimated from the linear response of each mode. Assuming linear resonance, the maximum modal displacement and velocity can be approximated as 
-
-$$
-\begin{aligned}
-x_{\max,i} &= \frac{f_i Q_i}{\omega_{0,i}^2}, \\
-v_{\max,i} &= \frac{f_i Q_i}{\omega_{0,i}}.
-\end{aligned}
-$$
-
-This defines an approximate operating range
+`LinearResponse` creates `n_init_cond` random initial displacement and velocity
+vectors for every requested frequency. Its sampling bounds are based on modal
+linear-response scales:
 
 $$
-\begin{aligned}
-x_{0,i} &\in [-x_{\max,i},\, x_{\max,i}], \\
-v_{0,i} &\in [-v_{\max,i},\, v_{\max,i}],
-\end{aligned}
+x_{\max,i} = \frac{Q_i}{\omega_{0,i}^2}c,
+\qquad
+v_{\max,i} = \frac{Q_i}{\omega_{0,i}}c,
 $$
 
-from which Poscidyn draws $\texttt{n_init_cond}$ random initial conditions. By sampling the initial state space in this way, the package increases the probability of capturing the relevant stable attractors at each excitation condition. Increasing $\texttt{n_init_cond}$ thus increases the odds of finding all the stable attractors, and will be a key simulation hyperparameter. 
+where `c` is `linear_response_factor`. The strategy samples uniformly inside
+the resulting hyper-rectangle using `random_seed` for reproducibility.
+
+```python
+multistart = poscidyn.LinearResponse(
+    n_init_cond=32,
+    linear_response_factor=1.5,
+    random_seed=0,
+)
+```
+
+Increase `n_init_cond` when coexisting responses are likely. Increase
+`linear_response_factor` when the expected nonlinear amplitude lies outside the
+linear scale. Both increase the computational search burden, and a larger batch
+also increases memory use.
+
+These are heuristics for exploring basins of attraction, not a branch-complete
+sampling guarantee. Validate sensitive results with changed seeds and denser
+sampling.

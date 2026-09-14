@@ -1,71 +1,70 @@
-# Poscidyn in a nutshell
+# Poscidyn
 
-Poscidyn (Python oscillator dynamics) is a Python toolkit based on [JAX](https://github.com/google/jax), designed to **streamline and accelerate time-response and frequency-sweep simulations**. It leverages novel parallelization strategies to gain a speed advantages over standard continuation software.
+**Fast, batched simulation of nonlinear oscillator dynamics in Python.**
 
-Features include:
+Poscidyn is a JAX-based toolkit for nonlinear time responses and frequency
+sweeps. Its current workflow combines direct time integration, many initial
+conditions, and an artificial sweep-selection method to make branch-like
+frequency-response curves practical on accelerator-oriented hardware.
 
-- Frequency sweep simulation (forward and backward)
-- Time-response simulation
-- Built-in models of (nonlinear) oscillators
-- Everything vmappable (batchable)
+It is an alpha-stage scientific package. The supported public workflow is the
+**solver-instance API**: construct a model, excitation, and `TimeIntegration`
+solver, then call `solver.time_response(...)` or
+`solver.frequency_sweep(...)`.
 
-!!! note
+## Start here
 
-    This project is in its early stages, some functionality is missing, some docs are missing and/or might not yet fully align with the (future) API. 
+1. [Install Poscidyn](getting-started/installation.md).
+2. Run the [first frequency sweep](quickstart/frequency-sweep.md) to produce a
+   response curve.
+3. Read [the workflow](concepts/workflow.md) before tuning multistart or
+   interpreting branches.
 
-## Quick example
+## What is available today?
 
-A two-degree-of-freedom oscillator including nonlinear coupling and duffing nonlinearity:
+- nonlinear modal oscillator models with quadratic and cubic stiffness terms;
+- direct harmonic excitation;
+- time-domain responses and batched frequency sweeps with `TimeIntegration`;
+- linear-response multistart, nearest-neighbour artificial sweeps, and
+  demodulated, RMS, minimum, or maximum response measures.
 
-$$
-\begin{align}
-  \ddot q_1 + \frac{\omega_{0,1}}{Q_1} \dot q_1 + \omega^2_{0,1} q_1 
-  + a^{(1)}_{12} q_1 q_2 + b^{(1)}_{111} q_1^3 
-  &= f_1 \cos(\omega t), \\
-  \ddot q_2 + \frac{\omega_{0,2}}{Q_2} \dot q_2 + \omega^2_{0,2} q_2 
-  + a^{(2)}_{11} q_1^2 
-  &= f_2 \cos(\omega t),
-\end{align}
-\label{eq:symmetry-breaking-model}
-$$
-
+## A deliberately narrow first example
 
 ```python
+import jax.numpy as jnp
 import poscidyn
-import numpy as np
 
-Q, omega_0, a, b = np.array([50.0, 50.0]), np.array([1.00, 2.00]), np.zeros((2, 2, 2)), np.zeros((2, 2, 2, 2))
-a[0,0,1] = 2.0
-a[1,0,0] = 1.0
-b[0,0,0,0] = 1.0
-modal_forces = np.array([1.0, 1.0])
-modal_contributions = np.array([1.0, 1.0])
-
-driving_frequency = np.linspace(0.9, 1.13, 256)
-driving_amplitude = np.linspace(0.1, 1.0, 8) * 0.0144
-
-model = poscidyn.Nonlinear(Q=Q, a=a, b=b, omega_0=omega_0)
-excitation = poscidyn.DirectExcitation(driving_frequency, driving_amplitude, modal_forces)
-solver = poscidyn.TimeIntegration(max_steps=4096 * 20, n_time_steps=100, rtol=1e-5, atol=1e-7, t_steady_state_factor=2.0)
-response_measure = poscidyn.Demodulation(multiples=(1,), modal_contributions=modal_contributions)
-
-frequency_sweep = poscidyn.frequency_sweep(
-    model = model, excitation=excitation, solver=solver, response_measure=response_measure, precision=poscidyn.Precision.DOUBLE
-) 
+oscillator = poscidyn.NonlinearOscillator(
+    omega_0=jnp.array([1.0]),
+    Q=jnp.array([80.0]),
+    a=jnp.zeros((1, 1, 1)),
+    b=jnp.array([[[[0.2]]]]),
+)
+excitation = poscidyn.DirectHarmonicExcitation(f_d=jnp.array([0.002]))
+solver = poscidyn.TimeIntegration(
+    oscillator=oscillator,
+    excitation=excitation,
+    response_measure=poscidyn.Demodulation(),
+    n_time_steps=64,
+    multistart=poscidyn.LinearResponse(n_init_cond=8),
+)
+result = solver.frequency_sweep(jnp.linspace(0.8, 1.2, 100))
 ```
 
-When plotting the total response (superposition of modes):
+The quickstart explains each line and shows how to plot `result`.
 
-![Frequency sweep](images/frequency_sweeps.png)
+## Use Poscidyn with care
 
-## For who is Poscidyn?
+The selected curves are synthetic approximations to quasi-static frequency
+sweeps, not a replacement for continuation or a proof that every solution
+branch has been found. Batch size also has a direct memory cost. Read
+[accuracy, performance, and limitations](getting-started/limitations.md)
+before relying on results for a scientific conclusion.
 
-If you want to know more for who Poscidyn could be a useful package, have a look at the [For who is Poscidyn?](for-who-is-poscidyn) page.
+## Looking ahead
 
-## Credits where they are due
-
-[JAX](https://github.com/google/jax): a Python library for accelerator-oriented array computation and program transformation, designed for high-performance numerical computing and large-scale machine learning.
-
-[Diffrax](https://github.com/patrick-kidger/diffrax): JAX-based library providing numerical differential equation solvers.
-
-[Equinox](https://github.com/patrick-kidger/equinox): your one-stop JAX library, for everything you need that isn't already in core JAX.
+Poscidyn is intentionally designed to grow. Collocation, shooting,
+continuation/hybrid methods, hybrid dynamics, and new excitation families are
+important directions, but they are not part of the supported API yet. See
+[status and roadmap](future-work.md) for the boundary between available work,
+experiments, and plans.

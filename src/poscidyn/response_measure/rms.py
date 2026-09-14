@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from .abstract_response_measure import AbstractResponseMeasure
 
-class L2(AbstractResponseMeasure):
+class RMS(AbstractResponseMeasure):
     def __init__(
         self,
         modal_contributions: jnp.ndarray | None = None,

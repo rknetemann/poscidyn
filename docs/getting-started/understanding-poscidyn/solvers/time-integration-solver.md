@@ -1,55 +1,34 @@
-[<-- Go back to solvers](../start-here.md#solvers)
+# Configure time integration
 
-# Time integration solver
+`TimeIntegration` is the supported Poscidyn solver. It integrates the first
+order state system with Diffrax's adaptive `Tsit5` method, estimates a
+transient duration, and retains a final time window for analysis.
 
-`TimeIntegration` is the default solver in Poscidyn. It computes responses by integrating the equations of motion in time and then extracting the steady-state part of the trajectory.
+## Important settings
 
-## Core idea
+- `rtol`, `atol`: relative and absolute tolerances for adaptive integration.
+- `max_steps`: hard upper limit on internal integration steps per trajectory.
+- `n_time_steps`: saved samples per retained period block. Set it explicitly
+  when you need predictable resolution or use JIT/vmap around the call.
+- `periods_to_retain`: number of final drive periods retained for a periodic
+  response. The default is 4.
+- `t_steady_state_factor`: safety factor multiplying the oscillator's
+  linear-model transient estimate.
+- `max_order_superharmonics`: used only when Poscidyn estimates
+  `n_time_steps` automatically.
+- `throw`: if `True`, integration failures are raised by Diffrax instead of
+  being represented in sweep statistics.
 
-The solver rewrites the oscillator as a first-order system
+## A defensible tuning sequence
 
-$$
-\dot{\mathbf{y}}(t) = \mathbf{f}(\mathbf{y}(t), t),
-\qquad
-\mathbf{y}(0) = \mathbf{y}_0,
-$$
+Begin with a representative `time_response` and inspect the transient. Then
+set `n_time_steps` high enough to resolve the highest response content relevant
+to the study. Finally, tighten tolerances or raise `max_steps` only after
+checking that numerical failures or visible sampling artefacts justify it.
 
-with state \(\mathbf{y} = [\mathbf{x}, \mathbf{v}]\), where \(\mathbf{x}\) contains modal displacements and \(\mathbf{v}\) modal velocities.
+For frequency sweeps, non-finite trajectories are counted in `result.stats`.
+Do not use an attractive selected curve to hide a poor completion rate.
 
-Poscidyn then:
-
-1. estimates a transient duration using `model.t_steady_state(...)`,
-2. multiplies that estimate by `t_steady_state_factor`,
-3. integrates beyond the transient,
-4. retains the final 10 drive periods,
-5. evaluates the chosen response measure on that retained window.
-
-## Numerical method
-
-The implementation uses:
-
-- `diffrax.Tsit5()` as the ODE integrator,
-- adaptive step-size control through `diffrax.PIDController`,
-- tolerances `rtol` and `atol`,
-- a hard `max_steps` limit per solve.
-
-For frequency sweeps, trajectories with non-finite states are marked as unsuccessful and excluded from the final sweep statistics.
-
-## Sampling
-
-`n_time_steps` controls how densely the retained response window is sampled.
-
-- If you set it explicitly, that value is used directly.
-- If you leave it as `None`, Poscidyn estimates a suitable value from the highest expected frequency component.
-- Inside traced or JIT-compiled workflows, `n_time_steps` must be set explicitly.
-
-For `time_response`, you can also pass `only_save_steady_state=True` to save only the final steady-state portion instead of the full transient.
-
-## Parameters
-
-- `rtol`, `atol`: relative and absolute tolerances for the adaptive integrator.
-- `n_time_steps`: number of saved samples per retained period block.
-- `max_steps`: maximum number of internal solver steps allowed per trajectory.
-- `t_steady_state_factor`: safety factor applied to the model's steady-state time estimate.
-- `throw`: passed to Diffrax. If `True`, integration failures raise immediately.
-- `verbose`: reserved on the class but currently not used in the implementation.
+The [time-response quickstart](../../../quickstart/time-response.md) shows the
+minimal construction; [limitations](../../limitations.md) explains the
+transient and computational assumptions.
