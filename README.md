@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/poscidyn_logo.png" alt="Poscidyn" width="250">
+  <img src="https://raw.githubusercontent.com/rknetemann/poscidyn/main/docs/images/poscidyn_logo.png" alt="Poscidyn" width="250">
 </p>
 <h2 align='center'>Fast Simulation of Nonlinear Oscillator Dynamics in Python</h2>
 
@@ -43,6 +43,8 @@ solver = poscidyn.TimeIntegration(
 )
 result = solver.frequency_sweep(jnp.linspace(0.8, 1.2, 100))
 ```
+
+![Example nonlinear frequency sweep](docs/images/symmetry_breaking_1_to_2_frequency_sweep.jpeg)
 
 The [documentation](https://rknetemann.github.io/poscidyn/) provides an
 executable first sweep, a time-response quickstart, numerical guidance, and a
