@@ -250,7 +250,7 @@ class TimeIntegration(AbstractSolver):
                 successful=successful
             )
             
-        # TO DO: Check if this is appropriate
+        # TO DO: Check if this is a proper/general way to estimate/calculate the number of time steps. This is very much related to Nyquist sampling theorem. The number of time steps should be enough to capture the highest frequency component in the system, which is determined by the maximum order of superharmonics and the maximum excitation frequency. The current implementation calculates the number of time steps based on these parameters, but it may need to be adjusted based on specific system dynamics or user requirements.
         if self.n_time_steps is None:
             if self._is_tracer(omegas):
                 raise ValueError("n_time_steps must be set before calling frequency_sweep when tracing. ")
