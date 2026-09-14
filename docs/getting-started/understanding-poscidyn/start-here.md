@@ -1,131 +1,40 @@
-To get started with Poscidyn, only a few core concepts need to be understood. Poscidyn provides built-in classes for oscillator models (e.g. the [Duffing oscillator](https://en.wikipedia.org/wiki/Duffing_equation) *and the [Van der Pol oscillator](https://en.wikipedia.org/wiki/Van_der_Pol_oscillator)*) as well as excitation models (e.g. single-tone and multi-tone forcing). 
+# Multistart and synthetic sweeps
 
-However, Poscidyn introduces a fundamentally different workflow compared to traditional continuation-based tools. To use the package effectively, and correctly, it is important to understand how it operates conceptually, and how it compares to established continuation and bifurcation analysis software such as [AUTO](https://sourceforge.net/projects/auto-07p/), [MATCONT](https://sourceforge.net/projects/matcont/), and [COCO](https://sourceforge.net/projects/cocotools/).
+Frequency sweeps in Poscidyn are built from independent time integrations,
+then assembled into selected paths. This is different from numerical
+continuation, where each solution is explicitly initialized from its immediate
+predecessor.
 
----
+## Why use multistart?
 
-## Numerical frequency sweeping
+At one drive frequency, nonlinear systems may admit several stable responses
+with different basins of attraction. `LinearResponse` generates a reproducible
+set of initial displacement and velocity candidates for each requested
+frequency. `TimeIntegration` integrates them in a JAX batch, then applies the
+configured response measure.
 
-In experiments, a frequency sweep is typically performed by slowly varying the excitation frequency while allowing the system to reach steady state at each step. Once steady state is reached, a response metric (e.g. amplitude) is recorded. 
+This improves the chance of finding different attracting responses, but it does
+not prove exhaustive branch discovery. Coverage depends on the number and range
+of initial conditions.
 
-This process must be **quasi-static**: if the frequency step is too large, the system may jump between coexisting solution branches.
+## Why select a synthetic path?
 
-In computational dynamics, this procedure is known as **continuation**. Software packages such as [AUTO](https://sourceforge.net/projects/auto-07p/), [MATCONT](https://sourceforge.net/projects/matcont/), and [COCO](https://sourceforge.net/projects/cocotools/) are specifically designed for this purpose. They are widely used for analyzing:
+Experiments often reveal one response as frequency rises or falls. Once many
+candidates have been computed independently, `NearestNeighbour` selects a
+forward or backward path by preferring nearby response amplitude and phase and
+discouraging unnecessary seed changes.
 
-- bifurcations  
-- limit cycles  
-- frequency response curves  
+The result can be useful for experiment-like plots and parameter studies. It is
+not a continuation method, a stability computation, or a replacement for
+bifurcation analysis. Use the [nearest-neighbour guide](artificial-sweeps/nearest-neighbour.md)
+for the selection rule and [limitations](../limitations.md) for the caveats.
 
-A key limitation of continuation methods is that they are inherently **sequential**. Each solution depends on the previous one, which:
+## What to tune first
 
-- limits parallelization  
-- increases computation time for large problems  
+1. Validate one representative case with `solver.time_response(...)`.
+2. Set enough retained samples for the response features you need.
+3. Increase `n_init_cond` and adjust `linear_response_factor` to explore
+   candidate coverage.
+4. Compare forward and backward paths and check `result.stats`.
 
-Additionally, many of these tools are built in environments such as [MATLAB](https://www.mathworks.com/products/matlab.html) or [FORTRAN](https://fortran-lang.org/), which may limit accessibility and flexibility.
-
----
-
-## Poscidyn approach: multistart + artificial sweeps
-
-Poscidyn takes a fundamentally different approach.
-
-Instead of following a single solution branch, it computes many steady-state responses **in parallel** using a **multistart strategy**. For each excitation condition, the system is simulated from a large set of initial conditions. This typically reveals **multiple coexisting attractors** at the same frequency.
-
-While this approach is computationally intensive, it is highly parallelizable and often faster in practice on modern hardware.
-
-However, experiments typically observe only a **single branch**. To bridge this gap, Poscidyn introduces **artificial sweep methods**, which:
-
-- select one solution per frequency  
-- enforce continuity in amplitude–phase space  
-- reconstruct continuation-like curves  
-
-In addition, Poscidyn provides several **response measures** (e.g. demodulation, extrema, \(L^2\) metrics) to extract physically meaningful quantities from the simulated signals.
-
-Future development aims to include hybrid approaches combining continuation and parallel methods (see [Future work](../../future-work)).
-
----
-
-## Multistarting
-
-For each combination of drive frequency and amplitude, Poscidyn defines a search space of initial conditions. From this space, \(\texttt{n_init_cond}\) initial conditions are randomly sampled.
-
-![Multistarting](../../../images/parallel_integration.jpg)
-
-This increases the probability of capturing all relevant stable attractors.
-
-The search space is defined as:
-
-$$
-\begin{aligned}
-x_{0,i} &\in [-x_{\max,i},\, x_{\max,i}], \\
-v_{0,i} &\in [-v_{\max,i},\, v_{\max,i}],
-\end{aligned}
-$$
-
-Increasing \(\texttt{n_init_cond}\) improves coverage of the state space and is therefore a key simulation hyperparameter.
-
-Currently, Poscidyn supports one method to determine these bounds:
-
-- [Linear response operating range](multistarting/linear-response.md): based on the linear response at resonance.
-
----
-
-## Artificial sweeps
-
-At a given frequency, multiple steady-state responses may exist due to different basins of attraction. In contrast, experiments typically observe only a single response.
-
-Poscidyn reconstructs a synthetic sweep by selecting one solution per frequency such that the resulting curve remains continuous in amplitude–phase space. This is analogous to continuation.
-
-![Artificial sweeps](../../../images/artificial_sweeps.jpg)
-
-Currently implemented:
-
-- [Nearest neighbour method](artificial-sweeps/nearest-neighbour.md):  
-  selects solutions by minimizing local amplitude–phase mismatch between consecutive frequency steps, while penalizing unnecessary switching between initial condition seeds.
-
----
-
-## Response measures
-
-In a stepped frequency sweep, the excitation frequency is held at each point until the measured response, such as displacement versus time, has reached steady state. The required settling time may be estimated beforehand from the system dynamics, calculated for each excitation condition, or determined online using a convergence criterion based on changes in successive cycles.
-At each frequency, the response may be summarized using time-domain measures such as minimum, maximum, mean, peak-to-peak value, or RMS value. However, for frequency-response characterization, it is usually more informative to extract the response components through synchronous demodulation. Demodulation at the excitation frequency yields the fundamental phasor, containing amplitude and phase relative to the input. Demodulation at integer multiples of the excitation frequency yields harmonic components, which can reveal nonlinear behavior. Demodulation can also be evaluated at other chosen analysis frequencies, though these are not, strictly speaking, harmonics unless they are integer multiples of the excitation frequency.
-
-- [Demodulation](response-measures/demodulation.md):  
-  extracts phasors at the drive frequency, superharmonics, or subharmonics  
-
-- [Minimum and maximum](response-measures/min-max.md):  
-  extracts lower and upper bounds directly in the time domain  
-
-- [RMS](response-measures/rms.md):  
-  computes the root-mean-square (RMS) magnitude of the signal  
-
----
-
-## Solvers
-
-Currently, Poscidyn computes steady-state responses using time integration.
-
-The system is defined as:
-
-$$
-\dot{\mathbf{x}}(t) = \mathbf{f}(\mathbf{x}(t), t),
-\qquad
-\mathbf{x}(t_0) = \mathbf{x}_0
-$$
-
-with solution:
-
-$$
-\mathbf{x}(t) = \boldsymbol{\Phi}(t; t_0, \mathbf{x}_0)
-$$
-
-Implemented method:
-
-- [Time integration](solvers/time-integration-solver.md):  
-  integrates each initial condition, retains the steady-state window, and evaluates the chosen response measure there  
-
----
-
-## Limitations
-
-Synthetic sweep methods approximate continuation behaviour but are not equivalent to true continuation algorithms. Important limitations and caveats are discussed on the [Limitations](../../limitations) page.
+This is the technical background behind the [first frequency sweep](../../../quickstart/frequency-sweep.md).

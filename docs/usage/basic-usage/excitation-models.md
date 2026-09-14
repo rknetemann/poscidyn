@@ -1,45 +1,39 @@
-# Excitation models
+# Define an excitation
 
-Poscidyn currently provides `DirectExcitation`, which defines a harmonic drive over one or more drive frequencies and drive amplitudes.
+The supported harmonic drive is `DirectHarmonicExcitation`. It applies
 
-## `DirectExcitation`
+$$
+\mathbf f_e(t) = \mathbf f_d \odot \boldsymbol\lambda
+\cos(\omega t),
+$$
 
-The constructor is
-
-```python
-excitation = poscidyn.DirectExcitation(
-    drive_frequencies,
-    drive_amplitudes,
-    modal_forces,
-)
-```
-
-with:
-
-- `drive_frequencies`: shape `(n_frequencies,)`
-- `drive_amplitudes`: shape `(n_amplitudes,)`
-- `modal_forces`: shape `(n_modes,)`
-
-Internally, Poscidyn forms the outer product between `drive_amplitudes` and `modal_forces`, so each drive amplitude is applied with the same modal-force distribution.
-
-## Example
+where `f_d` is the modal force vector and `lambdas` scales it elementwise.
 
 ```python
-import numpy as np
+import jax.numpy as jnp
 import poscidyn
 
-drive_frequencies = np.linspace(0.9, 1.1, 128)
-drive_amplitudes = np.array([0.002, 0.004, 0.006])
-modal_forces = np.array([1.0, 0.25])
-
-excitation = poscidyn.DirectExcitation(
-    drive_frequencies=drive_frequencies,
-    drive_amplitudes=drive_amplitudes,
-    modal_forces=modal_forces,
+excitation = poscidyn.DirectHarmonicExcitation(
+    f_d=jnp.array([0.002, 0.0]),
+    lambdas=jnp.array([1.0, 1.0]),
 )
 ```
 
-## How it is used
+For `solver.frequency_sweep(omegas)`, the solver supplies each drive frequency
+from `omegas`; leave `omega` unset. For `solver.time_response(...)`, provide
+exactly one positive drive frequency when creating the excitation:
 
-- In `poscidyn.time_response(...)`, you pass the same excitation object style, but currently with exactly one drive frequency and one drive amplitude.
-- In `poscidyn.frequency_sweep(...)`, you pass an excitation object, typically `DirectExcitation`, so Poscidyn can generate the full sweep grid.
+```python
+excitation = poscidyn.DirectHarmonicExcitation(
+    f_d=jnp.array([0.002]),
+    omega=jnp.array([1.0]),
+)
+```
+
+`f_d` and `lambdas` must be compatible with the number of oscillator modes.
+Use a zero entry to leave a mode unforced.
+
+`ParametricHarmonicExcitation` is present as development work, but its
+end-to-end solver support is not part of the supported documentation contract.
+See [status and roadmap](../../future-work.md) rather than relying on it for a
+production workflow.

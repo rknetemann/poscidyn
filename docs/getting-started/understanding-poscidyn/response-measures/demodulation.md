@@ -1,5 +1,3 @@
-[<-- Go back to response measures](../start-here.md#response-measures)
-
 # Demodulation
 
 `Demodulation` extracts a phasor from a steady-state time signal at selected multiples of the drive frequency. It is the response measure to use when you want quantities comparable to a lock-in amplifier or vector network analyzer: amplitude, phase, and response frequency.
@@ -52,5 +50,6 @@ If `modal_contributions` represents a mode-shape vector evaluated at a measureme
 ## Parameters
 
 - `multiples`: non-empty sequence of frequency multiples. `(1.0,)` extracts the driven component, `(1.0, 2.0, 3.0)` adds superharmonics, and `(1/3,)` extracts a subharmonic.
-- `window`: optional analysis window. Supported values are `None`, `"hann"`, and `"hamming"`.
+- `window`: optional analysis window. Supported values are `None`, `"hann"`,
+  `"hamming"`, `"blackman"`, and `"bartlett"`.
 - `modal_contributions`: optional 1D weight vector of length `n_modes` used to construct the total response.

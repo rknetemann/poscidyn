@@ -1,46 +1,30 @@
-# Oscillator models
+# Define an oscillator
 
-Poscidyn currently exposes one oscillator class:
-
-- `Nonlinear`: a modal oscillator model with linear, quadratic, and cubic terms.
-
-For most structural-dynamics workflows, `Nonlinear` is the main entry point.
-
-## `Nonlinear`
-
-The model is defined in modal coordinates as
+The supported built-in model is `NonlinearOscillator`. It represents modal
+coordinates with linear damping and stiffness plus quadratic and cubic
+restoring terms:
 
 $$
-\ddot q_i
-+ \frac{\omega_{0,i}}{Q_i} \dot q_i
-+ \omega_{0,i}^2 q_i
+\ddot q_i + \frac{\omega_{0,i}}{Q_i}\dot q_i + \omega_{0,i}^2 q_i
 + \sum_{j,k} a_{ijk} q_j q_k
-+ \sum_{j,k,l} b_{ijkl} q_j q_k q_l
-= f_i(t).
++ \sum_{j,k,l} b_{ijkl} q_j q_k q_l = f_{e,i}(t).
 $$
 
-Its constructor expects:
-
-- `omega_0`: shape `(n_modes,)`, linear resonance frequencies.
-- `Q`: shape `(n_modes,)`, quality factors.
-- `a`: shape `(n_modes, n_modes, n_modes)`, quadratic coupling tensor.
-- `b`: shape `(n_modes, n_modes, n_modes, n_modes)`, cubic coupling tensor.
-
-If a term is absent, pass zeros of the correct shape.
-
-### Single-mode example
+Construct it with one vector per mode and one tensor per restoring-force
+order.
 
 ```python
-import numpy as np
+import jax.numpy as jnp
 import poscidyn
 
-omega_0 = np.array([1.0])
-Q = np.array([100.0])
-a = np.zeros((1, 1, 1))
-b = np.zeros((1, 1, 1, 1))
-b[0, 0, 0, 0] = 0.1
+n_modes = 2
+omega_0 = jnp.array([1.0, 1.7])
+Q = jnp.array([80.0, 50.0])
+a = jnp.zeros((n_modes, n_modes, n_modes))
+b = jnp.zeros((n_modes, n_modes, n_modes, n_modes))
+b = b.at[0, 0, 0, 0].set(0.2)
 
-model = poscidyn.Nonlinear(
+oscillator = poscidyn.NonlinearOscillator(
     omega_0=omega_0,
     Q=Q,
     a=a,
@@ -48,26 +32,19 @@ model = poscidyn.Nonlinear(
 )
 ```
 
-### Two-mode example
+`omega_0` and `Q` must have shape `(n_modes,)`; `a` must have shape
+`(n_modes, n_modes, n_modes)`; and `b` must have shape
+`(n_modes, n_modes, n_modes, n_modes)`. The first index of `a` or `b` selects
+the equation receiving the nonlinear force.
 
-```python
-omega_0 = np.array([1.0, 2.0])
-Q = np.array([80.0, 40.0])
-a = np.zeros((2, 2, 2))
-b = np.zeros((2, 2, 2, 2))
+## Practical modelling notes
 
-a[0, 0, 1] = 0.16
-a[1, 0, 0] = 0.08
-b[0, 0, 0, 0] = 1.0
-
-model = poscidyn.Nonlinear(
-    omega_0=omega_0,
-    Q=Q,
-    a=a,
-    b=b,
-)
-```
-
-## Practical note
-
-Even for a single mode, Poscidyn uses arrays instead of scalars. That keeps the API consistent between single-mode and multi-mode problems.
+- Poscidyn assumes modal coordinates. Define your transformation and units
+  before constructing the tensors.
+- Supply zero tensors for terms that are absent; tensor shapes remain part of
+  the model contract.
+- The solver uses the model's settling-time estimate. For strongly nonlinear or
+  multimodal systems, validate it by inspecting a time response and tune
+  `t_steady_state_factor` if needed.
+- A custom oscillator must implement the extension interface; see
+  [Extending Poscidyn](../extending-poscidyn.md).

@@ -1,60 +1,44 @@
-You can install Poscidyn directly from PyPI using pip:
+# Installation
 
-* CPU-only (Linux/macOS/Windows)
-  ```
-  pip install -U poscidyn
-  ```
-* GPU (NVIDIA, CUDA 12) **(recommended)**
-  ```
-  pip install -U poscidyn[gpu]
-  ```
-  
-Requirements:
-
-- Python 3.10 or newer
-
-## Virtual environment
-To avoid dependency conflicts with other Python packages, it is strongly recommended to install Poscidyn inside a virtual environment.
-
-### Platform specific setup
-Below are examples for the most common platforms.
-
-It is recommended that you create a virtual environment before installing poscidyn in order to avoid potential conflicts with other packages. 
-
-=== "Windows"
-
-    ```powershell
-    python -m venv .venv
-    .venv\Scripts\activate
-    ```
+Poscidyn requires Python 3.10 or newer. Create an isolated environment, then
+install the CPU package:
 
 === "Linux / macOS"
 
     ```bash
     python -m venv .venv
     source .venv/bin/activate
+    python -m pip install --upgrade pip
+    python -m pip install poscidyn
     ```
 
----
+=== "Windows"
 
-## Compatibility
+    ```powershell
+    python -m venv .venv
+    .venv\Scripts\activate
+    python -m pip install --upgrade pip
+    python -m pip install poscidyn
+    ```
 
-The table below summarizes the supported platforms for **Poscidyn**.
+## GPU installation
 
-Compatibility is primarily determined by the availability of the **JAX** backend on each platform. As JAX continues to evolve, support for additional platforms may improve over time.
+The package offers a CUDA 12 extra:
 
-**Legend**
-- `yes` — fully supported and verified
-- `yes*` — expected to work but not yet fully verified
-- `experimental*` — experimental support; functionality may be limited or unstable
-- `no` — not supported
-- `n/a` — not applicable
+```bash
+python -m pip install "poscidyn[gpu]"
+```
 
-| Platform | Linux, x86_64 | Linux, aarch64 | Mac, aarch64 | Windows, x86_64 | Windows WSL2, x86_64 |
-|--------|---------------|----------------|--------------|-----------------|----------------------|
-| **CPU** | yes | yes* | yes* | yes* | yes* |
-| **NVIDIA GPU** | yes | yes* | n/a | no | experimental* |
-| **Google Cloud TPU** | yes* | n/a | n/a | n/a | n/a |
-| **AMD GPU** | yes* | no | n/a | no | experimental* |
-| **Apple GPU** | n/a | no | experimental* | n/a | n/a |
-| **Intel GPU** | experimental* | n/a | n/a | no | no |
+GPU support ultimately depends on the JAX backend, driver, CUDA, and platform
+combination. Follow the current [JAX installation guidance](https://docs.jax.dev/en/latest/installation.html)
+when configuring a non-CPU backend.
+
+## Verify the installation
+
+```bash
+python -c "import poscidyn; print('Poscidyn imported successfully')"
+```
+
+Then run the [first frequency sweep](../quickstart/frequency-sweep.md). The
+first numerical call may take longer because JAX compiles the computation; later
+calls with compatible shapes can reuse that compiled work.

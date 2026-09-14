@@ -1,4 +1,7 @@
-Poscidyn has several limitations. Please review them before using the library for your application.
+# Accuracy, performance, and limitations
+
+Poscidyn has important physical and computational limitations. Review them
+before using the library for an engineering or scientific conclusion.
 
 ## Physics limitations
 
@@ -41,7 +44,10 @@ The term *parallel* in this package refers to **batched execution** using `jax.v
 
 Because the computation is executed as a batched operation, intermediate arrays are also batched. As a result, memory usage scales approximately **linearly with the batch size**.
 
-Increasing the multistart parameter `n_init_cond` therefore increases memory usage and may eventually exceed the available CPU or GPU memory. This is something that would be fixed with a hybrid approach where continuation and parallization are combined (see [Future work](../future-work))
+Increasing the multistart parameter `n_init_cond` therefore increases memory
+usage and may eventually exceed the available CPU or GPU memory. A future
+hybrid approach could combine continuation and parallelization to address this
+trade-off; see [status and roadmap](../future-work.md).
 
 ### Compilation overhead
 

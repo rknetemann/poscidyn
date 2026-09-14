@@ -1,11 +1,24 @@
-Poscidyn is primarily intended for users who need to simulate **experimentally realistic time responses and frequency sweeps** with minimal implementation overhead. The package is designed for applications where **ease of use and computational speed** are central requirements.
+# Is Poscidyn for me?
 
-Rather than serving as a general-purpose continuation or bifurcation analysis framework, Poscidyn focuses on simplifying common workflows in nonlinear oscillator dynamics. It provides ready-to-use abstractions for frequently used oscillator models, excitation types, solvers, and sweep strategies, allowing users to focus on analysis rather than numerical boilerplate.
+Poscidyn is for researchers and engineers who model nonlinear oscillators in
+Python and want efficient time-domain simulation or experiment-like
+frequency-response curves. It is especially useful when many related
+simulations make JAX batching worthwhile.
 
-By handling many of the practical challenges associated with these simulations—such as steady-state detection, sweep construction, and batching—Poscidyn enables rapid experimentation and large-scale studies with only a small amount of user code.
+It is a good fit when you:
 
-If Poscidyn does not include a specific model or excitation type required for your application, the package is designed to be extensible. The [Extending Poscidyn](../usage/extending-poscidyn) section of the documentation explains how existing components can be adapted or expanded to fit custom use cases.
+- work with modal oscillator models and harmonic excitation;
+- need trajectories, response amplitudes, phases, or scalar response measures;
+- want to explore sensitivity to initial conditions and possible coexisting
+  attracting responses;
+- value a compact Python workflow that can run on JAX-supported CPU or GPU
+  backends.
 
-## Where to go next?
+It is not yet the right primary tool when you need certified branch following,
+bifurcation detection, stability/Floquet analysis, non-smooth hybrid dynamics,
+or a broad library of excitation types. Those are active design directions, not
+supported promises. See [status and roadmap](future-work.md).
 
-If this package aligns with your needs, the getting-started section walks through the initial steps of using Poscidyn. Begin with the [Installation](../getting-started/installation) page to install the package and verify platform compatibility.
+Start with the [first frequency sweep](quickstart/frequency-sweep.md) if this
+matches your use case. Read [limitations](getting-started/limitations.md)
+before using a selected synthetic path as a scientific result.
