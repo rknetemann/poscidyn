@@ -13,6 +13,10 @@
         <link rel="canonical" href="https://rknetemann.github.io/poscidyn/api/classes/">
       
       
+        <link rel="prev" href="../../examples/coupled-duffing/">
+      
+      
+        <link rel="next" href="../../usage/extending-poscidyn/">
       
       
         
@@ -23,7 +27,7 @@
     
     
       
-        <title>Classes - Poscidyn</title>
+        <title>Public API and result objects - Poscidyn</title>
       
     
     
@@ -65,6 +69,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#public-api-and-result-objects" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -97,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Classes
+              Public API and result objects
             
           </span>
         </div>
@@ -226,7 +235,7 @@
   <span class="md-ellipsis">
     
   
-    Poscidyn in a nutshell
+    Overview
   
 
     
@@ -253,7 +262,7 @@
   <span class="md-ellipsis">
     
   
-    For who is Poscidyn?
+    Is Poscidyn for me?
   
 
     
@@ -273,14 +282,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../where-poscidyn-shines/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Where Poscidyn shines
+    Installation
   
 
     
@@ -299,15 +308,73 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Quickstart
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
-      <a href="../../future-work/" class="md-nav__link">
+      <a href="../../quickstart/frequency-sweep/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Future work
+    First frequency sweep
   
 
     
@@ -316,6 +383,42 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/time-response/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First time response
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -360,7 +463,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Concepts
   
 
     
@@ -376,7 +479,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Concepts
   
 
           </label>
@@ -389,14 +492,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../../concepts/workflow/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Installation
+    The Poscidyn workflow
   
 
     
@@ -409,67 +512,6 @@
   
 
               
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Understanding Poscidyn
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Understanding Poscidyn
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -485,7 +527,7 @@
   <span class="md-ellipsis">
     
   
-    Start here
+    Multistart and synthetic sweeps
   
 
     
@@ -510,93 +552,6 @@
       
         
       
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2_2" id="__nav_5_2_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Multistarting
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Multistarting
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/understanding-poscidyn/multistarting/linear-response/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Linear response multistart
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
         
       
     
@@ -609,103 +564,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_2_3" id="__nav_5_2_3_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artificial sweeps
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Artificial sweeps
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Nearest neighbour sweep
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2_4" id="__nav_5_2_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
   
   
@@ -723,8 +585,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -769,14 +631,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/understanding-poscidyn/response-measures/min-max/" class="md-nav__link">
+      <a href="../../concepts/response-measures/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Minimum and maximum
+    RMS, minimum, and maximum
   
 
     
@@ -785,131 +647,6 @@
   
 
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/understanding-poscidyn/response-measures/l2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    L2
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5_2_5" id="__nav_5_2_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Solvers
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Solvers
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/understanding-poscidyn/solvers/time-integration-solver/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Time integration solver
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -937,35 +674,7 @@
   <span class="md-ellipsis">
     
   
-    Limitations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/next-steps/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Next steps
+    Accuracy, performance, and limitations
   
 
     
@@ -994,6 +703,18 @@
   
     
     
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
       
         
       
@@ -1022,7 +743,7 @@
   <span class="md-ellipsis">
     
   
-    Usage
+    Guides
   
 
     
@@ -1038,66 +759,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Usage
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" >
-        
-          
-          <label class="md-nav__link" for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Basic usage
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6_1">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Basic usage
+    Guides
   
 
           </label>
@@ -1117,7 +779,7 @@
   <span class="md-ellipsis">
     
   
-    Setting up an oscillator model
+    Define an oscillator
   
 
     
@@ -1145,7 +807,7 @@
   <span class="md-ellipsis">
     
   
-    Setting up an excitation model
+    Define an excitation
   
 
     
@@ -1173,7 +835,7 @@
   <span class="md-ellipsis">
     
   
-    Performing a time response
+    Run a time response
   
 
     
@@ -1201,7 +863,7 @@
   <span class="md-ellipsis">
     
   
-    Performing a frequency sweep
+    Run a frequency sweep
   
 
     
@@ -1210,14 +872,6 @@
   
 
       </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -1230,14 +884,98 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/extending-poscidyn/" class="md-nav__link">
+      <a href="../../getting-started/understanding-poscidyn/solvers/time-integration-solver/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Extending Poscidyn
+    Configure time integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/understanding-poscidyn/multistarting/linear-response/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configure multistart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/understanding-poscidyn/artificial-sweeps/nearest-neighbour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configure synthetic sweeps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/interpreting-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpret sweep results
   
 
     
@@ -1266,6 +1004,8 @@
   
     
     
+      
+        
       
         
       
@@ -1322,36 +1062,15 @@
   
   
   
-    
-    
-      
+    <li class="md-nav__item">
+      <a href="../../examples/frequency-sweep/1dof-duffing/" class="md-nav__link">
         
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1" >
-        
-          
-          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
     
   
-    Time Response
+    1-DOF Duffing sweep
   
 
     
@@ -1359,19 +1078,11 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_1">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Time Response
+      </a>
+    </li>
   
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+              
             
               
                 
@@ -1387,7 +1098,7 @@
   <span class="md-ellipsis">
     
   
-    1DOF Duffing oscillator
+    1-DOF Duffing time response
   
 
     
@@ -1408,42 +1119,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/time-response/2dof-duffing/" class="md-nav__link">
+      <a href="../../examples/coupled-duffing/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    2DOF Duffing oscillator
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../examples/time-response/symmetry-breaking-1-to-2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Symmetry-breaking 1:2 internal resonance
+    Coupled Duffing systems
   
 
     
@@ -1463,44 +1146,44 @@
     </li>
   
 
-              
-            
-              
-                
-  
-  
+    
+      
+      
   
   
     
+  
+  
+  
+    
     
       
         
       
-        
-      
-        
-      
     
     
     
       
+        
+        
+      
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
-          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
     
   
-    Frequency Sweep
+    Reference
   
 
     
@@ -1511,12 +1194,12 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Frequency Sweep
+    Reference
   
 
           </label>
@@ -1526,17 +1209,44 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../examples/frequency-sweep/1dof-duffing/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public API and result objects
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
     
   
-    1DOF Duffing oscillator
+    Public API and result objects
   
 
     
@@ -1545,69 +1255,119 @@
   
 
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../examples/frequency-sweep/2dof-duffing/" class="md-nav__link">
+      
         
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
-  <span class="md-ellipsis">
+  
     
   
-    2DOF Duffing oscillator
   
-
-    
-  </span>
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core components
+      
+    </span>
+  </a>
   
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../examples/frequency-sweep/symmetry-breaking-1-to-2/" class="md-nav__link">
+    <nav class="md-nav" aria-label="Core components">
+      <ul class="md-nav__list">
         
+          <li class="md-nav__item">
+  <a href="#nonlinearoscillator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NonlinearOscillator
+      
+    </span>
+  </a>
   
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directharmonicexcitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirectHarmonicExcitation
+      
+    </span>
+  </a>
   
-  <span class="md-ellipsis">
-    
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeintegration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeIntegration
+      
+    </span>
+  </a>
   
-    Symmetry-breaking 1:2 internal resonance
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multistart-and-synthetic-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multistart and synthetic selection
+      
+    </span>
+  </a>
   
-
-    
-  </span>
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#response-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response measures
+      
+    </span>
+  </a>
   
+</li>
+        
+      </ul>
+    </nav>
   
-
-      </a>
-    </li>
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#result-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result objects
+      
+    </span>
+  </a>
   
-
-              
-            
-          </ul>
-        </nav>
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API status
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1647,17 +1407,17 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
     
   
-    API Reference
+    Development
   
 
     
@@ -1668,67 +1428,12 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
   
-    API Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
-        
-          
-          <label class="md-nav__link" for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Methods
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_1">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Methods
+    Development
   
 
           </label>
@@ -1741,14 +1446,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../methods.md#time-response" class="md-nav__link">
+      <a href="../../usage/extending-poscidyn/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    time_response
+    Extending Poscidyn
   
 
     
@@ -1769,14 +1474,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../methods.md#frequency-sweep" class="md-nav__link">
+      <a href="../../future-work/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    frequency_sweep
+    Status and roadmap
   
 
     
@@ -1785,253 +1490,6 @@
   
 
       </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Classes
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Classes
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../classes.md#oscillator-models" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Oscillator models
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../classes.md#excitation-models" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Excitation models
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../classes.md#solvers" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Solvers
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../classes.md#multistart-strategies" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Multistart strategies
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../classes.md#frequency-sweep-strategies" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Frequency sweep methods
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../classes.md#results-analysis" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Results analysis
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
     </li>
   
 
@@ -2061,6 +1519,110 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nonlinearoscillator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NonlinearOscillator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directharmonicexcitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirectHarmonicExcitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeintegration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeIntegration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multistart-and-synthetic-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multistart and synthetic selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#response-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response measures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#result-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result objects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API status
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -2080,9 +1642,61 @@
   
 
 
-  <h1>Classes</h1>
-
-
+<h1 id="public-api-and-result-objects">Public API and result objects</h1>
+<p>This reference covers the supported solver-instance workflow. It deliberately
+does not list experimental solver prototypes as ordinary public alternatives.</p>
+<h2 id="core-components">Core components</h2>
+<h3 id="nonlinearoscillator"><code>NonlinearOscillator</code></h3>
+<p><code>poscidyn.NonlinearOscillator(omega_0, Q, a, b, n_modes=None)</code> defines the
+modal nonlinear oscillator. See <a href="../../usage/basic-usage/oscillator-models/">define an oscillator</a>
+for shapes and the equation of motion.</p>
+<h3 id="directharmonicexcitation"><code>DirectHarmonicExcitation</code></h3>
+<p><code>poscidyn.DirectHarmonicExcitation(f_d, omega=None, lambdas=jnp.array([1.0]))</code>
+defines a modal single-tone harmonic drive. <code>omega</code> is required for a periodic
+time response and supplied by <code>frequency_sweep</code> for a sweep.</p>
+<h3 id="timeintegration"><code>TimeIntegration</code></h3>
+<p><code>poscidyn.TimeIntegration(oscillator, excitation=..., response_measure=..., ...)</code>
+is the supported solver. Its principal methods are:</p>
+<div class="highlight"><pre><span></span><code><span class="n">response</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">time_response</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">v0</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">frequency_sweep</span><span class="p">(</span><span class="n">omegas</span><span class="p">)</span>
+</code></pre></div>
+<p>Relevant configuration parameters are <code>rtol</code>, <code>atol</code>, <code>n_time_steps</code>,
+<code>max_steps</code>, <code>multistart</code>, <code>synthetic_sweep</code>, <code>t_steady_state_factor</code>,
+<code>periods_to_retain</code>, <code>max_order_superharmonics</code>, and <code>throw</code>.</p>
+<h3 id="multistart-and-synthetic-selection">Multistart and synthetic selection</h3>
+<p><code>LinearResponse(n_init_cond=16, linear_response_factor=1.0, random_seed=0)</code>
+creates the default initial-condition sampling strategy.</p>
+<p><code>NearestNeighbour(sweep_direction=[Forward(), Backward()], phase_weight=0.25,
+seed_switch_penalty=0.05)</code> selects synthetic forward and backward paths from
+the candidates.</p>
+<h3 id="response-measures">Response measures</h3>
+<ul>
+<li><code>Demodulation(multiples=(1.0,), window="hann", modal_contributions=None)</code></li>
+<li><code>RMS(modal_contributions=None)</code></li>
+<li><code>Min(modal_contributions=None)</code></li>
+<li><code>Max(modal_contributions=None)</code></li>
+</ul>
+<p><code>modal_contributions</code> defines how modal coordinates form the total response.</p>
+<h2 id="result-objects">Result objects</h2>
+<p><code>TimeResponse</code> provides <code>time</code>, <code>displacement</code>, and <code>velocity</code> fields and can
+be unpacked into those three values.</p>
+<p><code>FrequencySweep</code> provides:</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span><span class="o">.</span><span class="n">frequency</span>
+<span class="n">result</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">modal</span><span class="o">.</span><span class="n">amplitude</span>
+<span class="n">result</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">total</span><span class="o">.</span><span class="n">amplitude</span>
+<span class="n">result</span><span class="o">.</span><span class="n">backward</span><span class="o">.</span><span class="n">modal</span><span class="o">.</span><span class="n">amplitude</span>
+<span class="n">result</span><span class="o">.</span><span class="n">backward</span><span class="o">.</span><span class="n">total</span><span class="o">.</span><span class="n">amplitude</span>
+<span class="n">result</span><span class="o">.</span><span class="n">stats</span>
+</code></pre></div>
+<p>For <code>Demodulation</code>, branch responses also carry phase and response-frequency
+data. See <a href="../../guides/interpreting-results/">interpret sweep results</a> for
+array shapes and validation guidance.</p>
+<h2 id="api-status">API status</h2>
+<p>The old top-level <code>poscidyn.time_response(...)</code> and
+<code>poscidyn.frequency_sweep(...)</code> helper style is not part of this documentation
+contract. Use methods on <code>TimeIntegration</code>. Experimental shooting and
+collocation code is described in <a href="../../future-work/">status and roadmap</a>, not
+in this reference.</p>
 
 
 
